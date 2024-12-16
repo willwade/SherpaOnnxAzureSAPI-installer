@@ -21,16 +21,21 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Restore Dependencies
-        run: dotnet restore
-
-      - name: Build Solution
+      - name: Locate Project File
         run: |
-          dotnet build -c Release
+          echo "Locating project file..."
+          ls
+
+      - name: Restore Dependencies
+        run: dotnet restore TTSInstaller.csproj
+
+      - name: Build Project
+        run: |
+          dotnet build TTSInstaller.csproj -c Release
 
       - name: Publish as Single File EXE
         run: |
-          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+          dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
