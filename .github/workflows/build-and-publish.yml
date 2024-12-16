@@ -1,0 +1,57 @@
+name: Build and Publish TTSInstaller
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore
+
+      - name: Build Solution
+        run: |
+          dotnet build -c Release
+
+      - name: Publish as Single File EXE
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: TTSInstaller
+          path: |
+            ./bin/Release/net6.0-windows/win-x64/publish/TTSInstaller.exe
+            ./bin/Release/net6.0-windows/win-x64/publish/OpenSpeechTTS.dll
+
+  sign:
+    runs-on: windows-latest
+    if: always()
+
+    steps:
+      - name: Notify Signing Required
+        run: |
+          echo "The build artifacts are ready but must be signed locally."
+          echo "Download them from the artifacts tab and sign the EXE and DLL locally."
+
+      - name: Provide Signing Instructions
+        run: |
+          echo "Use the following commands to sign the artifacts locally:"
+          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-TTSInstaller.exe>"
+          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-OpenSpeechTTS.dll>"

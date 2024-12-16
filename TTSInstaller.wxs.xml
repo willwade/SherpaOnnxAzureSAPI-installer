@@ -1,0 +1,30 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="TTS Installer" Language="1033" Version="1.0.0.0" Manufacturer="YourCompany" UpgradeCode="PUT-GUID-HERE">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of this software is already installed." />
+
+    <MediaTemplate />
+
+    <Feature Id="ProductFeature" Title="TTSInstaller" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="TTSInstaller" />
+      </Directory>
+    </Directory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="TTSInstallerExe" Guid="PUT-GUID-HERE">
+        <File Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" />
+      </Component>
+      <Component Id="OpenSpeechTTSDll" Guid="PUT-GUID-HERE">
+        <File Source="bin\Release\net6.0-windows\win-x64\publish\OpenSpeechTTS.dll" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

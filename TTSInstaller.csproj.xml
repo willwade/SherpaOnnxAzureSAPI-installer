@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWindowsForms>false</UseWindowsForms>
+    <RootNamespace>TTSInstaller</RootNamespace>
+    <AssemblyName>TTSInstaller</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="NAudio" Version="2.0.1" />
+    <PackageReference Include="SharpCompress" Version="0.30.0" />
+    <PackageReference Include="Downloader" Version="3.0.2" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Installer\Program.cs" />
+    <Compile Include="Installer\ModelInstaller.cs" />
+    <Compile Include="Installer\Sapi5Registrar.cs" />
+    <Compile Include="Installer\Shared\LanguageInfo.cs" />
+    <Compile Include="Installer\Shared\TtsModel.cs" />
+    <Compile Include="OpenSpeechTTS\ISapi5Voice.cs" />
+    <Compile Include="OpenSpeechTTS\Sapi5VoiceImpl.cs" />
+    <Compile Include="OpenSpeechTTS\SherpaTTS.cs" />
+  </ItemGroup>
+
+</Project>
