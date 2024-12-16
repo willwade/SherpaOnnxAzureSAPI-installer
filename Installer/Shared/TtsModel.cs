@@ -1,4 +1,6 @@
 
+using System.Collections.Generic;
+
 // Defines the structure for TTS model metadata.
 public class TtsModel
 {
@@ -7,5 +9,6 @@ public class TtsModel
     public string Developer { get; set; }
     public string Name { get; set; }
     public List<LanguageInfo> Language { get; set; }
+    
     public string Url { get; set; }
 }
