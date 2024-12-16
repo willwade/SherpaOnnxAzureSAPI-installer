@@ -6,6 +6,7 @@
     <UseWindowsForms>false</UseWindowsForms>
     <RootNamespace>TTSInstaller</RootNamespace>
     <AssemblyName>TTSInstaller</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
