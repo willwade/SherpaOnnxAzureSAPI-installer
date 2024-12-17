@@ -21,7 +21,7 @@ public class Sapi5Registrar
 
             // Add required 'Attributes' subkey with CLSID and VoicePath
             string attributesPath = $@"HKEY_LOCAL_MACHINE\{registryBasePath}\Attributes";
-            Registry.SetValue(attributesPath, "CLSID", "{YOUR-VOICE-CLASS-GUID-HERE}"); // Replace with your GUID
+            Registry.SetValue(attributesPath, "CLSID", "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2"); 
             Registry.SetValue(attributesPath, "VoicePath", dllPath);
 
             Console.WriteLine($"Registered voice '{model.Name}' with SAPI5.");
