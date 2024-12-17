@@ -9,31 +9,33 @@ class Program
     private const string OnlineJsonUrl = "https://github.com/willwade/tts-wrapper/raw/main/tts_wrapper/engines/sherpaonnx/merged_models.json";
     private const string LocalJsonPath = "./merged_models.json";
 
-    static async Task Main(string[] args)
+    static async Task<Dictionary<string, TtsModel>> LoadModelsAsync()
     {
-        var installer = new ModelInstaller();
-        var registrar = new Sapi5Registrar();
-        string dllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
-
-        // Check for uninstall argument
-        if (args.Length > 0 && args[0] == "uninstall")
+        try
         {
-            await UninstallVoicesAndDll(registrar, dllPath);
-            return;
+            using var client = new System.Net.Http.HttpClient();
+            Console.WriteLine("Downloading merged_models.json...");
+            var json = await client.GetStringAsync(OnlineJsonUrl);
+            
+            File.WriteAllText(LocalJsonPath, json); // Cache the downloaded file
+            Console.WriteLine("Successfully loaded merged_models.json from the web.");
+            return JsonConvert.DeserializeObject<Dictionary<string, TtsModel>>(json);
         }
-
-        // Default install behavior
-        var models = await LoadModelsAsync();
-        foreach (var model in models.Values)
+        catch (Exception ex)
         {
-            try
+            Console.WriteLine($"Failed to download merged_models.json: {ex.Message}");
+
+            // Attempt to load local copy
+            if (File.Exists(LocalJsonPath))
             {
-                await installer.DownloadAndExtractModelAsync(model);
-                registrar.RegisterVoice(model, dllPath);
+                Console.WriteLine("Using cached local copy of merged_models.json.");
+                var json = File.ReadAllText(LocalJsonPath);
+                return JsonConvert.DeserializeObject<Dictionary<string, TtsModel>>(json);
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine($"Failed to install {model.Name}: {ex.Message}");
+                Console.WriteLine("Local merged_models.json not found. Cannot proceed.");
+                throw new FileNotFoundException("merged_models.json is missing locally and online.");
             }
         }
     }
