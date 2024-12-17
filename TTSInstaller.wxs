@@ -6,6 +6,17 @@
   <?define ISapi5VoiceInterfaceId = "74c1c045-6e6a-4623-9735-2326a149af54" ?>
   <?define OpenSpeechTTSComponentGuid = "480e8975-0ba1-4b55-bf51-7dc20c7a299e" ?>
   <?define TTSInstallerComponentGuid = "7cd5a3c9-fa5e-4164-9e0b-c536fa97761f" ?>
+  <?define SherpaOnnxComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b3" ?>
+  <?define NAudioComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b4" ?>
+  <?define NAudioCoreComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b5" ?>
+  <?define NAudioAsioComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b6" ?>
+  <?define NAudioMidiComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b7" ?>
+  <?define NAudioWasapiComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b8" ?>
+  <?define NAudioWinFormsComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6b9" ?>
+  <?define NAudioWinMMComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6c0" ?>
+  <?define Win32RegistryComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6c1" ?>
+  <?define SecurityAccessControlComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6c2" ?>
+  <?define SecurityPrincipalComponentGuid = "f8a75d2e-7b1a-4b92-a12b-1a6dff80b6c3" ?>
 
   <!-- Main Package -->
   <Package Name="TTS Installer" 
@@ -25,11 +36,60 @@
         <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
           <!-- Define components directly in the directory where they should be installed -->
           <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)" Bitness="always64">
-            <File Id="TTSInstallerExeFile" Source="publish\TTSInstaller.exe" KeyPath="yes" />
+            <File Id="TTSInstallerExeFile" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes" />
+            <File Id="TTSInstallerDll" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.dll" />
+            <File Id="TTSInstallerPdb" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.pdb" />
+            <File Id="TTSInstallerDeps" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.deps.json" />
+            <File Id="TTSInstallerRuntimeConfig" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.runtimeconfig.json" />
           </Component>
 
           <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)" Bitness="always64">
-            <File Id="OpenSpeechTTSDllFile" Source="publish\OpenSpeechTTS.dll" KeyPath="yes" />
+            <File Id="OpenSpeechTTSDllFile" Source="OpenSpeechTTS\bin\Release\net48\OpenSpeechTTS.dll" KeyPath="yes" />
+          </Component>
+
+          <!-- Dependencies -->
+          <Component Id="SherpaOnnxComponent" Guid="$(var.SherpaOnnxComponentGuid)" Bitness="always64">
+            <File Id="SherpaOnnxDll" Source="OpenSpeechTTS\bin\Release\net48\sherpa-onnx.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioComponent" Guid="$(var.NAudioComponentGuid)" Bitness="always64">
+            <File Id="NAudioDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioCoreComponent" Guid="$(var.NAudioCoreComponentGuid)" Bitness="always64">
+            <File Id="NAudioCoreDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Core.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioAsioComponent" Guid="$(var.NAudioAsioComponentGuid)" Bitness="always64">
+            <File Id="NAudioAsioDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Asio.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioMidiComponent" Guid="$(var.NAudioMidiComponentGuid)" Bitness="always64">
+            <File Id="NAudioMidiDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Midi.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioWasapiComponent" Guid="$(var.NAudioWasapiComponentGuid)" Bitness="always64">
+            <File Id="NAudioWasapiDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Wasapi.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioWinFormsComponent" Guid="$(var.NAudioWinFormsComponentGuid)" Bitness="always64">
+            <File Id="NAudioWinFormsDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.WinForms.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="NAudioWinMMComponent" Guid="$(var.NAudioWinMMComponentGuid)" Bitness="always64">
+            <File Id="NAudioWinMMDll" Source="OpenSpeechTTS\bin\Release\net48\NAudio.WinMM.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="Win32RegistryComponent" Guid="$(var.Win32RegistryComponentGuid)" Bitness="always64">
+            <File Id="MicrosoftWin32RegistryDll" Source="OpenSpeechTTS\bin\Release\net48\Microsoft.Win32.Registry.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="SecurityAccessControlComponent" Guid="$(var.SecurityAccessControlComponentGuid)" Bitness="always64">
+            <File Id="SystemSecurityAccessControlDll" Source="OpenSpeechTTS\bin\Release\net48\System.Security.AccessControl.dll" KeyPath="yes" />
+          </Component>
+
+          <Component Id="SecurityPrincipalComponent" Guid="$(var.SecurityPrincipalComponentGuid)" Bitness="always64">
+            <File Id="SystemSecurityPrincipalWindowsDll" Source="OpenSpeechTTS\bin\Release\net48\System.Security.Principal.Windows.dll" KeyPath="yes" />
           </Component>
         </Directory>
       </Directory>
@@ -39,6 +99,17 @@
     <Feature Id="MainFeature" Title="TTS Installer" Level="1">
       <ComponentRef Id="TTSInstallerExe" />
       <ComponentRef Id="OpenSpeechTTSDll" />
+      <ComponentRef Id="SherpaOnnxComponent" />
+      <ComponentRef Id="NAudioComponent" />
+      <ComponentRef Id="NAudioCoreComponent" />
+      <ComponentRef Id="NAudioAsioComponent" />
+      <ComponentRef Id="NAudioMidiComponent" />
+      <ComponentRef Id="NAudioWasapiComponent" />
+      <ComponentRef Id="NAudioWinFormsComponent" />
+      <ComponentRef Id="NAudioWinMMComponent" />
+      <ComponentRef Id="Win32RegistryComponent" />
+      <ComponentRef Id="SecurityAccessControlComponent" />
+      <ComponentRef Id="SecurityPrincipalComponent" />
     </Feature>
 
     <!-- Custom Actions -->
