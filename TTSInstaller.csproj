@@ -13,7 +13,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NAudio" Version="2.0.1" />
     <PackageReference Include="SharpCompress" Version="0.30.0" />
-    <PackageReference Include="Downloader" Version="3.0.2" />
+    <PackageReference Include="Downloader" Version="3.3.1" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
     <ProjectReference Include="OpenSpeechTTS\OpenSpeechTTS.csproj" />
   </ItemGroup>

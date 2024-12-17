@@ -1,0 +1,27 @@
+<Project Sdk="WixToolset.Sdk/4.0.4">
+  <PropertyGroup>
+    <EnableProjectHarvesting>true</EnableProjectHarvesting>
+    <HarvestProjectsSuppressUniqueIds>true</HarvestProjectsSuppressUniqueIds>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <HarvestDirectory Include="bin\Release\net6.0-windows\win-x64\publish">
+      <DirectoryRefId>OpenSpeechFolder</DirectoryRefId>
+      <ComponentGroupName>PublishedFiles</ComponentGroupName>
+      <PreprocessorVariable>var.PublishDir</PreprocessorVariable>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+      <SuppressRegistry>true</SuppressRegistry>
+    </HarvestDirectory>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DefineConstants>PublishDir=bin\Release\net6.0-windows\win-x64\publish</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" Version="4.0.4" />
+  </ItemGroup>
+</Project>
