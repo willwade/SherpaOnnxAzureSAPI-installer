@@ -5,7 +5,7 @@
     <TargetFramework>net6.0-windows</TargetFramework>
     <UseWindowsForms>false</UseWindowsForms>
     <RootNamespace>TTSInstaller</RootNamespace>
-    <AssemblyName>TTSInstaller</AssemblyName>
+	  <AssemblyName>TTSInstaller</AssemblyName>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 

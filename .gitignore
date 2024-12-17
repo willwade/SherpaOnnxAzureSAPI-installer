@@ -1,0 +1,80 @@
+# Build artifacts
+bin/
+obj/
+Debug/
+Release/
+
+# NuGet Packages
+*.nupkg
+packages/
+!packages.config
+
+# Visual Studio User-Specific Files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Auto-generated files
+*.pid.lock
+*.log
+*.tlog
+
+# Project Lock Files
+project.lock.json
+artifacts/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.sln.cache
+
+# NuGet Restore Files
+*.nuget.props
+*.nuget.targets
+.nuget/
+
+# Rider / JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Local configuration
+appsettings.Development.json
+
+# Windows specific
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Publish files
+publish/
+*.publishsettings
+
+# Dotnet CLI
+*.deps.json
+*.runtimeconfig.json
+
+# Logs
+*.log
+*.dmp
+
+# Additional ignore for Windows
+*.exe
+*.dll
+*.pdb
+*.mdb
+*.ilk
+*.obj
+*.lib
+*.exp
+*.iobj
+*.ipdb
+
+# Cache
+*.cache/
