@@ -6,41 +6,49 @@
   <?define OpenSpeechTTSComponentGuid = "480e8975-0ba1-4b55-bf51-7dc20c7a299e" ?>
   <?define TTSInstallerComponentGuid = "7cd5a3c9-fa5e-4164-9e0b-c536fa97761f" ?>
 
-  <Package Name="TTS Installer" Manufacturer="OpenAssistive" Version="1.0.0.0" UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" InstallScope="perMachine">
-    <Property Id="RegAsmPath" Value="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" />
-
+  <!-- Main Package -->
+  <Package Name="TTS Installer" Manufacturer="OpenAssistive" Version="1.0.0.0" UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" Scope="perMachine">
+    
     <!-- Directory Structure -->
-    <Directory Id="ProgramFilesFolder">
+    <StandardDirectory Id="ProgramFilesFolder">
       <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
-        <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
-          <ComponentGroupRef Id="ProductComponents" />
-        </Directory>
+        <Directory Id="OpenSpeechFolder" Name="OpenSpeech" />
       </Directory>
-    </Directory>
+    </StandardDirectory>
 
-    <!-- Custom Actions for COM Registration -->
-    <CustomAction Id="RegisterCOM" ExeCommand="[RegAsmPath] &quot;[INSTALLFOLDER]OpenSpeechTTS.dll&quot; /codebase /tlb" Execute="deferred" />
-    <CustomAction Id="UnregisterCOM" ExeCommand="[RegAsmPath] &quot;[INSTALLFOLDER]OpenSpeechTTS.dll&quot; /unregister" Execute="deferred" />
+    <!-- Features -->
+    <Feature Id="MainFeature" Title="TTS Installer" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
 
-    <!-- Sequence of Actions -->
+    <!-- Custom Actions -->
+  <CustomAction Id="RegisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /codebase /tlb" Execute="deferred" />
+  <CustomAction Id="UnregisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /unregister" Execute="deferred" />
+
+    <!-- Sequences -->
     <InstallExecuteSequence>
       <Custom Action="RegisterCOM" After="InstallFiles" />
       <Custom Action="UnregisterCOM" Before="RemoveFiles" />
     </InstallExecuteSequence>
 
-    <!-- Feature to Install Components -->
-    <Feature Id="MainFeature" Title="TTS Installer" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
-    </Feature>
   </Package>
 
+  <!-- Components -->
   <Fragment>
     <ComponentGroup Id="ProductComponents">
+      <!-- TTSInstaller.exe -->
       <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)">
-        <File Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" />
+        <File Id="TTSInstallerExe" Source="publish\TTSInstaller.exe" KeyPath="yes" />
       </Component>
+
+      <!-- OpenSpeechTTS.dll -->
       <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)">
-        <File Source="bin\Release\net6.0-windows\win-x64\publish\OpenSpeechTTS.dll" />
+        <File Id="OpenSpeechTTSDll" Source="publish\OpenSpeechTTS.dll" KeyPath="yes" />
+      </Component>
+
+      <!-- RegAsm.exe -->
+      <Component Id="RegAsmExe" Guid="7a0bc7c4-ad17-4e8c-900a-e3c3d2c0ca3f">
+        <File Id="RegAsmExe" Source="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" KeyPath="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>

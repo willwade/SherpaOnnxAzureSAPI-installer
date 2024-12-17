@@ -4,6 +4,9 @@ obj/
 Debug/
 Release/
 models/
+*.wixpdb
+*.msi
+*.cab
 
 # NuGet Packages
 *.nupkg
