@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -22,19 +23,35 @@ class Program
             return;
         }
 
-        // Default install behavior
+        // Load models JSON
         var models = await LoadModelsAsync();
+        Console.WriteLine("Available voices to install:");
         foreach (var model in models.Values)
+        {
+            Console.WriteLine($" - {model.Id} ({model.Name})");
+        }
+
+        // Simulate a user choice (this would come from GUI)
+        Console.WriteLine("Enter the model ID to install (e.g., 'cantonese-fs-xiaomaiiwn'):");
+        string chosenModelId = Console.ReadLine();
+
+        if (models.TryGetValue(chosenModelId, out var chosenModel))
         {
             try
             {
-                await installer.DownloadAndExtractModelAsync(model);
-                registrar.RegisterVoice(model, dllPath);
+                Console.WriteLine($"Downloading and installing {chosenModel.Name}...");
+                await installer.DownloadAndExtractModelAsync(chosenModel);
+                registrar.RegisterVoice(chosenModel, dllPath);
+                Console.WriteLine($"Successfully installed voice: {chosenModel.Name}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to install {model.Name}: {ex.Message}");
+                Console.WriteLine($"Failed to install {chosenModel.Name}: {ex.Message}");
             }
+        }
+        else
+        {
+            Console.WriteLine("Invalid model ID entered.");
         }
     }
 
@@ -43,6 +60,7 @@ class Program
         try
         {
             using var client = new System.Net.Http.HttpClient();
+            Console.WriteLine("Downloading merged_models.json...");
             var json = await client.GetStringAsync(OnlineJsonUrl);
             File.WriteAllText(LocalJsonPath, json); // Cache the downloaded file
             Console.WriteLine("Successfully loaded merged_models.json from the web.");
@@ -68,40 +86,10 @@ class Program
             try
             {
                 registrar.UnregisterVoice(model.Id);
+                Console.WriteLine($"Unregistered voice: {model.Name}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error uninstalling {model.Name}: {ex.Message}");
             }
-        }
-
-        // Check if any models remain; if not, unregister DLL
-        var modelDirs = Directory.Exists("./models") ? Directory.GetDirectories("./models") : Array.Empty<string>();
-        if (modelDirs.Length == 0)
-        {
-            UnregisterDll(dllPath);
-        }
-
-        Console.WriteLine("Uninstallation complete.");
-    }
-
-    private static void UnregisterDll(string dllPath)
-    {
-        try
-        {
-            var process = new System.Diagnostics.Process();
-            process.StartInfo.FileName = "regasm";
-            process.StartInfo.Arguments = $"/unregister \"{dllPath}\"";
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.UseShellExecute = false;
-            process.Start();
-            process.WaitForExit();
-
-            Console.WriteLine("DLL successfully unregistered.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error unregistering DLL: {ex.Message}");
-        }
-    }
-}
+  
