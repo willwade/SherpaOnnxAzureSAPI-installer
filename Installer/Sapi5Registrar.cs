@@ -2,24 +2,34 @@ using System;
 using Microsoft.Win32;
 using Installer.Shared;
 
-
 public class Sapi5Registrar
 {
     public void RegisterVoice(TtsModel model, string dllPath)
     {
-        string registryPath = $@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\{model.Id}";
+        string registryBasePath = $@"SOFTWARE\Microsoft\SPEECH\Voices\Tokens\{model.Id}";
         int lcid = LanguageCodeConverter.ConvertToLcid(model.Language[0].LangCode, model.Language[0].Country);
 
-        Registry.SetValue(registryPath, "", model.Name);
-        Registry.SetValue(registryPath, "Lang", lcid.ToString("X"));
-        Registry.SetValue(registryPath, "Gender", "Neutral");
-        Registry.SetValue(registryPath, "Age", "Adult");
-        Registry.SetValue(registryPath, "Vendor", model.Developer);
-        Registry.SetValue(registryPath, "Version", "1.0");
-        Registry.SetValue($@"{registryPath}\Attributes", "CLSID", "{Your-CLSID-GUID}");
-        Registry.SetValue($@"{registryPath}\Attributes", "VoicePath", dllPath);
+        try
+        {
+            // Set main registry values for the voice
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "", model.Name);
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "Lang", lcid.ToString("X"));
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "Gender", "Neutral");
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "Age", "Adult");
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "Vendor", model.Developer);
+            Registry.SetValue($@"HKEY_LOCAL_MACHINE\{registryBasePath}", "Version", "1.0");
 
-        Console.WriteLine($"Registered {model.Name} with SAPI5.");
+            // Add required 'Attributes' subkey with CLSID and VoicePath
+            string attributesPath = $@"HKEY_LOCAL_MACHINE\{registryBasePath}\Attributes";
+            Registry.SetValue(attributesPath, "CLSID", "{YOUR-VOICE-CLASS-GUID-HERE}"); // Replace with your GUID
+            Registry.SetValue(attributesPath, "VoicePath", dllPath);
+
+            Console.WriteLine($"Registered voice '{model.Name}' with SAPI5.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error registering voice '{model.Name}': {ex.Message}");
+        }
     }
 
     public void UnregisterVoice(string voiceId)
@@ -34,11 +44,15 @@ public class Sapi5Registrar
                     Registry.LocalMachine.DeleteSubKeyTree(registryPath);
                     Console.WriteLine($"Successfully unregistered voice: {voiceId}");
                 }
+                else
+                {
+                    Console.WriteLine($"Voice '{voiceId}' not found in the registry.");
+                }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error unregistering voice {voiceId}: {ex.Message}");
+            Console.WriteLine($"Error unregistering voice '{voiceId}': {ex.Message}");
         }
     }
 }

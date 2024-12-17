@@ -1,4 +1,6 @@
-﻿namespace OpenSpeechTTS;
+﻿namespace OpenSpeechTTS
+{
+}
 
 public class Class1
 {

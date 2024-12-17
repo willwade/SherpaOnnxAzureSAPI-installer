@@ -2,12 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>10.0</LangVersion>
     <RootNamespace>OpenSpeechTTS</RootNamespace>
-    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <RegisterForComInterop>true</RegisterForComInterop>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RegisterForComInterop>false</RegisterForComInterop>
     <AssemblyOriginatorKeyFile>OpenSpeechTTS.snk</AssemblyOriginatorKeyFile>
     <SignAssembly>true</SignAssembly>
+    <ComVisible>true</ComVisible>
   </PropertyGroup>
 
   <ItemGroup>

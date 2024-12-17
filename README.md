@@ -68,6 +68,14 @@ This removes voices and unregisters the DLL if no models are left installed.
    TTSInstaller.exe
    ```
 
+
+Developing locallt
+- dotnet publish -c Release --output ./publish
+- register com object 
+ & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "publish\OpenSpeechTTS.dll" /codebase
+
+- Run the ttsinstaller.exe to choose a voice
+
 ---
 
 
