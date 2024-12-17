@@ -1,3 +1,4 @@
+using System;
 using Downloader;
 using System.IO;
 using System.Threading.Tasks;
