@@ -3,6 +3,7 @@ bin/
 obj/
 Debug/
 Release/
+models/
 
 # NuGet Packages
 *.nupkg
