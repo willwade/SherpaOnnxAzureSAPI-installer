@@ -4,10 +4,15 @@
     <OutputType>Library</OutputType>
     <TargetFramework>net6.0-windows</TargetFramework>
     <RootNamespace>OpenSpeechTTS</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <RegisterForComInterop>true</RegisterForComInterop>
+    <AssemblyOriginatorKeyFile>OpenSpeechTTS.snk</AssemblyOriginatorKeyFile>
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
+    <PackageReference Include="NAudio" Version="2.0.1" />
   </ItemGroup>
 
 </Project>
