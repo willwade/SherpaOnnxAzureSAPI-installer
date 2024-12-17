@@ -22,6 +22,7 @@
     <Compile Include="Installer\ModelInstaller.cs" />
     <Compile Include="Installer\Sapi5Registrar.cs" />
     <Compile Include="Installer\Shared\LanguageInfo.cs" />
+    <Compile Include="Installer\Shared\LanguageCodeConverter.cs" />
     <Compile Include="Installer\Shared\TtsModel.cs" />
     <Compile Include="OpenSpeechTTS\ISapi5Voice.cs" />
     <Compile Include="OpenSpeechTTS\Sapi5VoiceImpl.cs" />
