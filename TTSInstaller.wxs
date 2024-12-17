@@ -8,13 +8,14 @@
 
   <!-- Main Package -->
   <Package Name="TTS Installer" Manufacturer="OpenAssistive" Version="1.0.0.0" UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" Scope="perMachine">
-    
+
     <!-- Directory Structure -->
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
         <Directory Id="OpenSpeechFolder" Name="OpenSpeech" />
       </Directory>
     </StandardDirectory>
+    
 
     <!-- Features -->
     <Feature Id="MainFeature" Title="TTS Installer" Level="1">
@@ -22,16 +23,18 @@
     </Feature>
 
     <!-- Custom Actions -->
+    
+
     <CustomAction Id="RegisterCOM"
               FileKey="RegAsmExe"
               ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
-              Execute="deferred" />
+              Execute="deferred" Return="check" />
 
     <CustomAction Id="UnregisterCOM"
                   FileKey="RegAsmExe"
                   ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
-                  Execute="deferred" />
->
+                  Execute="deferred" Return="check" />
+
 
     <!-- Sequences -->
     <InstallExecuteSequence>
@@ -44,7 +47,7 @@
   <!-- Components -->
   <Fragment>
     <ComponentGroup Id="ProductComponents">
-    
+
       <!-- TTSInstaller.exe -->
       <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)">
         <File Id="TTSInstallerExe" Source="publish\TTSInstaller.exe" KeyPath="yes" />
@@ -57,8 +60,10 @@
 
       <!-- RegAsm.exe -->
       <Component Id="RegAsmExe" Guid="7a0bc7c4-ad17-4e8c-900a-e3c3d2c0ca3f">
-        <File Id="RegAsmExe" Source="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" KeyPath="yes" />
+          <File Id="RegAsmExe" Source="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" KeyPath="yes" />
       </Component>
+      
+
     </ComponentGroup>
   </Fragment>
 </Wix>
