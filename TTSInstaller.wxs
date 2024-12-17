@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <?define Sapi5VoiceImplClsid = "3d8f5c5d-9d6b-4623-9735-2326a149af54" ?>
+  <?define Sapi5VoiceImplClsid = "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2" ?>
   <?define ISapi5VoiceInterfaceId = "74c1c045-6e6a-4623-9735-2326a149af54" ?>
   <?define OpenSpeechTTSComponentGuid = "480e8975-0ba1-4b55-bf51-7dc20c7a299e" ?>
   <?define TTSInstallerComponentGuid = "7cd5a3c9-fa5e-4164-9e0b-c536fa97761f" ?>
@@ -11,37 +12,53 @@
            Manufacturer="OpenAssistive" 
            Version="1.0.0.0" 
            UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" 
-           Scope="perMachine" 
+           Scope="perMachine"
            InstallerVersion="500">
 
     <!-- Directory Structure -->
+    <StandardDirectory Id="WindowsFolder">
+      <Directory Id="REGASMEXE" Name="Microsoft.NET\Framework64\v4.0.30319" />
+    </StandardDirectory>
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
-        <Directory Id="OpenSpeechFolder" Name="OpenSpeech" />
+        <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
+          <!-- Define components directly in the directory where they should be installed -->
+          <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)">
+            <File Id="TTSInstallerExeFile" Source="publish\TTSInstaller.exe" KeyPath="yes" />
+          </Component>
+
+          <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)">
+            <File Id="OpenSpeechTTSDllFile" Source="publish\OpenSpeechTTS.dll" KeyPath="yes" />
+          </Component>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
     <!-- Features -->
     <Feature Id="MainFeature" Title="TTS Installer" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="TTSInstallerExe" />
+      <ComponentRef Id="OpenSpeechTTSDll" />
     </Feature>
 
     <!-- Custom Actions -->
+    <SetProperty Id="REGASMEXE" Value="C:\Windows\Microsoft.NET\Framework64\v4.0.30319" Sequence="execute" Before="RegisterCOM" />
+
     <CustomAction Id="RegisterCOM"
-              FileRef="RegAsmExe"
-              ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
-              Execute="deferred" 
-              Return="check" />
+                  Directory="REGASMEXE"
+                  ExeCommand="regasm.exe &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
+                  Execute="deferred" 
+                  Return="check" />
 
     <CustomAction Id="UnregisterCOM"
-                  FileRef="RegAsmExe"
-                  ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
+                  Directory="REGASMEXE"
+                  ExeCommand="regasm.exe &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
                   Execute="deferred" 
                   Return="check" />
 
     <CustomAction Id="LaunchTTSInstaller"
-                  FileRef="TTSInstallerExe"
-                  ExeCommand="&quot;[OpenSpeechFolder]TTSInstaller.exe&quot;"
+                  FileRef="TTSInstallerExeFile"
+                  ExeCommand=""
                   Execute="immediate"
                   Return="asyncNoWait"
                   Impersonate="yes" />
@@ -54,24 +71,4 @@
     </InstallExecuteSequence>
 
   </Package>
-
-  <!-- Components -->
-  <Fragment>
-    <ComponentGroup Id="ProductComponents">
-      <!-- TTSInstaller.exe -->
-      <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)" Directory="OpenSpeechFolder">
-        <File Id="TTSInstallerExe" Source="publish\TTSInstaller.exe" KeyPath="yes" />
-      </Component>
-
-      <!-- OpenSpeechTTS.dll -->
-      <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)" Directory="OpenSpeechFolder">
-        <File Id="OpenSpeechTTSDll" Source="publish\OpenSpeechTTS.dll" KeyPath="yes" />
-      </Component>
-
-      <!-- RegAsm.exe -->
-      <Component Id="RegAsmExe" Guid="7a0bc7c4-ad17-4e8c-900a-e3c3d2c0ca3f" Directory="OpenSpeechFolder">
-          <File Id="RegAsmExe" Source="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" KeyPath="yes" />
-      </Component>
-    </ComponentGroup>
-  </Fragment>
 </Wix>
