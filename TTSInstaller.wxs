@@ -26,12 +26,12 @@
     
 
     <CustomAction Id="RegisterCOM"
-              FileKey="RegAsmExe"
+              FileRef="RegAsmExe"
               ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
               Execute="deferred" Return="check" />
 
     <CustomAction Id="UnregisterCOM"
-                  FileKey="RegAsmExe"
+                  FileRef="RegAsmExe"
                   ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
                   Execute="deferred" Return="check" />
 
