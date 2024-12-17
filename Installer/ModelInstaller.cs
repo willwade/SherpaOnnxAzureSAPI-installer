@@ -45,7 +45,7 @@ public class ModelInstaller
         {
             Address = url,
             FileName = Path.GetFileName(destinationPath),
-            Destination = Path.GetDirectoryName(destinationPath)
+            Directory = Path.GetDirectoryName(destinationPath)
         };
         
 

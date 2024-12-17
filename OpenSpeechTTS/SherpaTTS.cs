@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using SherpaOnnx;
 
 public class SherpaTTS
@@ -23,15 +25,16 @@ public class SherpaTTS
         _tts = new OfflineTts(config);
     }
 
-    public float[] GenerateAudio(string text, float speed = 1.0f, int speakerId = 0)
+    public byte[] GenerateAudio(string text, float speed = 1.0f, int speakerId = 0)
     {
-        var audioData = _tts.Generate(text, speed, speakerId);
+    var audioData = _tts.Generate(text, speed, speakerId);
 
-        if (audioData == null || audioData.Samples.Length == 0)
-            throw new Exception("Failed to generate audio.");
+    if (audioData == null || audioData.Samples.Length == 0)
+        throw new Exception("Failed to generate audio.");
 
-        // Normalize audio data
-        float maxAmplitude = Math.Abs(audioData.Samples.Max());
-        return audioData.Samples.Select(sample => sample / maxAmplitude).ToArray();
+    // Convert float samples to 16-bit PCM byte array
+    return audioData.Samples
+        .SelectMany(sample => BitConverter.GetBytes((short)(sample * short.MaxValue)))
+        .ToArray();
     }
 }
