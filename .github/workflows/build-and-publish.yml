@@ -36,8 +36,7 @@ jobs:
 
       - name: Build WiX Installer
         run: |
-          candle.exe -o ttsinstaller.wixobj TTSInstaller.wxs
-          light.exe -o TTSInstaller.msi ttsinstaller.wixobj
+          wix build -o TTSInstaller.msi TTSInstaller.wxs
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3

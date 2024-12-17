@@ -6,7 +6,7 @@ using NAudio.Wave;
 
 [ComVisible(true)]
 [ClassInterface(ClassInterfaceType.None)]
-[Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")] 
+[Guid(Guids.Sapi5VoiceImplClsid)]
 public class Sapi5VoiceImpl : ISapi5Voice
 {
     private SherpaTTS _ttsEngine;
