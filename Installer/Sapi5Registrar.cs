@@ -1,5 +1,7 @@
 using System;
 using Microsoft.Win32;
+using Installer.Shared;
+
 
 public class Sapi5Registrar
 {
