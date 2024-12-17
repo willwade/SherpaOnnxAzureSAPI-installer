@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Win32;
 
 public class Sapi5Registrar

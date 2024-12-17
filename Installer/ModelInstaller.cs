@@ -45,8 +45,9 @@ public class ModelInstaller
         {
             Address = url,
             FileName = Path.GetFileName(destinationPath),
-            FilePath = Path.GetDirectoryName(destinationPath)
+            Directory = Path.GetDirectoryName(destinationPath)
         };
+        
 
         downloadService.DownloadProgressChanged += (s, e) =>
         {

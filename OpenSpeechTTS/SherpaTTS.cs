@@ -20,22 +20,32 @@ public class SherpaTTS
             lengthScale: 1.0
         );
 
+        var vitsConfig = new OfflineTtsVitsModelConfig
+        {
+            Model = modelPath,
+            Lexicon = lexiconPath,
+            Tokens = tokensPath,
+            NoiseScale = 0.667f,
+            NoiseScaleW = 0.8f,
+            LengthScale = 1.0f
+        };
+
         var modelConfig = new OfflineTtsModelConfig { Vits = vitsConfig };
-        var config = new OfflineTtsConfig(modelConfig, maxNumSentences: 2);
+        var config = new OfflineTtsConfig { Model = modelConfig };
 
         _tts = new OfflineTts(config);
     }
 
-    public float[] GenerateAudio(string text)
+    
+    public byte[] GenerateAudio(string text)
     {
-        var audioData = _tts.Generate(text);
-
+        var audioData = _tts.Generate(text, speed: 1.0f, speakerId: 0);
         if (audioData == null || audioData.Samples.Length == 0)
             throw new Exception("Failed to generate audio.");
 
-        // Normalize audio data
-        float maxAmplitude = Math.Abs(audioData.Samples.Max());
-        return audioData.Samples.Select(sample => sample / maxAmplitude).ToArray();
+        return audioData.Samples.SelectMany(sample =>
+            BitConverter.GetBytes((short)(sample * short.MaxValue))).ToArray();
     }
+
 
 }

@@ -67,7 +67,6 @@ public class Sapi5VoiceImpl : ISapi5Voice
         if (_ttsEngine != null)
         {
             float adjustedScale = Math.Max(0.5f, Math.Min(2.0f, 1.0f / rate)); // Example clamping
-            _ttsEngine.SetLengthScale(adjustedScale);
             Console.WriteLine($"Playback rate adjusted to: {rate}");
         }
     }
