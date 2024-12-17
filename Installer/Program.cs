@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Installer;
 
 class Program
 {
