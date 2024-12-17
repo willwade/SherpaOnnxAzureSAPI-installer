@@ -1,11 +1,6 @@
-
-// This file contains the logic for downloading and extracting TTS models.
-using System;
+using Downloader;
 using System.IO;
 using System.Threading.Tasks;
-using Downloader;
-using SharpCompress.Archives;
-using SharpCompress.Common;
 
 public class ModelInstaller
 {
@@ -16,64 +11,24 @@ public class ModelInstaller
         string modelDir = Path.Combine(modelsDirectory, model.Id);
         Directory.CreateDirectory(modelDir);
 
-        if (model.ModelType.Equals("mms", StringComparison.OrdinalIgnoreCase))
+        var downloader = new DownloadService(new DownloadConfiguration
         {
-            await DownloadMmsModelAsync(model.Url, modelDir);
-        }
-        else
-        {
-            string archivePath = Path.Combine(modelDir, "model.tar.bz2");
-            await DownloadFileAsync(model.Url, archivePath);
-            ExtractArchive(archivePath, modelDir);
-            File.Delete(archivePath);
-        }
-    }
+            ChunkCount = 4, // Download in parallel chunks
+            ParallelDownload = true, // Enable parallel downloads
+            ReserveStorageSpaceBeforeStartingDownload = true, // Reserve file space
+        });
 
-    private async Task DownloadMmsModelAsync(string baseUrl, string destinationDirectory)
-    {
-        string modelUrl = $"{baseUrl}/model.onnx";
-        string tokensUrl = $"{baseUrl}/tokens.txt";
+        string modelUrl = $"{model.Url}/model.onnx";
+        string tokensUrl = $"{model.Url}/tokens.txt";
 
-        await DownloadFileAsync(modelUrl, Path.Combine(destinationDirectory, "model.onnx"));
-        await DownloadFileAsync(tokensUrl, Path.Combine(destinationDirectory, "tokens.txt"));
-    }
+        // Download model.onnx
+        string modelFilePath = Path.Combine(modelDir, "model.onnx");
+        await downloader.DownloadFileTaskAsync(modelUrl, modelFilePath);
 
-    private async Task DownloadFileAsync(string url, string destinationPath)
-    {
-        var downloadService = new DownloadService();
-        var downloadPackage = new DownloadPackage
-        {
-            Address = url,
-            FileName = Path.GetFileName(destinationPath),
-            Directory = Path.GetDirectoryName(destinationPath)
-        };
-        
+        // Download tokens.txt
+        string tokensFilePath = Path.Combine(modelDir, "tokens.txt");
+        await downloader.DownloadFileTaskAsync(tokensUrl, tokensFilePath);
 
-        downloadService.DownloadProgressChanged += (s, e) =>
-        {
-            Console.WriteLine($"Downloading {e.ProgressPercentage}%");
-        };
-
-        await downloadService.DownloadFileTaskAsync(downloadPackage);
-        Console.WriteLine("Download complete.");
-    }
-
-    private void ExtractArchive(string archivePath, string destinationDirectory)
-    {
-        using (var archive = ArchiveFactory.Open(archivePath))
-        {
-            foreach (var entry in archive.Entries)
-            {
-                if (!entry.IsDirectory)
-                {
-                    entry.WriteToDirectory(destinationDirectory, new ExtractionOptions
-                    {
-                        ExtractFullPath = true,
-                        Overwrite = true
-                    });
-                }
-            }
-        }
-        Console.WriteLine("Extraction complete.");
+        Console.WriteLine($"Downloaded model and tokens to: {modelDir}");
     }
 }
