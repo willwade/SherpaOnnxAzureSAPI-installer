@@ -24,11 +24,11 @@
       <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
         <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
           <!-- Define components directly in the directory where they should be installed -->
-          <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)">
+          <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)" Bitness="always64">
             <File Id="TTSInstallerExeFile" Source="publish\TTSInstaller.exe" KeyPath="yes" />
           </Component>
 
-          <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)">
+          <Component Id="OpenSpeechTTSDll" Guid="$(var.OpenSpeechTTSComponentGuid)" Bitness="always64">
             <File Id="OpenSpeechTTSDllFile" Source="publish\OpenSpeechTTS.dll" KeyPath="yes" />
           </Component>
         </Directory>
@@ -42,32 +42,33 @@
     </Feature>
 
     <!-- Custom Actions -->
-    <SetProperty Id="REGASMEXE" Value="C:\Windows\Microsoft.NET\Framework64\v4.0.30319" Sequence="execute" Before="RegisterCOM" />
+    <SetProperty Id="REGASMEXE" Value="[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\" After="CostFinalize" />
 
     <CustomAction Id="RegisterCOM"
                   Directory="REGASMEXE"
-                  ExeCommand="regasm.exe &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
+                  ExeCommand="&quot;[REGASMEXE]regasm.exe&quot; &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
                   Execute="deferred" 
-                  Return="check" />
+                  Return="check"
+                  Impersonate="no" />
 
     <CustomAction Id="UnregisterCOM"
                   Directory="REGASMEXE"
-                  ExeCommand="regasm.exe &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
+                  ExeCommand="&quot;[REGASMEXE]regasm.exe&quot; &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
                   Execute="deferred" 
-                  Return="check" />
+                  Return="check"
+                  Impersonate="no" />
 
     <CustomAction Id="LaunchTTSInstaller"
-                  FileRef="TTSInstallerExeFile"
-                  ExeCommand=""
-                  Execute="immediate"
-                  Return="asyncNoWait"
-                  Impersonate="yes" />
+                  Directory="OpenSpeechFolder"
+                  ExeCommand="&quot;[#TTSInstallerExeFile]&quot;"
+                  Execute="commit"
+                  Return="asyncNoWait" />
 
     <!-- Sequences -->
     <InstallExecuteSequence>
-      <Custom Action="RegisterCOM" After="InstallFiles" Condition="NOT Installed" />
-      <Custom Action="LaunchTTSInstaller" After="InstallFinalize" Condition="NOT Installed" />
-      <Custom Action="UnregisterCOM" Before="RemoveFiles" Condition="Installed" />
+      <Custom Action="RegisterCOM" After="InstallFiles" Condition="NOT INSTALLED" />
+      <Custom Action="UnregisterCOM" Before="RemoveFiles" Condition="INSTALLED AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="LaunchTTSInstaller" Before="InstallFinalize" Condition="NOT INSTALLED" />
     </InstallExecuteSequence>
 
   </Package>
