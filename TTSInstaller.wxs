@@ -1,30 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="TTS Installer" Language="1033" Version="1.0.0.0" Manufacturer="YourCompany" UpgradeCode="PUT-GUID-HERE">
-    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+  <Product Id="*" Name="TTS Installer" Language="1033" Version="1.0.0.0" Manufacturer="YourCompany" UpgradeCode="PUT-NEW-GUID-HERE">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" InstallPrivileges="elevated" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of this software is already installed." />
-
     <MediaTemplate />
 
-    <Feature Id="ProductFeature" Title="TTSInstaller" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
-    </Feature>
-  </Product>
+    <Property Id="RegAsmPath" Value="C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" />
 
-  <Fragment>
+    <!-- Directory Structure -->
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-        <Directory Id="INSTALLFOLDER" Name="TTSInstaller" />
+        <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
+          <Directory Id="OpenSpeechFolder" Name="OpenSpeech" />
+        </Directory>
       </Directory>
     </Directory>
 
-    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Component Id="TTSInstallerExe" Guid="PUT-GUID-HERE">
-        <File Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" />
-      </Component>
-      <Component Id="OpenSpeechTTSDll" Guid="PUT-GUID-HERE">
-        <File Source="bin\Release\net6.0-windows\win-x64\publish\OpenSpeechTTS.dll" />
-      </Component>
-    </ComponentGroup>
-  </Fragment>
+    <!-- Custom Actions -->
+    <CustomAction Id="RegisterCOM" ExeCommand="[RegAsmPath] &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb" Execute="deferred" Return="check" Impersonate="no" />
+    <CustomAction Id="UnregisterCOM" ExeCommand="[RegAsmPath] &quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister" Execute="deferred" Return="check" Impersonate="no" />
+    <CustomAction Id="LaunchTTSInstaller" FileKey="TTSInstallerExe" ExeCommand="" Return="asyncNoWait" />
+
+    <!-- Install and Uninstall Sequences -->
+    <InstallExecuteSequence>
+      <Custom Action="RegisterCOM" After="InstallFinalize">NOT Installed</Custom>
+      <Custom Action="UnregisterCOM" Before="RemoveFiles">Installed</Custom>
+      <Custom Action="LaunchTTSInstaller" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+
+    <!-- Components -->
+    <Feature Id="ProductFeature" Title="TTSInstaller" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <Fragment>
+      <ComponentGroup Id="ProductComponents" Directory="OpenSpeechFolder">
+        <!-- TTSInstaller.exe -->
+        <Component Id="TTSInstallerExe" Guid="PUT-GUID-HERE-1">
+          <File Id="TTSInstallerExe" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes" />
+        </Component>
+
+        <!-- OpenSpeechTTS.dll -->
+        <Component Id="OpenSpeechTTSDll" Guid="PUT-GUID-HERE-2">
+          <File Id="OpenSpeechTTSDll" Source="bin\Release\net6.0-windows\win-x64\publish\OpenSpeechTTS.dll" KeyPath="yes" />
+        </Component>
+      </ComponentGroup>
+    </Fragment>
+  </Product>
 </Wix>

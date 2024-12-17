@@ -21,21 +21,23 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Locate Project File
-        run: |
-          echo "Locating project file..."
-          ls
-
       - name: Restore Dependencies
         run: dotnet restore TTSInstaller.csproj
 
       - name: Build Project
-        run: |
-          dotnet build TTSInstaller.csproj -c Release
+        run: dotnet build TTSInstaller.csproj -c Release
 
       - name: Publish as Single File EXE
         run: |
           dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+
+      - name: Install WiX Toolset
+        uses: wixtoolset/setup-wix3-action@v1
+
+      - name: Build WiX Installer
+        run: |
+          candle.exe -o ttsinstaller.wixobj TTSInstaller.wxs
+          light.exe -o TTSInstaller.msi ttsinstaller.wixobj
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
@@ -44,6 +46,7 @@ jobs:
           path: |
             ./bin/Release/net6.0-windows/win-x64/publish/TTSInstaller.exe
             ./bin/Release/net6.0-windows/win-x64/publish/OpenSpeechTTS.dll
+            ./TTSInstaller.msi
 
   sign:
     runs-on: windows-latest
@@ -53,10 +56,11 @@ jobs:
       - name: Notify Signing Required
         run: |
           echo "The build artifacts are ready but must be signed locally."
-          echo "Download them from the artifacts tab and sign the EXE and DLL locally."
+          echo "Download them from the artifacts tab and sign the EXE, DLL, and MSI locally."
 
       - name: Provide Signing Instructions
         run: |
           echo "Use the following commands to sign the artifacts locally:"
           echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-TTSInstaller.exe>"
           echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-OpenSpeechTTS.dll>"
+          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-TTSInstaller.msi>"
