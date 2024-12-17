@@ -29,7 +29,7 @@
     </Feature>
 
     <!-- Custom Actions -->
-    <SetProperty Id="REGASMEXE" Value="[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\" After="CostFinalize" />
+    <SetProperty Id="REGASMEXE" Value="[WindowsFolder]Microsoft.NET\Framework64\v4.0.30319\" Before="CostFinalize" />
 
     <CustomAction Id="RegisterCOM"
                   Directory="REGASMEXE"
@@ -53,9 +53,9 @@
 
     <!-- Sequences -->
     <InstallExecuteSequence>
-      <Custom Action="RegisterCOM" After="InstallFiles" Condition="NOT INSTALLED" />
-      <Custom Action="UnregisterCOM" Before="RemoveFiles" Condition="INSTALLED AND NOT UPGRADINGPRODUCTCODE" />
-      <Custom Action="LaunchTTSInstaller" Before="InstallFinalize" Condition="NOT INSTALLED" />
+      <Custom Action="RegisterCOM" After="InstallFiles" Condition="NOT Installed" />
+      <Custom Action="UnregisterCOM" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="LaunchTTSInstaller" Before="InstallFinalize" Condition="NOT Installed" />
     </InstallExecuteSequence>
 
   </Package>

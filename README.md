@@ -3,88 +3,70 @@
 This project contains a complete installer for TTS voices, integrating with Sherpa ONNX, downloading models dynamically, and registering them with SAPI5.
 
 ## Features
-- Downloads the latest `merged_models.json` dynamically from the web.
-- Handles MMS and non-MMS models differently during installation.
-- Registers the TTS voices with correct language codes (LCIDs) for SAPI5.
-- Uses Sherpa ONNX for TTS audio generation.
+- Downloads the latest `merged_models.json` dynamically from the web
+- Handles MMS and non-MMS models differently during installation
+- Registers the TTS voices with correct language codes (LCIDs) for SAPI5
+- Uses Sherpa ONNX for TTS audio generation
 
-
-### Example Usage
-
-- **Install Models**:
+## Prerequisites
+1. Install [.NET 6.0](https://dotnet.microsoft.com/en-us/download) or later
+2. Install [WiX Toolset v4](https://wixtoolset.org/docs/intro/)
+3. Install WiX .NET CLI Tool:
    ```bash
-   TTSInstaller.exe
+   dotnet tool install --global wix
+   ```
+4. Ensure the `dotnet` CLI is available in your system PATH
+
+## Building the Project
+
+1. **Clean and Restore**:
+   ```bash
+   dotnet clean
+   dotnet restore
    ```
 
-- **Uninstall Models**:
+2. **Build the TTS Project**:
    ```bash
-   TTSInstaller.exe uninstall
+   dotnet build TTSInstaller.csproj -c Release
    ```
+
+3. **Publish the TTS Application**:
+   ```bash
+   dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+   ```
+
+4. **Build the WiX Installer**:
+   ```bash
+   wix build -o TTSInstaller.msi TTSInstaller.wxs
+   ```
+
+## Installation
+
+### For End Users
+- Double-click the generated `TTSInstaller.msi`
+- Or run from command line:
+  ```bash
+  msiexec /i TTSInstaller.msi
+  ```
+
+### For Development/Testing
+Manual COM registration (if needed):
+```bash
+& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "publish\OpenSpeechTTS.dll" /codebase
+```
 
 ### Uninstallation
-To uninstall all voices and unregister the DLL, run:
-```bash
-TTSInstaller.exe uninstall
-```
-This removes voices and unregisters the DLL if no models are left installed.
+To uninstall:
+- Use Windows Control Panel
+- Or run from command line:
+  ```bash
+  msiexec /x TTSInstaller.msi
+  ```
 
+## Troubleshooting
+- If you encounter build errors, ensure all prerequisites are installed
+- Check the Windows Event Viewer for installation errors
+- Review the install.log file in the project directory for detailed logs
 
-
-### Developer Details
-
-
-### Prerequisites
-1. Install [.NET 6.0](https://dotnet.microsoft.com/en-us/download) or later.
-2. Ensure the `dotnet` CLI is available in your system PATH.
-
----
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://your-repo-url
-   cd TTSInstaller
-   ```
-
-2. **Restore and Build**:
-   Restore dependencies and build the installer:
-   ```bash
-   dotnet restore
-   dotnet build
-   ```
-
-3. **Publish the Executable**:
-   Create a single EXE for distribution:
-   ```bash
-   dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
-   ```
-   The EXE will be in:
-   ```
-   bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe
-   ```
-
-4. **Run the Installer**:
-   Execute the installer to download and register voices:
-   ```bash
-   TTSInstaller.exe
-   ```
-
-
-Developing locallt
-- dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
-- register com object 
- & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "publish\OpenSpeechTTS.dll" /codebase
-
-- Run the ttsinstaller.exe to choose a voice
-
-
-dotnet clean
-dotnet restore
-dotnet build TTSInstaller.csproj -c Release
-dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
-wix build -o TTSInstaller.msi TTSInstaller.wxs
----
-
-
-### License
+## License
 This project is licensed under Apache 2.0.
-
