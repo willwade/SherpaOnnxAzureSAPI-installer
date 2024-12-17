@@ -1,5 +1,3 @@
-
-// Defines the structure for language information.
 public class LanguageInfo
 {
     public string LangCode { get; set; }
