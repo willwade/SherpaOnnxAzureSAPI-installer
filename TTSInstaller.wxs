@@ -22,13 +22,13 @@
     </Feature>
 
     <!-- Custom Actions -->
-  <CustomAction Id="RegisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /codebase /tlb" Execute="deferred" />
-  <CustomAction Id="UnregisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /unregister" Execute="deferred" />
+    <CustomAction Id="RegisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /codebase /tlb" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="UnregisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /unregister" Execute="deferred" Impersonate="no" />
 
     <!-- Sequences -->
     <InstallExecuteSequence>
-      <Custom Action="RegisterCOM" After="InstallFiles" />
-      <Custom Action="UnregisterCOM" Before="RemoveFiles" />
+      <Custom Action="RegisterCOM" After="InstallFiles" Condition="NOT Installed" />
+      <Custom Action="UnregisterCOM" Before="RemoveFiles" Condition="Installed" />
     </InstallExecuteSequence>
 
   </Package>
