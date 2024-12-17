@@ -10,7 +10,7 @@
   <Package Name="TTS Installer" Manufacturer="OpenAssistive" Version="1.0.0.0" UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" Scope="perMachine">
     
     <!-- Directory Structure -->
-    <StandardDirectory Id="ProgramFilesFolder">
+    <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenAssistive">
         <Directory Id="OpenSpeechFolder" Name="OpenSpeech" />
       </Directory>
@@ -22,8 +22,16 @@
     </Feature>
 
     <!-- Custom Actions -->
-    <CustomAction Id="RegisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /codebase /tlb" Execute="deferred" Impersonate="no" />
-    <CustomAction Id="UnregisterCOM" FileRef="RegAsmExe" ExeCommand="[OpenSpeechFolder]OpenSpeechTTS.dll /unregister" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="RegisterCOM"
+              FileKey="RegAsmExe"
+              ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /codebase /tlb"
+              Execute="deferred" />
+
+    <CustomAction Id="UnregisterCOM"
+                  FileKey="RegAsmExe"
+                  ExeCommand="&quot;[OpenSpeechFolder]OpenSpeechTTS.dll&quot; /unregister"
+                  Execute="deferred" />
+>
 
     <!-- Sequences -->
     <InstallExecuteSequence>
@@ -36,6 +44,7 @@
   <!-- Components -->
   <Fragment>
     <ComponentGroup Id="ProductComponents">
+    
       <!-- TTSInstaller.exe -->
       <Component Id="TTSInstallerExe" Guid="$(var.TTSInstallerComponentGuid)">
         <File Id="TTSInstallerExe" Source="publish\TTSInstaller.exe" KeyPath="yes" />

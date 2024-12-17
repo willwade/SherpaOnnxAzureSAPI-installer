@@ -70,12 +70,18 @@ This removes voices and unregisters the DLL if no models are left installed.
 
 
 Developing locallt
-- dotnet publish -c Release --output ./publish
+- dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 - register com object 
  & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "publish\OpenSpeechTTS.dll" /codebase
 
 - Run the ttsinstaller.exe to choose a voice
 
+
+dotnet clean
+dotnet restore
+dotnet build TTSInstaller.csproj -c Release
+dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+wix build -o TTSInstaller.msi TTSInstaller.wxs
 ---
 
 

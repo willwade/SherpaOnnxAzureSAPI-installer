@@ -15,7 +15,6 @@
   <ItemGroup>
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
     <PackageReference Include="NAudio" Version="2.0.1" />
-    <Compile Include="..\Shared\Guids.cs" />
   </ItemGroup>
 
 <ItemGroup>

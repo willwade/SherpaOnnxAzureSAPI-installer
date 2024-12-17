@@ -25,7 +25,6 @@
     <Compile Include="Installer\Shared\LanguageInfo.cs" />
     <Compile Include="Installer\Shared\LanguageCodeConverter.cs" />
     <Compile Include="Installer\Shared\TtsModel.cs" />
-    <Compile Include="Shared\Guids.cs" />
   </ItemGroup>
 
 </Project>

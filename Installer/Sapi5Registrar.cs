@@ -11,7 +11,7 @@ namespace Installer
         public void RegisterVoice(TtsModel model, string dllPath)
         {
             string voiceRegistryPath = $@"{RegistryBasePath}\{model.Id}";
-            string clsid = Guids.Sapi5VoiceImplClsid;
+            string clsid = "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2";
             string clsidPath = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}";
             string inprocServer32Path = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}\InprocServer32";
 
