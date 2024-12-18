@@ -19,10 +19,12 @@ This project contains a complete installer for TTS voices, integrating with Sher
 
 ## Building the Project
 
+**Note**: Building the WiX installer requires administrative privileges. Run your terminal/PowerShell as Administrator.
+
 1. **Clean and Restore**:
    ```bash
-   dotnet clean
-   dotnet restore
+   dotnet clean TTSInstaller.csproj
+   dotnet restore TTSInstaller.csproj
    ```
 
 2. **Build the TTS Project**:
@@ -35,9 +37,9 @@ This project contains a complete installer for TTS voices, integrating with Sher
    dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
    ```
 
-4. **Build the WiX Installer**:
+4. **Build the WiX Installer** (requires admin privileges):
    ```bash
-   wix build -o TTSInstaller.msi TTSInstaller.wxs
+   wix build TTSInstaller.wxs -o TTSInstaller.msi -b .
    ```
 
 ## Installation
@@ -67,6 +69,7 @@ To uninstall:
 - If you encounter build errors, ensure all prerequisites are installed
 - Check the Windows Event Viewer for installation errors
 - Review the install.log file in the project directory for detailed logs
+- For permission errors during build, ensure you're running as Administrator
 
 ## License
 This project is licensed under Apache 2.0.

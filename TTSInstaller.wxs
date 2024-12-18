@@ -19,13 +19,40 @@
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
-        <!-- The harvested files will be placed here -->
+        <Component Id="MainExecutable" Bitness="always64">
+          <File Id="TTSInstallerEXE" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="OpenSpeechTTSDLL" Bitness="always64">
+          <File Id="OpenSpeechTTSDLL" Source="OpenSpeechTTS\bin\Release\net48\OpenSpeechTTS.dll" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="NAudioDLL" Bitness="always64">
+          <File Id="NAudioDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.dll" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="NAudioCoreDLL" Bitness="always64">
+          <File Id="NAudioCoreDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Core.dll" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="NAudioWasapiDLL" Bitness="always64">
+          <File Id="NAudioWasapiDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Wasapi.dll" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="SherpaDLL" Bitness="always64">
+          <File Id="SherpaDLL" Source="OpenSpeechTTS\bin\Release\net48\sherpa-onnx.dll" KeyPath="yes"/>
+        </Component>
       </Directory>
     </StandardDirectory>
 
     <!-- Features -->
     <Feature Id="MainFeature" Title="TTS Installer" Level="1">
-      <ComponentGroupRef Id="PublishedFiles" />
+      <ComponentRef Id="MainExecutable"/>
+      <ComponentRef Id="OpenSpeechTTSDLL"/>
+      <ComponentRef Id="NAudioDLL"/>
+      <ComponentRef Id="NAudioCoreDLL"/>
+      <ComponentRef Id="NAudioWasapiDLL"/>
+      <ComponentRef Id="SherpaDLL"/>
     </Feature>
 
     <!-- Custom Actions -->
@@ -47,7 +74,7 @@
 
     <CustomAction Id="LaunchTTSInstaller"
                   Directory="OpenSpeechFolder"
-                  ExeCommand="&quot;[#TTSInstallerExe]&quot;"
+                  ExeCommand="&quot;[#TTSInstallerEXE]&quot;"
                   Execute="commit"
                   Return="asyncNoWait" />
 
