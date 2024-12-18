@@ -52,18 +52,31 @@ namespace Installer
                 // Add Attributes subkey with CLSID, VoicePath, and model paths
                 string attributesPath = $@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}\Attributes";
                 Registry.SetValue(attributesPath, "CLSID", clsid);
-                Registry.SetValue(attributesPath, "VoicePath", dllPath);
-                Registry.SetValue(attributesPath, "ModelPath", model.ModelPath);
-                Registry.SetValue(attributesPath, "TokensPath", model.TokensPath);
+                Registry.SetValue(attributesPath, "VoicePath", Path.GetFullPath(dllPath)); // Use full path
+                Registry.SetValue(attributesPath, "ModelPath", Path.GetFullPath(model.ModelPath)); // Use full path
+                Registry.SetValue(attributesPath, "TokensPath", Path.GetFullPath(model.TokensPath)); // Use full path
                 Registry.SetValue(attributesPath, "LexiconPath", model.LexiconPath ?? "");
                 Registry.SetValue(attributesPath, "ModelType", model.ModelType ?? "vits");
 
                 // 2. Register the COM class CLSID with InprocServer32
-                Registry.SetValue(clsidPath, "", "Sapi5VoiceImpl");
-                Registry.SetValue(inprocServer32Path, "", @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscoree.dll");
+                Registry.SetValue(clsidPath, "", "OpenSpeechTTS.Sapi5VoiceImpl");
+                Registry.SetValue(inprocServer32Path, "", @"mscoree.dll"); // Just use mscoree.dll, Windows will find it
                 Registry.SetValue(inprocServer32Path, "ThreadingModel", "Both");
+                Registry.SetValue(inprocServer32Path, "Class", "OpenSpeechTTS.Sapi5VoiceImpl");
+                Registry.SetValue(inprocServer32Path, "Assembly", "OpenSpeechTTS, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null");
+                Registry.SetValue(inprocServer32Path, "RuntimeVersion", "v4.0.30319");
+                Registry.SetValue(inprocServer32Path, "CodeBase", $"file:///{Path.GetFullPath(dllPath)}"); // Use file:/// format
+
+                // 3. Register the ProgID
+                string progId = "OpenSpeechTTS.Sapi5VoiceImpl";
+                Registry.SetValue($@"HKEY_CLASSES_ROOT\{progId}", "", "OpenSpeechTTS SAPI5 Voice Implementation");
+                Registry.SetValue($@"HKEY_CLASSES_ROOT\{progId}\CLSID", "", clsid);
+                Registry.SetValue(clsidPath, "ProgId", progId);
 
                 Console.WriteLine($"Registered voice '{model.Name}' successfully with SAPI5 and COM.");
+                Console.WriteLine($"Model path: {Path.GetFullPath(model.ModelPath)}");
+                Console.WriteLine($"Tokens path: {Path.GetFullPath(model.TokensPath)}");
+                Console.WriteLine($"DLL path: {Path.GetFullPath(dllPath)}");
             }
             catch (Exception ex)
             {

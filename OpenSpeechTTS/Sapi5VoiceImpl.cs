@@ -5,118 +5,122 @@ using System.Threading;
 using NAudio.Wave;
 using Microsoft.Win32;
 
-[ComVisible(true)]
-[ClassInterface(ClassInterfaceType.None)]
-[Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")]
-public class Sapi5VoiceImpl : ISapi5Voice
+namespace OpenSpeechTTS
 {
-    private SherpaTTS _ttsEngine;
-    private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
-
-    public Sapi5VoiceImpl()
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    [Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")]
+    [ProgId("OpenSpeechTTS.Sapi5VoiceImpl")]
+    public class Sapi5VoiceImpl : ISapi5Voice
     {
-        try
-        {
-            Console.WriteLine("Initializing SherpaTTS...");
-            var modelPaths = GetModelPathsFromRegistry();
-            _ttsEngine = new SherpaTTS(modelPaths.ModelPath, modelPaths.TokensPath, modelPaths.LexiconPath);
-            Console.WriteLine("SherpaTTS initialized successfully.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error initializing SherpaTTS: {ex.Message}");
-            throw;
-        }
-    }
+        private SherpaTTS _ttsEngine;
+        private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
 
-    private (string ModelPath, string TokensPath, string LexiconPath) GetModelPathsFromRegistry()
-    {
-        using (var voicesKey = Registry.LocalMachine.OpenSubKey(RegistryBasePath))
+        public Sapi5VoiceImpl()
         {
-            if (voicesKey == null)
-                throw new Exception("SAPI voices registry key not found");
-
-            // Find our voice token by CLSID
-            foreach (var voiceName in voicesKey.GetSubKeyNames())
+            try
             {
-                using (var voiceKey = voicesKey.OpenSubKey($"{voiceName}\\Attributes"))
+                Console.WriteLine("Initializing SherpaTTS...");
+                var modelPaths = GetModelPathsFromRegistry();
+                _ttsEngine = new SherpaTTS(modelPaths.ModelPath, modelPaths.TokensPath, modelPaths.LexiconPath);
+                Console.WriteLine("SherpaTTS initialized successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing SherpaTTS: {ex.Message}");
+                throw;
+            }
+        }
+
+        private (string ModelPath, string TokensPath, string LexiconPath) GetModelPathsFromRegistry()
+        {
+            using (var voicesKey = Registry.LocalMachine.OpenSubKey(RegistryBasePath))
+            {
+                if (voicesKey == null)
+                    throw new Exception("SAPI voices registry key not found");
+
+                // Find our voice token by CLSID
+                foreach (var voiceName in voicesKey.GetSubKeyNames())
                 {
-                    if (voiceKey == null) continue;
-
-                    var clsid = voiceKey.GetValue("CLSID") as string;
-                    if (clsid == "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")
+                    using (var voiceKey = voicesKey.OpenSubKey($"{voiceName}\\Attributes"))
                     {
-                        var modelPath = voiceKey.GetValue("ModelPath") as string;
-                        var tokensPath = voiceKey.GetValue("TokensPath") as string;
-                        var lexiconPath = voiceKey.GetValue("LexiconPath") as string ?? "";
+                        if (voiceKey == null) continue;
 
-                        if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(tokensPath))
-                            throw new Exception("Model paths not found in registry");
+                        var clsid = voiceKey.GetValue("CLSID") as string;
+                        if (clsid == "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")
+                        {
+                            var modelPath = voiceKey.GetValue("ModelPath") as string;
+                            var tokensPath = voiceKey.GetValue("TokensPath") as string;
+                            var lexiconPath = voiceKey.GetValue("LexiconPath") as string ?? "";
 
-                        return (modelPath, tokensPath, lexiconPath);
+                            if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(tokensPath))
+                                throw new Exception("Model paths not found in registry");
+
+                            return (modelPath, tokensPath, lexiconPath);
+                        }
                     }
                 }
             }
+
+            throw new Exception("Voice not found in registry");
         }
 
-        throw new Exception("Voice not found in registry");
-    }
-
-    public void Speak(string text)
-    {
-        try
+        public void Speak(string text)
         {
-            var audioData = _ttsEngine.GenerateAudio(text);
-            if (audioData == null || audioData.Length == 0)
+            try
             {
-                Console.WriteLine("No audio generated.");
-                return;
-            }
-
-            using (var waveOut = new WaveOutEvent())
-            {
-                var waveProvider = new RawSourceWaveStream(
-                    new MemoryStream(audioData),
-                    new WaveFormat(16000, 16, 1)); // Match Sherpa's sample rate
-                waveOut.Init(waveProvider);
-                waveOut.Play();
-                while (waveOut.PlaybackState == PlaybackState.Playing)
+                var audioData = _ttsEngine.GenerateAudio(text);
+                if (audioData == null || audioData.Length == 0)
                 {
-                    Thread.Sleep(100);
+                    Console.WriteLine("No audio generated.");
+                    return;
                 }
+
+                using (var waveOut = new WaveOutEvent())
+                {
+                    var waveProvider = new RawSourceWaveStream(
+                        new MemoryStream(audioData),
+                        new WaveFormat(16000, 16, 1)); // Match Sherpa's sample rate
+                    waveOut.Init(waveProvider);
+                    waveOut.Play();
+                    while (waveOut.PlaybackState == PlaybackState.Playing)
+                    {
+                        Thread.Sleep(100);
+                    }
+                }
+
+                Console.WriteLine($"Played audio for: {text}");
             }
-
-            Console.WriteLine($"Played audio for: {text}");
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during playback: {ex.Message}");
+            }
         }
-        catch (Exception ex)
+
+        public void SetRate(int rate)
         {
-            Console.WriteLine($"Error during playback: {ex.Message}");
+            if (_ttsEngine != null)
+            {
+                float adjustedScale = Math.Max(0.5f, Math.Min(2.0f, 1.0f + (rate / 10.0f))); // Adjust rate scale
+                Console.WriteLine($"Playback rate adjusted to: {adjustedScale}");
+            }
         }
-    }
 
-    public void SetRate(int rate)
-    {
-        if (_ttsEngine != null)
+        public void SetVolume(int volume)
         {
-            float adjustedScale = Math.Max(0.5f, Math.Min(2.0f, 1.0f + (rate / 10.0f))); // Adjust rate scale
-            Console.WriteLine($"Playback rate adjusted to: {adjustedScale}");
+            // Volume adjustment (0-100)
+            float normalizedVolume = Math.Max(0, Math.Min(100, volume)) / 100.0f;
+            Console.WriteLine($"Volume set to: {normalizedVolume}");
         }
-    }
 
-    public void SetVolume(int volume)
-    {
-        // Volume adjustment (0-100)
-        float normalizedVolume = Math.Max(0, Math.Min(100, volume)) / 100.0f;
-        Console.WriteLine($"Volume set to: {normalizedVolume}");
-    }
+        public void Pause()
+        {
+            Console.WriteLine("TTS paused.");
+        }
 
-    public void Pause()
-    {
-        Console.WriteLine("TTS paused.");
-    }
-
-    public void Resume()
-    {
-        Console.WriteLine("TTS resumed.");
+        public void Resume()
+        {
+            Console.WriteLine("TTS resumed.");
+        }
     }
 }

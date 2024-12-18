@@ -5,7 +5,23 @@ using System.Threading.Tasks;
 
 public class ModelInstaller
 {
-    private readonly string modelsDirectory = "./models";
+    private readonly string modelsDirectory;
+
+    public ModelInstaller()
+    {
+        // Use Program Files for all users
+        modelsDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "OpenSpeech",
+            "models"
+        );
+        
+        // Ensure directory exists with proper permissions
+        if (!Directory.Exists(modelsDirectory))
+        {
+            Directory.CreateDirectory(modelsDirectory);
+        }
+    }
 
     public async Task DownloadAndExtractModelAsync(TtsModel model)
     {
@@ -25,15 +41,15 @@ public class ModelInstaller
         try
         {
             // Attempt to download model files
-            Console.WriteLine("Downloading model.onnx...");
+            Console.WriteLine($"Downloading model.onnx to {modelPath}...");
             await downloader.DownloadFileTaskAsync($"{model.Url}/model.onnx", modelPath);
 
-            Console.WriteLine("Downloading tokens.txt...");
+            Console.WriteLine($"Downloading tokens.txt to {tokensPath}...");
             await downloader.DownloadFileTaskAsync($"{model.Url}/tokens.txt", tokensPath);
 
             // Set the paths in the model object
-            model.ModelPath = Path.GetFullPath(modelPath);
-            model.TokensPath = Path.GetFullPath(tokensPath);
+            model.ModelPath = modelPath;
+            model.TokensPath = tokensPath;
             model.LexiconPath = ""; // Leave empty for MMS models
 
             Console.WriteLine($"Downloaded model and tokens for {model.Id}.");
@@ -55,8 +71,8 @@ public class ModelInstaller
                 File.Copy(localTokensPath, tokensPath, overwrite: true);
 
                 // Set the paths in the model object
-                model.ModelPath = Path.GetFullPath(modelPath);
-                model.TokensPath = Path.GetFullPath(tokensPath);
+                model.ModelPath = modelPath;
+                model.TokensPath = tokensPath;
                 model.LexiconPath = ""; // Leave empty for MMS models
 
                 Console.WriteLine("Successfully used the local copy.");

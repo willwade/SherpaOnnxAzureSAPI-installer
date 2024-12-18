@@ -5,8 +5,13 @@
     <TargetFramework>net6.0-windows</TargetFramework>
     <UseWindowsForms>false</UseWindowsForms>
     <RootNamespace>TTSInstaller</RootNamespace>
-	  <AssemblyName>TTSInstaller</AssemblyName>
+    <AssemblyName>TTSInstaller</AssemblyName>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
