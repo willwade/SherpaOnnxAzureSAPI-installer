@@ -21,22 +21,21 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
+      - name: Install WiX Toolset
+        run: |
+          dotnet tool install --global wix
+          dotnet tool install --global wix.tools
+
       - name: Restore Dependencies
-        run: dotnet restore TTSInstaller.csproj
+        run: dotnet restore
 
       - name: Build Project
-        run: dotnet build TTSInstaller.csproj -c Release
-
-      - name: Publish as Single File EXE
         run: |
-          dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
-
-      - name: Install WiX Toolset
-        uses: wixtoolset/setup-wix3-action@v1
+          dotnet build -c Release
+          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 
       - name: Build WiX Installer
-        run: |
-          wix build -o TTSInstaller.msi TTSInstaller.wxs
+        run: dotnet build TTSInstaller.wixproj -c Release -p:Platform=x64
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
@@ -45,10 +44,11 @@ jobs:
           path: |
             ./bin/Release/net6.0-windows/win-x64/publish/TTSInstaller.exe
             ./bin/Release/net6.0-windows/win-x64/publish/OpenSpeechTTS.dll
-            ./TTSInstaller.msi
+            ./bin/Release/TTSInstaller.msi
 
   sign:
     runs-on: windows-latest
+    needs: build
     if: always()
 
     steps:
