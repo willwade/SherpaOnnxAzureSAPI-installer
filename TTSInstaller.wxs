@@ -19,27 +19,27 @@
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
-        <Component Id="MainExecutable" Bitness="always64">
+        <Component Id="MainExecutable" Guid="*">
           <File Id="TTSInstallerEXE" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes"/>
         </Component>
         
-        <Component Id="OpenSpeechTTSDLL" Bitness="always64">
+        <Component Id="OpenSpeechTTSDLL" Guid="*">
           <File Id="OpenSpeechTTSDLL" Source="OpenSpeechTTS\bin\Release\net48\OpenSpeechTTS.dll" KeyPath="yes"/>
         </Component>
         
-        <Component Id="NAudioDLL" Bitness="always64">
+        <Component Id="NAudioDLL" Guid="*">
           <File Id="NAudioDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.dll" KeyPath="yes"/>
         </Component>
         
-        <Component Id="NAudioCoreDLL" Bitness="always64">
+        <Component Id="NAudioCoreDLL" Guid="*">
           <File Id="NAudioCoreDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Core.dll" KeyPath="yes"/>
         </Component>
         
-        <Component Id="NAudioWasapiDLL" Bitness="always64">
+        <Component Id="NAudioWasapiDLL" Guid="*">
           <File Id="NAudioWasapiDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Wasapi.dll" KeyPath="yes"/>
         </Component>
         
-        <Component Id="SherpaDLL" Bitness="always64">
+        <Component Id="SherpaDLL" Guid="*">
           <File Id="SherpaDLL" Source="OpenSpeechTTS\bin\Release\net48\sherpa-onnx.dll" KeyPath="yes"/>
         </Component>
       </Directory>

@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using NAudio.Wave;
+using Microsoft.Win32;
 
 [ComVisible(true)]
 [ClassInterface(ClassInterfaceType.None)]
@@ -10,17 +11,15 @@ using NAudio.Wave;
 public class Sapi5VoiceImpl : ISapi5Voice
 {
     private SherpaTTS _ttsEngine;
+    private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
 
     public Sapi5VoiceImpl()
     {
-        string modelPath = @"C:\Path\To\Models\model.onnx";
-        string tokensPath = @"C:\Path\To\Models\tokens.txt";
-        string lexiconPath = ""; // Leave empty for MMS models
-
         try
         {
             Console.WriteLine("Initializing SherpaTTS...");
-            _ttsEngine = new SherpaTTS(modelPath, tokensPath, lexiconPath);
+            var modelPaths = GetModelPathsFromRegistry();
+            _ttsEngine = new SherpaTTS(modelPaths.ModelPath, modelPaths.TokensPath, modelPaths.LexiconPath);
             Console.WriteLine("SherpaTTS initialized successfully.");
         }
         catch (Exception ex)
@@ -28,6 +27,39 @@ public class Sapi5VoiceImpl : ISapi5Voice
             Console.WriteLine($"Error initializing SherpaTTS: {ex.Message}");
             throw;
         }
+    }
+
+    private (string ModelPath, string TokensPath, string LexiconPath) GetModelPathsFromRegistry()
+    {
+        using (var voicesKey = Registry.LocalMachine.OpenSubKey(RegistryBasePath))
+        {
+            if (voicesKey == null)
+                throw new Exception("SAPI voices registry key not found");
+
+            // Find our voice token by CLSID
+            foreach (var voiceName in voicesKey.GetSubKeyNames())
+            {
+                using (var voiceKey = voicesKey.OpenSubKey($"{voiceName}\\Attributes"))
+                {
+                    if (voiceKey == null) continue;
+
+                    var clsid = voiceKey.GetValue("CLSID") as string;
+                    if (clsid == "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")
+                    {
+                        var modelPath = voiceKey.GetValue("ModelPath") as string;
+                        var tokensPath = voiceKey.GetValue("TokensPath") as string;
+                        var lexiconPath = voiceKey.GetValue("LexiconPath") as string ?? "";
+
+                        if (string.IsNullOrEmpty(modelPath) || string.IsNullOrEmpty(tokensPath))
+                            throw new Exception("Model paths not found in registry");
+
+                        return (modelPath, tokensPath, lexiconPath);
+                    }
+                }
+            }
+        }
+
+        throw new Exception("Voice not found in registry");
     }
 
     public void Speak(string text)
@@ -66,15 +98,16 @@ public class Sapi5VoiceImpl : ISapi5Voice
     {
         if (_ttsEngine != null)
         {
-            float adjustedScale = Math.Max(0.5f, Math.Min(2.0f, 1.0f / rate)); // Example clamping
-            Console.WriteLine($"Playback rate adjusted to: {rate}");
+            float adjustedScale = Math.Max(0.5f, Math.Min(2.0f, 1.0f + (rate / 10.0f))); // Adjust rate scale
+            Console.WriteLine($"Playback rate adjusted to: {adjustedScale}");
         }
     }
 
     public void SetVolume(int volume)
     {
-        // Stub implementation for volume adjustment
-        Console.WriteLine($"Volume set to: {volume}");
+        // Volume adjustment (0-100)
+        float normalizedVolume = Math.Max(0, Math.Min(100, volume)) / 100.0f;
+        Console.WriteLine($"Volume set to: {normalizedVolume}");
     }
 
     public void Pause()
