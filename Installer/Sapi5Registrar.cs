@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using System.IO;
 using System.Globalization;
 using System.Linq;
+using Installer.Shared;
 
 namespace Installer
 {
@@ -10,28 +11,43 @@ namespace Installer
     {
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
 
-        private string GetLcidFromLanguage(string langCode)
+        private string GetLcidFromLanguage(LanguageInfo language)
         {
             try
             {
-                // Convert ISO language code to CultureInfo
+                if (language == null) return "409"; // Default to US English
+
+                // Combine language code and country for full culture code
+                string cultureName = $"{language.LangCode}-{language.Country}";
                 var culture = CultureInfo.GetCultures(CultureTypes.AllCultures)
-                    .FirstOrDefault(c => c.TwoLetterISOLanguageName.Equals(langCode, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(c => c.Name.Equals(cultureName, StringComparison.OrdinalIgnoreCase));
+
+                if (culture != null)
+                {
+                    return culture.LCID.ToString();
+                }
+
+                // Fallback to just language code if country specific culture not found
+                culture = CultureInfo.GetCultures(CultureTypes.AllCultures)
+                    .FirstOrDefault(c => c.TwoLetterISOLanguageName.Equals(language.LangCode, StringComparison.OrdinalIgnoreCase));
 
                 if (culture != null)
                 {
                     return culture.LCID.ToString();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting LCID: {ex.Message}");
+            }
 
-            // Default to English (US) if not found
-            return "409";
+            return "409"; // Default to US English if not found
         }
 
         public void RegisterVoice(TtsModel model, string dllPath)
         {
-            string voiceRegistryPath = $@"{RegistryBasePath}\{model.Id}";
+            // Use model.Name instead of model.Id for the registry key
+            string voiceRegistryPath = $@"{RegistryBasePath}\{model.Name}";
             string clsid = "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2";
             string clsidPath = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}";
             string inprocServer32Path = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}\InprocServer32";
@@ -39,7 +55,7 @@ namespace Installer
             try
             {
                 // Get LCID from the first language in the model
-                string lcid = GetLcidFromLanguage(model.Language.FirstOrDefault()?.LangCode ?? "en");
+                string lcid = GetLcidFromLanguage(model.Language.FirstOrDefault());
 
                 // 1. Register the SAPI voice
                 Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "", model.Name);
@@ -85,9 +101,9 @@ namespace Installer
             }
         }
 
-        public void UnregisterVoice(string voiceId)
+        public void UnregisterVoice(string voiceId, string voiceName)
         {
-            string voiceRegistryPath = $@"{RegistryBasePath}\{voiceId}";
+            string voiceRegistryPath = $@"{RegistryBasePath}\{voiceName}";
             try
             {
                 using (var key = Registry.LocalMachine.OpenSubKey(voiceRegistryPath, true))
@@ -95,13 +111,31 @@ namespace Installer
                     if (key != null)
                     {
                         Registry.LocalMachine.DeleteSubKeyTree(voiceRegistryPath);
-                        Console.WriteLine($"Successfully unregistered voice: {voiceId}");
+                        Console.WriteLine($"Unregistered voice from registry: {voiceName}");
                     }
+                    else
+                    {
+                        Console.WriteLine($"Voice not found in registry: {voiceName}");
+                    }
+                }
+
+                // Also try to clean up model files
+                string modelDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "OpenSpeech",
+                    "models",
+                    voiceId
+                );
+
+                if (Directory.Exists(modelDir))
+                {
+                    Directory.Delete(modelDir, true);
+                    Console.WriteLine($"Deleted model directory: {modelDir}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error unregistering voice {voiceId}: {ex.Message}");
+                Console.WriteLine($"Error unregistering voice '{voiceName}': {ex.Message}");
                 throw;
             }
         }

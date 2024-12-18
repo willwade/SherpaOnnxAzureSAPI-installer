@@ -15,16 +15,48 @@ class Program
 
     static async Task Main(string[] args)
     {
+        if (!IsRunningAsAdministrator())
+        {
+            Console.WriteLine("This application requires administrative privileges to install voices.");
+            Console.WriteLine("Please run as administrator.");
+            return;
+        }
+
         var installer = new ModelInstaller();
         var registrar = new Sapi5Registrar();
         string dllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
 
-        // Check for uninstall argument
-        if (args.Length > 0 && args[0] == "uninstall")
+        // Check for command line arguments
+        if (args.Length >= 2)
         {
-            await UninstallVoicesAndDll(registrar, dllPath);
-            return;
+            string command = args[0].ToLower();
+            string modelId = args[1];
+
+            switch (command)
+            {
+                case "install":
+                    await InstallSpecificVoice(modelId, installer, registrar, dllPath);
+                    return;
+
+                case "uninstall":
+                    if (modelId == "all")
+                    {
+                        await UninstallVoicesAndDll(registrar, dllPath);
+                    }
+                    else
+                    {
+                        await UninstallSpecificVoice(modelId, registrar);
+                    }
+                    return;
+
+                default:
+                    Console.WriteLine("Invalid command. Use 'install <model-id>' or 'uninstall <model-id|all>'");
+                    return;
+            }
         }
+
+        // If no arguments provided, continue with interactive mode
+        Console.WriteLine("Interactive Mode:");
 
         // Load models JSON
         var models = await LoadModelsAsync();
@@ -55,7 +87,6 @@ class Program
                     (lang.LangCode?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (lang.LanguageName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)))
             );
-
 
             if (!filteredModels.Any())
             {
@@ -98,7 +129,6 @@ class Program
         }
     }
 
-
     static async Task<Dictionary<string, TtsModel>> LoadModelsAsync()
     {
         try
@@ -108,7 +138,7 @@ class Program
             var json = await client.GetStringAsync(OnlineJsonUrl);
             File.WriteAllText(LocalJsonPath, json); // Cache the downloaded file
             Console.WriteLine("Successfully loaded merged_models.json from the web.");
-            
+
             // Deserialize JSON into a dictionary of TtsModel
             return JsonConvert.DeserializeObject<Dictionary<string, TtsModel>>(json);
         }
@@ -117,12 +147,11 @@ class Program
             Console.WriteLine("Failed to download merged_models.json. Using local copy.");
             if (!File.Exists(LocalJsonPath))
                 throw new FileNotFoundException("Local merged_models.json not found.");
-            
+
             var json = File.ReadAllText(LocalJsonPath);
             return JsonConvert.DeserializeObject<Dictionary<string, TtsModel>>(json);
         }
     }
-
 
     private static async Task UninstallVoicesAndDll(Sapi5Registrar registrar, string dllPath)
     {
@@ -133,7 +162,7 @@ class Program
         {
             try
             {
-                registrar.UnregisterVoice(model.Id);
+                registrar.UnregisterVoice(model.Id, model.Name);
                 Console.WriteLine($"Unregistered voice: {model.Name}");
             }
             catch (Exception ex)
@@ -142,14 +171,32 @@ class Program
             }
         }
 
-        // Check if any models remain; if not, unregister DLL
-        var modelDirs = Directory.Exists("./models") ? Directory.GetDirectories("./models") : Array.Empty<string>();
+        // Check if any models remain in Program Files
+        string modelsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "OpenSpeech",
+            "models"
+        );
+
+        var modelDirs = Directory.Exists(modelsDir) ? Directory.GetDirectories(modelsDir) : Array.Empty<string>();
         if (modelDirs.Length == 0)
         {
             UnregisterDll(dllPath);
-        }
 
-        Console.WriteLine("Uninstallation complete.");
+            // Clean up OpenSpeech directory if empty
+            try
+            {
+                if (Directory.Exists(modelsDir))
+                {
+                    Directory.Delete(modelsDir, true);
+                    Console.WriteLine($"Cleaned up models directory: {modelsDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error cleaning up models directory: {ex.Message}");
+            }
+        }
     }
 
     private static void UnregisterDll(string dllPath)
@@ -169,6 +216,50 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"Error unregistering DLL: {ex.Message}");
+        }
+    }
+
+    private static async Task InstallSpecificVoice(string modelId, ModelInstaller installer, Sapi5Registrar registrar, string dllPath)
+    {
+        try
+        {
+            var models = await LoadModelsAsync();
+            if (models.TryGetValue(modelId, out var model))
+            {
+                Console.WriteLine($"Installing voice: {model.Name}...");
+                await installer.DownloadAndExtractModelAsync(model);
+                registrar.RegisterVoice(model, dllPath);
+                Console.WriteLine($"Successfully installed voice: {model.Name}");
+            }
+            else
+            {
+                Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to install voice: {ex.Message}");
+        }
+    }
+
+    private static async Task UninstallSpecificVoice(string modelId, Sapi5Registrar registrar)
+    {
+        try
+        {
+            var models = await LoadModelsAsync();
+            if (models.TryGetValue(modelId, out var model))
+            {
+                registrar.UnregisterVoice(model.Id, model.Name);
+                Console.WriteLine($"Successfully uninstalled voice: {model.Name}");
+            }
+            else
+            {
+                Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to uninstall voice: {ex.Message}");
         }
     }
 

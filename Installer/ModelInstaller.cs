@@ -2,10 +2,15 @@ using Downloader;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.IO.Compression;
+using System.Net.Http;
+using ICSharpCode.SharpZipLib.BZip2;
+using ICSharpCode.SharpZipLib.Tar;
 
 public class ModelInstaller
 {
     private readonly string modelsDirectory;
+    private readonly string tempDirectory;
 
     public ModelInstaller()
     {
@@ -16,54 +21,98 @@ public class ModelInstaller
             "models"
         );
         
-        // Ensure directory exists with proper permissions
-        if (!Directory.Exists(modelsDirectory))
-        {
-            Directory.CreateDirectory(modelsDirectory);
-        }
+        tempDirectory = Path.Combine(Path.GetTempPath(), "OpenSpeech");
+        
+        // Ensure directories exist with proper permissions
+        Directory.CreateDirectory(modelsDirectory);
+        Directory.CreateDirectory(tempDirectory);
     }
 
     public async Task DownloadAndExtractModelAsync(TtsModel model)
     {
         string modelDir = Path.Combine(modelsDirectory, model.Id);
+        Console.WriteLine($"Creating model directory: {modelDir}");
         Directory.CreateDirectory(modelDir);
 
         string modelPath = Path.Combine(modelDir, "model.onnx");
         string tokensPath = Path.Combine(modelDir, "tokens.txt");
+        string archivePath = Path.Combine(tempDirectory, $"{model.Id}.tar.bz2");
 
-        var downloader = new DownloadService(new DownloadConfiguration
-        {
-            ChunkCount = 4, // Download in parallel chunks
-            ParallelDownload = true, // Enable parallel downloads
-            ReserveStorageSpaceBeforeStartingDownload = true
-        });
+        Console.WriteLine($"Model will be downloaded to: {modelPath}");
+        Console.WriteLine($"Tokens will be downloaded to: {tokensPath}");
 
         try
         {
-            // Attempt to download model files
-            Console.WriteLine($"Downloading model.onnx to {modelPath}...");
-            await downloader.DownloadFileTaskAsync($"{model.Url}/model.onnx", modelPath);
+            // Download the tar.bz2 archive
+            Console.WriteLine($"Downloading archive from {model.Url}");
+            using (var client = new HttpClient())
+            {
+                var response = await client.GetAsync(model.Url);
+                response.EnsureSuccessStatusCode();
+                using (var fs = new FileStream(archivePath, FileMode.Create))
+                {
+                    await response.Content.CopyToAsync(fs);
+                }
+            }
 
-            Console.WriteLine($"Downloading tokens.txt to {tokensPath}...");
-            await downloader.DownloadFileTaskAsync($"{model.Url}/tokens.txt", tokensPath);
+            // Extract files from tar.bz2
+            Console.WriteLine("Extracting files from archive...");
+            using (var fs = File.OpenRead(archivePath))
+            using (var bz2 = new BZip2InputStream(fs))
+            using (var tar = new TarInputStream(bz2))
+            {
+                TarEntry entry;
+                while ((entry = tar.GetNextEntry()) != null)
+                {
+                    if (entry.Name.EndsWith("model.onnx", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var outStream = File.Create(modelPath))
+                        {
+                            tar.CopyEntryContents(outStream);
+                        }
+                        Console.WriteLine($"Extracted model.onnx to {modelPath}");
+                    }
+                    else if (entry.Name.EndsWith("tokens.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var outStream = File.Create(tokensPath))
+                        {
+                            tar.CopyEntryContents(outStream);
+                        }
+                        Console.WriteLine($"Extracted tokens.txt to {tokensPath}");
+                    }
+                }
+            }
+
+            // Clean up temp file
+            try
+            {
+                File.Delete(archivePath);
+            }
+            catch { }
+
+            // Verify files exist and have content
+            if (!File.Exists(modelPath) || new FileInfo(modelPath).Length == 0)
+                throw new Exception($"Model file not found or empty at {modelPath}");
+            if (!File.Exists(tokensPath) || new FileInfo(tokensPath).Length == 0)
+                throw new Exception($"Tokens file not found or empty at {tokensPath}");
 
             // Set the paths in the model object
             model.ModelPath = modelPath;
             model.TokensPath = tokensPath;
             model.LexiconPath = ""; // Leave empty for MMS models
 
-            Console.WriteLine($"Downloaded model and tokens for {model.Id}.");
+            Console.WriteLine($"Successfully downloaded and extracted files for {model.Id}.");
             Console.WriteLine($"Model path: {model.ModelPath}");
             Console.WriteLine($"Tokens path: {model.TokensPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to download model: {ex.Message}");
+            Console.WriteLine($"Failed to download/extract model: {ex.Message}");
             Console.WriteLine("Falling back to local copy...");
 
             // Fallback to local copy
-            string localModelPath = $"./local/{model.Id}/model.onnx";
-            string localTokensPath = $"./local/{model.Id}/tokens.txt";
+            string localModelPath = Path.Combine("local", model.Id, "model.onnx");
+            string localTokensPath = Path.Combine("local", model.Id, "tokens.txt");
 
             if (File.Exists(localModelPath) && File.Exists(localTokensPath))
             {
