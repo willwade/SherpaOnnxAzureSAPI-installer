@@ -71,5 +71,14 @@ To uninstall:
 - Review the install.log file in the project directory for detailed logs
 - For permission errors during build, ensure you're running as Administrator
 
+
+## whats not working?
+
+- voice isnt showing up in sapi applications eg balabolka
+- basic test synth not working. should do
+- we have a error about strong tyoes in nuget sherpa onnx. ive dine wacky workarounds but not sure its needed
+
+
+
 ## License
 This project is licensed under Apache 2.0.
