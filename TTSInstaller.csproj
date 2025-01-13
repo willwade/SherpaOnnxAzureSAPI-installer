@@ -20,6 +20,7 @@
     <PackageReference Include="NAudio" Version="2.0.1" />
     <PackageReference Include="SharpCompress" Version="0.30.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
     <ProjectReference Include="OpenSpeechTTS\OpenSpeechTTS.csproj" />
   </ItemGroup>

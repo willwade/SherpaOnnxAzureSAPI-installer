@@ -1,40 +1,66 @@
 using System;
-using System.Linq;
+using System.IO;
 using SherpaOnnx;
 
-public class SherpaTTS
+namespace OpenSpeechTTS
 {
-    private OfflineTts _tts;
-
-    public SherpaTTS(string modelPath, string tokensPath, string lexiconPath = "")
+    public class SherpaTTS : IDisposable
     {
-        // Correct property-based initialization
-        var vitsConfig = new OfflineTtsVitsModelConfig
+        private readonly OfflineTts _tts;
+
+        public SherpaTTS(string modelPath, string tokensPath, string lexiconPath = "", string dataDirPath = "")
         {
-            Model = modelPath,
-            Lexicon = lexiconPath,
-            Tokens = tokensPath,
-            NoiseScale = 0.667f,
-            NoiseScaleW = 0.8f,
-            LengthScale = 1.0f
-        };
+            try
+            {
+                var config = new OfflineTtsConfig();
+                config.Model.Vits.Model = modelPath;
+                config.Model.Vits.Tokens = tokensPath;
+                config.Model.Vits.Lexicon = lexiconPath;
+                config.Model.Vits.DataDir = dataDirPath;
+                config.Model.Vits.NoiseScale = 0.667f;
+                config.Model.Vits.NoiseScaleW = 0.8f;
+                config.Model.Vits.LengthScale = 1.0f;
+                config.Model.NumThreads = 1;
+                config.Model.Debug = 0;
+                config.Model.Provider = "cpu";
 
-        var modelConfig = new OfflineTtsModelConfig { Vits = vitsConfig };
-        var config = new OfflineTtsConfig { Model = modelConfig };
+                _tts = new OfflineTts(config);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to initialize SherpaTTS: {ex.Message}", ex);
+            }
+        }
 
-        _tts = new OfflineTts(config);
-    }
+        public byte[] GenerateAudio(string text, float speed = 1.0f, int speakerId = 0)
+        {
+            try
+            {
+                var audio = _tts.Generate(text, speed, speakerId);
+                
+                // Convert float samples to 16-bit PCM
+                var pcmSamples = new byte[audio.Samples.Length * 2];
+                for (int i = 0; i < audio.Samples.Length; i++)
+                {
+                    var sample = (short)(audio.Samples[i] * short.MaxValue);
+                    var bytes = BitConverter.GetBytes(sample);
+                    pcmSamples[i * 2] = bytes[0];
+                    pcmSamples[i * 2 + 1] = bytes[1];
+                }
 
-    public byte[] GenerateAudio(string text, float speed = 1.0f, int speakerId = 0)
-    {
-    var audioData = _tts.Generate(text, speed, speakerId);
+                return pcmSamples;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to generate audio: {ex.Message}", ex);
+            }
+        }
 
-    if (audioData == null || audioData.Samples.Length == 0)
-        throw new Exception("Failed to generate audio.");
+        public int SampleRate => _tts.SampleRate;
 
-    // Convert float samples to 16-bit PCM byte array
-    return audioData.Samples
-        .SelectMany(sample => BitConverter.GetBytes((short)(sample * short.MaxValue)))
-        .ToArray();
+        public void Dispose()
+        {
+            _tts?.Dispose();
+        }
     }
 }

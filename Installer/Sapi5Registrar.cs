@@ -1,9 +1,8 @@
 using System;
-using Microsoft.Win32;
-using System.IO;
-using System.Globalization;
 using System.Linq;
-using Installer.Shared;
+using System.Collections.Generic;
+using Microsoft.Win32;
+using System.Globalization;
 
 namespace Installer
 {
@@ -15,127 +14,136 @@ namespace Installer
         {
             try
             {
-                if (language == null) return "409"; // Default to US English
+                if (language == null) return "0409"; // Default to en-US if no language specified
 
-                // Combine language code and country for full culture code
-                string cultureName = $"{language.LangCode}-{language.Country}";
-                var culture = CultureInfo.GetCultures(CultureTypes.AllCultures)
-                    .FirstOrDefault(c => c.Name.Equals(cultureName, StringComparison.OrdinalIgnoreCase));
-
-                if (culture != null)
+                // Special handling for British English
+                if (language.LangCode?.Equals("en", StringComparison.OrdinalIgnoreCase) == true &&
+                    (language.Country?.Equals("GB", StringComparison.OrdinalIgnoreCase) == true ||
+                     language.Country?.Equals("UK", StringComparison.OrdinalIgnoreCase) == true))
                 {
-                    return culture.LCID.ToString();
+                    return "0809"; // British English
                 }
 
-                // Fallback to just language code if country specific culture not found
-                culture = CultureInfo.GetCultures(CultureTypes.AllCultures)
-                    .FirstOrDefault(c => c.TwoLetterISOLanguageName.Equals(language.LangCode, StringComparison.OrdinalIgnoreCase));
+                // Create culture name from language code and country
+                string cultureName = !string.IsNullOrEmpty(language.Country) 
+                    ? $"{language.LangCode}-{language.Country}"
+                    : language.LangCode;
 
-                if (culture != null)
+                try
                 {
-                    return culture.LCID.ToString();
+                    var culture = CultureInfo.GetCultureInfo(cultureName);
+                    return culture.LCID.ToString("X4"); // Format as 4-digit hex
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Could not find culture for {cultureName}: {ex.Message}");
+                    
+                    // Try just the language code if country-specific lookup failed
+                    try
+                    {
+                        var culture = CultureInfo.GetCultureInfo(language.LangCode);
+                        return culture.LCID.ToString("X4");
+                    }
+                    catch
+                    {
+                        Console.WriteLine($"Warning: Could not find culture for language code {language.LangCode}");
+                        return "0409"; // Default to en-US if all lookups fail
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting LCID: {ex.Message}");
+                return "0409"; // Default to en-US if any error occurs
             }
+        }
 
-            return "409"; // Default to US English if not found
+        private string GetGenderAttribute(string gender)
+        {
+            if (string.IsNullOrEmpty(gender))
+                return "Male"; // Default to Male if not specified
+
+            // Handle common variations
+            switch (gender.Trim().ToLowerInvariant())
+            {
+                case "f":
+                case "female":
+                    return "Female";
+                case "m":
+                case "male":
+                    return "Male";
+                case "n":
+                case "neutral":
+                    return "Neutral";
+                default:
+                    return "Male"; // Default to Male for unknown values
+            }
         }
 
         public void RegisterVoice(TtsModel model, string dllPath)
         {
-            // Use model.Name instead of model.Id for the registry key
             string voiceRegistryPath = $@"{RegistryBasePath}\{model.Name}";
-            string clsid = "3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2";
-            string clsidPath = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}";
-            string inprocServer32Path = $@"HKEY_CLASSES_ROOT\CLSID\{clsid}\InprocServer32";
 
             try
             {
                 // Get LCID from the first language in the model
-                string lcid = GetLcidFromLanguage(model.Language.FirstOrDefault());
+                var language = model.Language.FirstOrDefault();
+                string lcid = GetLcidFromLanguage(language);
 
-                // 1. Register the SAPI voice
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "", model.Name);
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "Lang", lcid);
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "Gender", "Neutral");
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "Age", "Adult");
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "Vendor", model.Developer);
-                Registry.SetValue($@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}", "Version", "1.0");
+                Console.WriteLine($"Registering voice with LCID: {lcid}");
 
-                // Add Attributes subkey with CLSID, VoicePath, and model paths
-                string attributesPath = $@"HKEY_LOCAL_MACHINE\{voiceRegistryPath}\Attributes";
-                Registry.SetValue(attributesPath, "CLSID", clsid);
-                Registry.SetValue(attributesPath, "VoicePath", Path.GetFullPath(dllPath)); // Use full path
-                Registry.SetValue(attributesPath, "ModelPath", Path.GetFullPath(model.ModelPath)); // Use full path
-                Registry.SetValue(attributesPath, "TokensPath", Path.GetFullPath(model.TokensPath)); // Use full path
-                Registry.SetValue(attributesPath, "LexiconPath", model.LexiconPath ?? "");
-                Registry.SetValue(attributesPath, "ModelType", model.ModelType ?? "vits");
+                using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
+                {
+                    // 1. Register the SAPI voice
+                    voiceKey.SetValue("", model.Name);
+                    voiceKey.SetValue(lcid, model.Name); // Register for the specific language
+                    voiceKey.SetValue("CLSID", "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}");
+                    voiceKey.SetValue("Path", dllPath);
 
-                // 2. Register the COM class CLSID with InprocServer32
-                Registry.SetValue(clsidPath, "", "OpenSpeechTTS.Sapi5VoiceImpl");
-                Registry.SetValue(inprocServer32Path, "", @"mscoree.dll"); // Just use mscoree.dll, Windows will find it
-                Registry.SetValue(inprocServer32Path, "ThreadingModel", "Both");
-                Registry.SetValue(inprocServer32Path, "Class", "OpenSpeechTTS.Sapi5VoiceImpl");
-                Registry.SetValue(inprocServer32Path, "Assembly", "OpenSpeechTTS, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null");
-                Registry.SetValue(inprocServer32Path, "RuntimeVersion", "v4.0.30319");
-                Registry.SetValue(inprocServer32Path, "CodeBase", $"file:///{Path.GetFullPath(dllPath)}"); // Use file:/// format
+                    // 2. Set voice attributes
+                    using (var attributesKey = voiceKey.CreateSubKey("Attributes"))
+                    {
+                        attributesKey.SetValue("Language", lcid);
+                        attributesKey.SetValue("Gender", GetGenderAttribute(model.Gender));
+                        attributesKey.SetValue("Age", "Adult");
+                        attributesKey.SetValue("Vendor", model.Developer);
+                        attributesKey.SetValue("Version", "1.0");
+                        attributesKey.SetValue("Name", model.Name);
 
-                // 3. Register the ProgID
-                string progId = "OpenSpeechTTS.Sapi5VoiceImpl";
-                Registry.SetValue($@"HKEY_CLASSES_ROOT\{progId}", "", "OpenSpeechTTS SAPI5 Voice Implementation");
-                Registry.SetValue($@"HKEY_CLASSES_ROOT\{progId}\CLSID", "", clsid);
-                Registry.SetValue(clsidPath, "ProgId", progId);
+                        // 3. Set model paths
+                        attributesKey.SetValue("Model Path", model.ModelPath);
+                        attributesKey.SetValue("Tokens Path", model.TokensPath);
+                    }
+                }
 
                 Console.WriteLine($"Registered voice '{model.Name}' successfully with SAPI5 and COM.");
-                Console.WriteLine($"Model path: {Path.GetFullPath(model.ModelPath)}");
-                Console.WriteLine($"Tokens path: {Path.GetFullPath(model.TokensPath)}");
-                Console.WriteLine($"DLL path: {Path.GetFullPath(dllPath)}");
+                Console.WriteLine($"Language ID: {lcid}");
+                Console.WriteLine($"Model path: {model.ModelPath}");
+                Console.WriteLine($"Tokens path: {model.TokensPath}");
+                Console.WriteLine($"DLL path: {dllPath}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error registering voice '{model.Name}': {ex.Message}");
-                throw;
+                throw new Exception($"Failed to register voice: {ex.Message}", ex);
             }
         }
 
-        public void UnregisterVoice(string voiceId, string voiceName)
+        public void UnregisterVoice(string voiceId)
         {
-            string voiceRegistryPath = $@"{RegistryBasePath}\{voiceName}";
             try
             {
-                using (var key = Registry.LocalMachine.OpenSubKey(voiceRegistryPath, true))
+                using (var voicesKey = Registry.LocalMachine.OpenSubKey(RegistryBasePath, true))
                 {
-                    if (key != null)
+                    if (voicesKey != null)
                     {
-                        Registry.LocalMachine.DeleteSubKeyTree(voiceRegistryPath);
-                        Console.WriteLine($"Unregistered voice from registry: {voiceName}");
+                        voicesKey.DeleteSubKeyTree(voiceId, false);
+                        Console.WriteLine($"Successfully unregistered voice: {voiceId}");
                     }
-                    else
-                    {
-                        Console.WriteLine($"Voice not found in registry: {voiceName}");
-                    }
-                }
-
-                // Also try to clean up model files
-                string modelDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                    "OpenSpeech",
-                    "models",
-                    voiceId
-                );
-
-                if (Directory.Exists(modelDir))
-                {
-                    Directory.Delete(modelDir, true);
-                    Console.WriteLine($"Deleted model directory: {modelDir}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error unregistering voice '{voiceName}': {ex.Message}");
+                Console.WriteLine($"Error unregistering voice {voiceId}: {ex.Message}");
                 throw;
             }
         }

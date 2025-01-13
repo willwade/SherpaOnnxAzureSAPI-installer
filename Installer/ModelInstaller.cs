@@ -62,25 +62,41 @@ public class ModelInstaller
             using (var tar = new TarInputStream(bz2))
             {
                 TarEntry entry;
+                bool foundModel = false;
+                bool foundTokens = false;
+
                 while ((entry = tar.GetNextEntry()) != null)
                 {
-                    if (entry.Name.EndsWith("model.onnx", StringComparison.OrdinalIgnoreCase))
+                    string entryName = entry.Name.ToLower();
+                    Console.WriteLine($"Found entry: {entry.Name}");
+
+                    if (entryName.EndsWith(".onnx") && !entryName.EndsWith(".onnx.json"))
                     {
                         using (var outStream = File.Create(modelPath))
                         {
                             tar.CopyEntryContents(outStream);
                         }
-                        Console.WriteLine($"Extracted model.onnx to {modelPath}");
+                        Console.WriteLine($"Extracted model file to {modelPath}");
+                        foundModel = true;
                     }
-                    else if (entry.Name.EndsWith("tokens.txt", StringComparison.OrdinalIgnoreCase))
+                    else if (entryName.EndsWith("tokens.txt"))
                     {
                         using (var outStream = File.Create(tokensPath))
                         {
                             tar.CopyEntryContents(outStream);
                         }
                         Console.WriteLine($"Extracted tokens.txt to {tokensPath}");
+                        foundTokens = true;
                     }
+
+                    if (foundModel && foundTokens)
+                        break;
                 }
+
+                if (!foundModel)
+                    throw new Exception("ONNX model file not found in archive");
+                if (!foundTokens)
+                    throw new Exception("tokens.txt not found in archive");
             }
 
             // Clean up temp file

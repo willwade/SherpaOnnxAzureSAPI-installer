@@ -13,6 +13,7 @@ public class TtsModel
     public string Url { get; set; }
     public bool Compression { get; set; }
     public double FilesizeMb { get; set; }
+    public string Gender { get; set; }
 
     // Model file paths (set after downloading)
     public string ModelPath { get; set; }

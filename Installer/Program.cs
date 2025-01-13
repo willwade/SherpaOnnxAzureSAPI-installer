@@ -38,6 +38,10 @@ class Program
                     await InstallSpecificVoice(modelId, installer, registrar, dllPath);
                     return;
 
+                case "verify":
+                    await VerifyVoiceInstallation(modelId);
+                    return;
+
                 case "uninstall":
                     if (modelId == "all")
                     {
@@ -50,7 +54,7 @@ class Program
                     return;
 
                 default:
-                    Console.WriteLine("Invalid command. Use 'install <model-id>' or 'uninstall <model-id|all>'");
+                    Console.WriteLine("Invalid command. Use 'install <model-id>', 'verify <model-id>', or 'uninstall <model-id|all>'");
                     return;
             }
         }
@@ -162,7 +166,7 @@ class Program
         {
             try
             {
-                registrar.UnregisterVoice(model.Id, model.Name);
+                registrar.UnregisterVoice(model.Id);
                 Console.WriteLine($"Unregistered voice: {model.Name}");
             }
             catch (Exception ex)
@@ -221,24 +225,48 @@ class Program
 
     private static async Task InstallSpecificVoice(string modelId, ModelInstaller installer, Sapi5Registrar registrar, string dllPath)
     {
-        try
+        Console.WriteLine($"Installing voice: {modelId}");
+        var models = await LoadModelsAsync();
+
+        if (models.TryGetValue(modelId, out var model))
         {
-            var models = await LoadModelsAsync();
-            if (models.TryGetValue(modelId, out var model))
+            // Set gender based on model name/id if not already set
+            if (string.IsNullOrEmpty(model.Gender))
             {
-                Console.WriteLine($"Installing voice: {model.Name}...");
+                if (model.Name?.Contains("female", StringComparison.OrdinalIgnoreCase) == true ||
+                    model.Id?.Contains("female", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    model.Gender = "Female";
+                }
+                else if (model.Name?.Contains("male", StringComparison.OrdinalIgnoreCase) == true ||
+                         model.Id?.Contains("male", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    model.Gender = "Male";
+                }
+            }
+
+            // Debug language info
+            var language = model.Language?.FirstOrDefault();
+            if (language != null)
+            {
+                Console.WriteLine($"Language Info - Code: {language.LangCode}, Country: {language.Country}");
+            }
+
+            try
+            {
+                Console.WriteLine($"Downloading and installing {model.Name}...");
                 await installer.DownloadAndExtractModelAsync(model);
                 registrar.RegisterVoice(model, dllPath);
                 Console.WriteLine($"Successfully installed voice: {model.Name}");
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
+                Console.WriteLine($"Failed to install voice: {ex.Message}");
             }
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"Failed to install voice: {ex.Message}");
+            Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
         }
     }
 
@@ -249,8 +277,8 @@ class Program
             var models = await LoadModelsAsync();
             if (models.TryGetValue(modelId, out var model))
             {
-                registrar.UnregisterVoice(model.Id, model.Name);
-                Console.WriteLine($"Successfully uninstalled voice: {model.Name}");
+                registrar.UnregisterVoice(modelId);
+                Console.WriteLine($"Successfully uninstalled voice: {modelId}");
             }
             else
             {
@@ -260,6 +288,139 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to uninstall voice: {ex.Message}");
+        }
+    }
+
+    private static async Task VerifyVoiceInstallation(string modelId)
+    {
+        try
+        {
+            var models = await LoadModelsAsync();
+            if (!models.TryGetValue(modelId, out var model))
+            {
+                Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
+                return;
+            }
+
+            Console.WriteLine($"Verifying installation for voice: {model.Name}");
+            Console.WriteLine("----------------------------------------");
+
+            // 1. Check model files
+            string modelDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "OpenSpeech",
+                "models",
+                model.Id
+            );
+            string modelPath = Path.Combine(modelDir, "model.onnx");
+            string tokensPath = Path.Combine(modelDir, "tokens.txt");
+
+            Console.WriteLine("\nChecking model files:");
+            Console.WriteLine($"Model directory: {modelDir}");
+            if (Directory.Exists(modelDir))
+            {
+                Console.WriteLine("✓ Model directory exists");
+                if (File.Exists(modelPath))
+                {
+                    var modelSize = new FileInfo(modelPath).Length;
+                    Console.WriteLine($"✓ model.onnx exists ({modelSize / 1024.0 / 1024.0:F2} MB)");
+                }
+                else
+                {
+                    Console.WriteLine("✗ model.onnx is missing");
+                }
+
+                if (File.Exists(tokensPath))
+                {
+                    var tokensSize = new FileInfo(tokensPath).Length;
+                    Console.WriteLine($"✓ tokens.txt exists ({tokensSize / 1024.0:F2} KB)");
+                }
+                else
+                {
+                    Console.WriteLine("✗ tokens.txt is missing");
+                }
+            }
+            else
+            {
+                Console.WriteLine("✗ Model directory is missing");
+            }
+
+            // 2. Check registry entries
+            Console.WriteLine("\nChecking registry entries:");
+            string registryPath = $@"SOFTWARE\Microsoft\Speech\Voices\Tokens\{model.Name}";
+            using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(registryPath))
+            {
+                if (key != null)
+                {
+                    Console.WriteLine("✓ Voice registry key exists");
+                    
+                    var lang = key.GetValue("Lang");
+                    Console.WriteLine($"Language ID: {lang}");
+                    
+                    var gender = key.GetValue("Gender");
+                    Console.WriteLine($"Gender: {gender}");
+                    
+                    var vendor = key.GetValue("Vendor");
+                    Console.WriteLine($"Vendor: {vendor}");
+
+                    using (var attribKey = key.OpenSubKey("Attributes"))
+                    {
+                        if (attribKey != null)
+                        {
+                            Console.WriteLine("\nAttribute values:");
+                            Console.WriteLine($"CLSID: {attribKey.GetValue("CLSID")}");
+                            Console.WriteLine($"Voice Path: {attribKey.GetValue("VoicePath")}");
+                            Console.WriteLine($"Model Path: {attribKey.GetValue("ModelPath")}");
+                            Console.WriteLine($"Tokens Path: {attribKey.GetValue("TokensPath")}");
+                        }
+                        else
+                        {
+                            Console.WriteLine("✗ Attributes subkey is missing");
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("✗ Voice registry key is missing");
+                }
+            }
+
+            // 3. Test voice with SAPI
+            Console.WriteLine("\nTesting voice with SAPI:");
+            try
+            {
+                var synth = new System.Speech.Synthesis.SpeechSynthesizer();
+                var voices = synth.GetInstalledVoices();
+                var voice = voices.FirstOrDefault(v => v.VoiceInfo.Name == model.Name);
+                
+                if (voice != null)
+                {
+                    Console.WriteLine($"✓ Voice found in SAPI");
+                    Console.WriteLine($"Voice Info:");
+                    Console.WriteLine($"  Name: {voice.VoiceInfo.Name}");
+                    Console.WriteLine($"  Culture: {voice.VoiceInfo.Culture}");
+                    Console.WriteLine($"  Gender: {voice.VoiceInfo.Gender}");
+                    Console.WriteLine($"  Age: {voice.VoiceInfo.Age}");
+                    
+                    Console.WriteLine("\nTesting speech synthesis...");
+                    synth.SelectVoice(model.Name);
+                    synth.SetOutputToDefaultAudioDevice();
+                    synth.Speak("This is a test of the voice installation.");
+                    Console.WriteLine("✓ Speech test completed");
+                }
+                else
+                {
+                    Console.WriteLine("✗ Voice not found in SAPI");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ Speech test failed: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Verification failed: {ex.Message}");
         }
     }
 

@@ -1,0 +1,5 @@
+LIBRARY SherpaNative
+EXPORTS
+    CreateTTS
+    GenerateAudio
+    DestroyTTS

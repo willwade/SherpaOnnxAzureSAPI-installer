@@ -19,28 +19,100 @@
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
+        <Directory Id="ModelsFolder" Name="models">
+          <Directory Id="AmyModelFolder" Name="vits-piper-en_US-amy-low">
+            <Directory Id="AmyEspeakData" Name="espeak-ng-data">
+              <Component Id="AmyEspeakPhondata" Guid="*">
+                <File Id="AmyEspeakPhondata" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\phondata" KeyPath="yes"/>
+              </Component>
+              <Component Id="AmyEspeakPhondataManifest" Guid="*">
+                <File Id="AmyEspeakPhondataManifest" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\phondata-manifest" KeyPath="yes"/>
+              </Component>
+              <Component Id="AmyEspeakPhonindex" Guid="*">
+                <File Id="AmyEspeakPhonindex" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\phonindex" KeyPath="yes"/>
+              </Component>
+              <Component Id="AmyEspeakPhontab" Guid="*">
+                <File Id="AmyEspeakPhontab" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\phontab" KeyPath="yes"/>
+              </Component>
+              <Component Id="AmyEspeakIntonations" Guid="*">
+                <File Id="AmyEspeakIntonations" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\intonations" KeyPath="yes"/>
+              </Component>
+              <Component Id="AmyEspeakEnDict" Guid="*">
+                <File Id="AmyEspeakEnDict" Source="models\vits-piper-en_US-amy-low\espeak-ng-data\en_dict" KeyPath="yes"/>
+              </Component>
+            </Directory>
+            <Component Id="AmyOnnxModel" Guid="*">
+              <File Id="AmyOnnxModel" Source="models\vits-piper-en_US-amy-low\en_US-amy-low.onnx" KeyPath="yes"/>
+            </Component>
+            <Component Id="AmyTokens" Guid="*">
+              <File Id="AmyTokens" Source="models\vits-piper-en_US-amy-low\tokens.txt" KeyPath="yes"/>
+            </Component>
+          </Directory>
+        </Directory>
+
+        <!-- Main Components -->
         <Component Id="MainExecutable" Guid="*">
           <File Id="TTSInstallerEXE" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes"/>
         </Component>
         
         <Component Id="OpenSpeechTTSDLL" Guid="*">
-          <File Id="OpenSpeechTTSDLL" Source="OpenSpeechTTS\bin\Release\net48\OpenSpeechTTS.dll" KeyPath="yes"/>
+          <File Id="OpenSpeechTTSDLL" Source="OpenSpeechTTS\bin\Release\net472\OpenSpeechTTS.dll" KeyPath="yes"/>
         </Component>
         
         <Component Id="NAudioDLL" Guid="*">
-          <File Id="NAudioDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.dll" KeyPath="yes"/>
+          <File Id="NAudioDLL" Source="OpenSpeechTTS\bin\Release\net472\NAudio.dll" KeyPath="yes"/>
         </Component>
         
         <Component Id="NAudioCoreDLL" Guid="*">
-          <File Id="NAudioCoreDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Core.dll" KeyPath="yes"/>
+          <File Id="NAudioCoreDLL" Source="OpenSpeechTTS\bin\Release\net472\NAudio.Core.dll" KeyPath="yes"/>
         </Component>
         
         <Component Id="NAudioWasapiDLL" Guid="*">
-          <File Id="NAudioWasapiDLL" Source="OpenSpeechTTS\bin\Release\net48\NAudio.Wasapi.dll" KeyPath="yes"/>
+          <File Id="NAudioWasapiDLL" Source="OpenSpeechTTS\bin\Release\net472\NAudio.Wasapi.dll" KeyPath="yes"/>
         </Component>
         
-        <Component Id="SherpaDLL" Guid="*">
-          <File Id="SherpaDLL" Source="OpenSpeechTTS\bin\Release\net48\sherpa-onnx.dll" KeyPath="yes"/>
+        <Component Id="SherpaOnnxDLL" Guid="*">
+          <File Id="SherpaOnnxDLL" Source="OpenSpeechTTS\bin\Release\net472\sherpa-onnx.dll" KeyPath="yes"/>
+        </Component>
+
+        <!-- Registry Component -->
+        <Component Id="VoiceRegistryEntries" Guid="*">
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\SPEECH\Voices\Tokens\OpenSpeechAmyVoice">
+            <RegistryValue Id="reg_voice_default" Type="string" Value="OpenSpeech Amy"/>
+            <RegistryValue Id="reg_voice_409" Type="string" Name="409" Value="OpenSpeech Amy"/>
+            <RegistryValue Id="reg_voice_clsid" Type="string" Name="CLSID" Value="{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"/>
+            <RegistryValue Id="reg_voice_path" Type="string" Name="Path" Value="[OpenSpeechFolder]OpenSpeechTTS.dll"/>
+            <RegistryValue Id="reg_voice_model" Type="string" Name="ModelPath" Value="[AmyModelFolder]en_US-amy-low.onnx"/>
+            <RegistryValue Id="reg_voice_tokens" Type="string" Name="TokensPath" Value="[AmyModelFolder]tokens.txt"/>
+            <RegistryValue Id="reg_voice_data" Type="string" Name="DataDirPath" Value="[AmyModelFolder]espeak-ng-data"/>
+            <RegistryValue Id="reg_voice_name" Type="string" Name="Name" Value="OpenSpeech Amy"/>
+            <RegistryValue Id="reg_voice_lang" Type="string" Name="Language" Value="409"/>
+            <RegistryValue Id="reg_voice_gender" Type="string" Name="Gender" Value="Female"/>
+            <RegistryValue Id="reg_voice_age" Type="string" Name="Age" Value="Adult"/>
+          </RegistryKey>
+
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\SPEECH\Voices\Tokens\OpenSpeechAmyVoice\Attributes">
+            <RegistryValue Id="reg_attr_name" Type="string" Name="Name" Value="OpenSpeech Amy"/>
+            <RegistryValue Id="reg_attr_gender" Type="string" Name="Gender" Value="Female"/>
+            <RegistryValue Id="reg_attr_age" Type="string" Name="Age" Value="Adult"/>
+            <RegistryValue Id="reg_attr_lang" Type="string" Name="Language" Value="409"/>
+            <RegistryValue Id="reg_attr_vendor" Type="string" Name="Vendor" Value="OpenSpeech"/>
+            <RegistryValue Id="reg_attr_version" Type="string" Name="Version" Value="1.0"/>
+          </RegistryKey>
+
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices">
+            <RegistryKey Key="Tokens">
+              <RegistryKey Key="OpenSpeechAmyVoice">
+                <RegistryValue Type="string" Value="OpenSpeech Amy"/>
+                <RegistryValue Type="string" Name="409" Value="OpenSpeech Amy"/>
+                <RegistryValue Type="string" Name="CLSID" Value="{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"/>
+                <RegistryValue Type="string" Name="Path" Value="[OpenSpeechFolder]OpenSpeechTTS.dll"/>
+                <RegistryValue Type="string" Name="ModelPath" Value="[AmyModelFolder]en_US-amy-low.onnx"/>
+                <RegistryValue Type="string" Name="TokensPath" Value="[AmyModelFolder]tokens.txt"/>
+                <RegistryValue Type="string" Name="DataDirPath" Value="[AmyModelFolder]espeak-ng-data"/>
+              </RegistryKey>
+            </RegistryKey>
+          </RegistryKey>
         </Component>
       </Directory>
     </StandardDirectory>
@@ -52,7 +124,16 @@
       <ComponentRef Id="NAudioDLL"/>
       <ComponentRef Id="NAudioCoreDLL"/>
       <ComponentRef Id="NAudioWasapiDLL"/>
-      <ComponentRef Id="SherpaDLL"/>
+      <ComponentRef Id="SherpaOnnxDLL"/>
+      <ComponentRef Id="AmyOnnxModel"/>
+      <ComponentRef Id="AmyTokens"/>
+      <ComponentRef Id="AmyEspeakPhondata"/>
+      <ComponentRef Id="AmyEspeakPhondataManifest"/>
+      <ComponentRef Id="AmyEspeakPhonindex"/>
+      <ComponentRef Id="AmyEspeakPhontab"/>
+      <ComponentRef Id="AmyEspeakIntonations"/>
+      <ComponentRef Id="AmyEspeakEnDict"/>
+      <ComponentRef Id="VoiceRegistryEntries"/>
     </Feature>
 
     <!-- Custom Actions -->
