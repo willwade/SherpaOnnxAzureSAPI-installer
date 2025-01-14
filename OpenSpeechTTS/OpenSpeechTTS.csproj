@@ -12,9 +12,17 @@
     <EnableComHosting>true</EnableComHosting>
     <Version>1.0.0.0</Version>
     <Platforms>x64</Platforms>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>OpenSpeechTTS.snk</AssemblyOriginatorKeyFile>
-    <DelaySign>false</DelaySign>
+    <SignAssembly>false</SignAssembly>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AppConfig>App.config</AppConfig>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +36,9 @@
 
   <ItemGroup>
     <None Update="OpenSpeechTTS.snk">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="App.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

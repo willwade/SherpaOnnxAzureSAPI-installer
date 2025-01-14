@@ -1,6 +1,8 @@
 using System;
 using System.Speech.Synthesis;
 using System.Linq;
+using Microsoft.Win32;
+using System.IO;
 
 namespace SimpleTest
 {
@@ -10,10 +12,57 @@ namespace SimpleTest
         {
             try
             {
+                // Test registry access first
+                Console.WriteLine("Testing registry access...");
+                string modelPath = null;
+                string tokensPath = null;
+                string dataDirPath = null;
+
+                using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice"))
+                {
+                    if (key != null)
+                    {
+                        Console.WriteLine("Found registry key. Values:");
+                        foreach (var valueName in key.GetValueNames())
+                        {
+                            var value = key.GetValue(valueName);
+                            Console.WriteLine($"  {valueName}: {value}");
+                            if (valueName == "ModelPath") modelPath = value as string;
+                            if (valueName == "TokensPath") tokensPath = value as string;
+                            if (valueName == "DataDirPath") dataDirPath = value as string;
+                        }
+
+                        Console.WriteLine("\nChecking if files exist:");
+                        if (modelPath != null)
+                        {
+                            Console.WriteLine($"Model file exists: {File.Exists(modelPath)} at {modelPath}");
+                        }
+                        if (tokensPath != null)
+                        {
+                            Console.WriteLine($"Tokens file exists: {File.Exists(tokensPath)} at {tokensPath}");
+                        }
+                        if (dataDirPath != null)
+                        {
+                            Console.WriteLine($"Data directory exists: {Directory.Exists(dataDirPath)} at {dataDirPath}");
+                            if (Directory.Exists(dataDirPath))
+                            {
+                                Console.WriteLine("Data directory contents:");
+                                foreach (var file in Directory.GetFiles(dataDirPath))
+                                {
+                                    Console.WriteLine($"  {Path.GetFileName(file)}");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Registry key not found!");
+                    }
+                }
+
+                Console.WriteLine("\nAvailable voices:");
                 using (var synth = new SpeechSynthesizer())
                 {
-                    // List all available voices
-                    Console.WriteLine("Available voices:");
                     foreach (var voice in synth.GetInstalledVoices())
                     {
                         var info = voice.VoiceInfo;
@@ -50,7 +99,7 @@ namespace SimpleTest
             }
 
             Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
+            try { Console.ReadKey(); } catch { }
         }
     }
 }

@@ -52,7 +52,16 @@
 
         <!-- Main Components -->
         <Component Id="MainExecutable" Guid="*">
-          <File Id="TTSInstallerEXE" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes"/>
+          <File Id="TTSInstallerEXE" Source="bin\Release\net6.0-windows\win-x64\publish\TTSInstaller.exe" KeyPath="yes">
+            <!-- Add a shortcut that requests elevation -->
+            <Shortcut Id="TTSInstallerShortcut" 
+                     Name="OpenSpeech TTS Installer" 
+                     Description="OpenSpeech TTS Voice Installer"
+                     Directory="ProgramMenuFolder"
+                     Advertise="yes">
+              <ShortcutProperty Key="System.AppUserModel.ID" Value="OpenSpeech.TTSInstaller"/>
+            </Shortcut>
+          </File>
         </Component>
         
         <Component Id="OpenSpeechTTSDLL" Guid="*">
@@ -77,41 +86,27 @@
 
         <!-- Registry Component -->
         <Component Id="VoiceRegistryEntries" Guid="*">
-          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\SPEECH\Voices\Tokens\OpenSpeechAmyVoice">
-            <RegistryValue Id="reg_voice_default" Type="string" Value="OpenSpeech Amy"/>
-            <RegistryValue Id="reg_voice_409" Type="string" Name="409" Value="OpenSpeech Amy"/>
-            <RegistryValue Id="reg_voice_clsid" Type="string" Name="CLSID" Value="{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"/>
-            <RegistryValue Id="reg_voice_path" Type="string" Name="Path" Value="[OpenSpeechFolder]OpenSpeechTTS.dll"/>
-            <RegistryValue Id="reg_voice_model" Type="string" Name="ModelPath" Value="[AmyModelFolder]en_US-amy-low.onnx"/>
-            <RegistryValue Id="reg_voice_tokens" Type="string" Name="TokensPath" Value="[AmyModelFolder]tokens.txt"/>
-            <RegistryValue Id="reg_voice_data" Type="string" Name="DataDirPath" Value="[AmyModelFolder]espeak-ng-data"/>
-            <RegistryValue Id="reg_voice_name" Type="string" Name="Name" Value="OpenSpeech Amy"/>
-            <RegistryValue Id="reg_voice_lang" Type="string" Name="Language" Value="409"/>
-            <RegistryValue Id="reg_voice_gender" Type="string" Name="Gender" Value="Female"/>
-            <RegistryValue Id="reg_voice_age" Type="string" Name="Age" Value="Adult"/>
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice">
+            <RegistryValue Type="string" Value="OpenSpeech Amy"/>
+            <RegistryValue Type="string" Name="409" Value="OpenSpeech Amy"/>
+            <RegistryValue Type="string" Name="CLSID" Value="{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"/>
+            <RegistryValue Type="string" Name="Path" Value="[#OpenSpeechTTSDLL]"/>
+            <RegistryValue Type="string" Name="ModelPath" Value="[#AmyOnnxModel]"/>
+            <RegistryValue Type="string" Name="TokensPath" Value="[#AmyTokens]"/>
+            <RegistryValue Type="string" Name="DataDirPath" Value="[AmyEspeakData]"/>
+            <RegistryValue Type="string" Name="Name" Value="OpenSpeech Amy"/>
+            <RegistryValue Type="string" Name="Language" Value="409"/>
+            <RegistryValue Type="string" Name="Gender" Value="Female"/>
+            <RegistryValue Type="string" Name="Age" Value="Adult"/>
           </RegistryKey>
 
-          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\SPEECH\Voices\Tokens\OpenSpeechAmyVoice\Attributes">
-            <RegistryValue Id="reg_attr_name" Type="string" Name="Name" Value="OpenSpeech Amy"/>
-            <RegistryValue Id="reg_attr_gender" Type="string" Name="Gender" Value="Female"/>
-            <RegistryValue Id="reg_attr_age" Type="string" Name="Age" Value="Adult"/>
-            <RegistryValue Id="reg_attr_lang" Type="string" Name="Language" Value="409"/>
-            <RegistryValue Id="reg_attr_vendor" Type="string" Name="Vendor" Value="OpenSpeech"/>
-            <RegistryValue Id="reg_attr_version" Type="string" Name="Version" Value="1.0"/>
-          </RegistryKey>
-
-          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices">
-            <RegistryKey Key="Tokens">
-              <RegistryKey Key="OpenSpeechAmyVoice">
-                <RegistryValue Type="string" Value="OpenSpeech Amy"/>
-                <RegistryValue Type="string" Name="409" Value="OpenSpeech Amy"/>
-                <RegistryValue Type="string" Name="CLSID" Value="{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"/>
-                <RegistryValue Type="string" Name="Path" Value="[OpenSpeechFolder]OpenSpeechTTS.dll"/>
-                <RegistryValue Type="string" Name="ModelPath" Value="[AmyModelFolder]en_US-amy-low.onnx"/>
-                <RegistryValue Type="string" Name="TokensPath" Value="[AmyModelFolder]tokens.txt"/>
-                <RegistryValue Type="string" Name="DataDirPath" Value="[AmyModelFolder]espeak-ng-data"/>
-              </RegistryKey>
-            </RegistryKey>
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice\Attributes">
+            <RegistryValue Type="string" Name="Name" Value="OpenSpeech Amy"/>
+            <RegistryValue Type="string" Name="Gender" Value="Female"/>
+            <RegistryValue Type="string" Name="Age" Value="Adult"/>
+            <RegistryValue Type="string" Name="Language" Value="409"/>
+            <RegistryValue Type="string" Name="Vendor" Value="OpenSpeech"/>
+            <RegistryValue Type="string" Name="Version" Value="1.0"/>
           </RegistryKey>
         </Component>
       </Directory>
@@ -157,7 +152,8 @@
                   Directory="OpenSpeechFolder"
                   ExeCommand="&quot;[#TTSInstallerEXE]&quot;"
                   Execute="commit"
-                  Return="asyncNoWait" />
+                  Return="asyncNoWait"
+                  Impersonate="no" />
 
     <!-- Sequences -->
     <InstallExecuteSequence>
