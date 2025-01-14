@@ -1,66 +1,62 @@
+using NAudio.Wave;
 using System;
 using System.IO;
-using SherpaOnnx;
+using SherpaNative;
 
 namespace OpenSpeechTTS
 {
     public class SherpaTTS : IDisposable
     {
-        private readonly OfflineTts _tts;
+        private readonly SherpaWrapper _tts;
+        private bool _disposed;
 
-        public SherpaTTS(string modelPath, string tokensPath, string lexiconPath = "", string dataDirPath = "")
+        public SherpaTTS(string modelPath, string tokensPath, string lexiconPath, string dataDirPath)
         {
-            try
-            {
-                var config = new OfflineTtsConfig();
-                config.Model.Vits.Model = modelPath;
-                config.Model.Vits.Tokens = tokensPath;
-                config.Model.Vits.Lexicon = lexiconPath;
-                config.Model.Vits.DataDir = dataDirPath;
-                config.Model.Vits.NoiseScale = 0.667f;
-                config.Model.Vits.NoiseScaleW = 0.8f;
-                config.Model.Vits.LengthScale = 1.0f;
-                config.Model.NumThreads = 1;
-                config.Model.Debug = 0;
-                config.Model.Provider = "cpu";
+            if (!File.Exists(modelPath))
+                throw new FileNotFoundException($"Model file not found: {modelPath}");
 
-                _tts = new OfflineTts(config);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to initialize SherpaTTS: {ex.Message}", ex);
-            }
+            if (!File.Exists(tokensPath))
+                throw new FileNotFoundException($"Tokens file not found: {tokensPath}");
+
+            if (!Directory.Exists(dataDirPath))
+                throw new DirectoryNotFoundException($"Data directory not found: {dataDirPath}");
+
+            _tts = new SherpaWrapper(modelPath, tokensPath);
         }
 
-        public byte[] GenerateAudio(string text, float speed = 1.0f, int speakerId = 0)
+        public void SpeakToWaveStream(string text, Stream stream)
         {
-            try
-            {
-                var audio = _tts.Generate(text, speed, speakerId);
-                
-                // Convert float samples to 16-bit PCM
-                var pcmSamples = new byte[audio.Samples.Length * 2];
-                for (int i = 0; i < audio.Samples.Length; i++)
-                {
-                    var sample = (short)(audio.Samples[i] * short.MaxValue);
-                    var bytes = BitConverter.GetBytes(sample);
-                    pcmSamples[i * 2] = bytes[0];
-                    pcmSamples[i * 2 + 1] = bytes[1];
-                }
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(SherpaTTS));
 
-                return pcmSamples;
-            }
-            catch (Exception ex)
+            var bytes = _tts.GenerateWaveform(text);
+
+            using (var writer = new BinaryWriter(stream))
             {
-                throw new Exception($"Failed to generate audio: {ex.Message}", ex);
+                writer.Write(0x46464952); // "RIFF"
+                writer.Write(36 + bytes.Length);
+                writer.Write(0x45564157); // "WAVE"
+                writer.Write(0x20746D66); // "fmt "
+                writer.Write(16);
+                writer.Write((short)1); // PCM
+                writer.Write((short)1); // Mono
+                writer.Write(22050); // Sample rate
+                writer.Write(22050 * 2); // Bytes per second
+                writer.Write((short)2); // Block align
+                writer.Write((short)16); // Bits per sample
+                writer.Write(0x61746164); // "data"
+                writer.Write(bytes.Length);
+                writer.Write(bytes);
             }
         }
-
-        public int SampleRate => _tts.SampleRate;
 
         public void Dispose()
         {
-            _tts?.Dispose();
+            if (!_disposed)
+            {
+                _tts?.Dispose();
+                _disposed = true;
+            }
         }
     }
 }

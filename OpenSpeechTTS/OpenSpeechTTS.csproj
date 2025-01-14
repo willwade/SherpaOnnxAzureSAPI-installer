@@ -12,7 +12,8 @@
     <EnableComHosting>true</EnableComHosting>
     <Version>1.0.0.0</Version>
     <Platforms>x64</Platforms>
-    <SignAssembly>false</SignAssembly>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>OpenSpeechTTS.snk</AssemblyOriginatorKeyFile>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
@@ -30,15 +31,18 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.9.12" />
     <Reference Include="System.Core" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="OpenSpeechTTS.snk">
+    <ProjectReference Include="..\SherpaNative\SherpaNative.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="App.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="App.config">
+    <None Update="OpenSpeechTTS.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
