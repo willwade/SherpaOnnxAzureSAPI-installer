@@ -33,6 +33,24 @@ jobs:
           dotnet build TTSInstaller.sln -c Release
           dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 
+      - name: Download Model Files
+        run: |
+          # Create the model directory structure
+          mkdir -p models\vits-piper-en_US-amy-low\espeak-ng-data
+          
+          # Download the Piper model files
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low/en_US-amy-low.onnx" -OutFile "models\vits-piper-en_US-amy-low\en_US-amy-low.onnx"
+          Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low/tokens.txt" -OutFile "models\vits-piper-en_US-amy-low\tokens.txt"
+          
+          # Download espeak-ng-data files
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phondata" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phondata"
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phondata-manifest" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phondata-manifest"
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phonindex" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phonindex"
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phontab" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phontab"
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/intonations" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\intonations"
+          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/en_dict" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\en_dict"
+          
       - name: Build WiX Installer
         run: dotnet build TTSInstaller.wixproj -c Release -p:Platform=x64
 
