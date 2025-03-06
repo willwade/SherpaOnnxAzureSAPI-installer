@@ -117,9 +117,7 @@ class Program
                 try
                 {
                     Console.WriteLine($"Downloading and installing {chosenModel.Name}...");
-                    await installer.DownloadAndExtractModelAsync(chosenModel);
-                    registrar.RegisterVoice(chosenModel, dllPath);
-                    Console.WriteLine($"Successfully installed voice: {chosenModel.Name}");
+                    await InstallSpecificVoice(chosenModelId, installer, registrar, dllPath);
                 }
                 catch (Exception ex)
                 {
@@ -249,24 +247,82 @@ class Program
             var language = model.Language?.FirstOrDefault();
             if (language != null)
             {
-                Console.WriteLine($"Language Info - Code: {language.LangCode}, Country: {language.Country}");
+                Console.WriteLine($"Language: {language.LanguageName} ({language.LangCode})");
             }
 
             try
             {
                 Console.WriteLine($"Downloading and installing {model.Name}...");
                 await installer.DownloadAndExtractModelAsync(model);
+                
+                // Register the COM DLL first
+                RegisterComDll(dllPath);
+                
+                // Then register the voice
                 registrar.RegisterVoice(model, dllPath);
+                
                 Console.WriteLine($"Successfully installed voice: {model.Name}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to install voice: {ex.Message}");
+                Console.WriteLine($"Failed to install {model.Name}: {ex.Message}");
+                throw;
             }
         }
         else
         {
-            Console.WriteLine($"Model ID '{modelId}' not found in available voices.");
+            Console.WriteLine($"Model ID {modelId} not found in the models database.");
+            throw new KeyNotFoundException($"Model ID {modelId} not found");
+        }
+    }
+
+    // Add a method to register the COM DLL
+    private static void RegisterComDll(string dllPath)
+    {
+        try
+        {
+            Console.WriteLine($"Registering COM DLL: {dllPath}");
+            
+            // Ensure the directory exists
+            string dllDir = Path.GetDirectoryName(dllPath);
+            if (!Directory.Exists(dllDir))
+            {
+                Directory.CreateDirectory(dllDir);
+            }
+            
+            // Check if the DLL exists
+            if (!File.Exists(dllPath))
+            {
+                throw new FileNotFoundException($"DLL not found: {dllPath}");
+            }
+            
+            // Register the DLL with regasm
+            var process = new Process();
+            process.StartInfo.FileName = "regasm";
+            process.StartInfo.Arguments = $"/codebase \"{dllPath}\"";
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.CreateNoWindow = true;
+            
+            process.Start();
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            
+            if (process.ExitCode != 0)
+            {
+                Console.WriteLine($"regasm output: {output}");
+                Console.WriteLine($"regasm error: {error}");
+                throw new Exception($"Failed to register COM DLL. Exit code: {process.ExitCode}");
+            }
+            
+            Console.WriteLine("COM DLL registered successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error registering COM DLL: {ex.Message}");
+            throw;
         }
     }
 

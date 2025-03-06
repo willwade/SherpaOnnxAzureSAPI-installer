@@ -3,6 +3,7 @@ using System.Speech.Synthesis;
 using System.Linq;
 using Microsoft.Win32;
 using System.IO;
+using System.Threading;
 
 namespace SimpleTest
 {
@@ -10,96 +11,69 @@ namespace SimpleTest
     {
         static void Main(string[] args)
         {
+            Console.WriteLine("Sherpa ONNX TTS Test Application");
+            Console.WriteLine("================================");
+            
             try
             {
-                // Test registry access first
-                Console.WriteLine("Testing registry access...");
-                string modelPath = null;
-                string tokensPath = null;
-                string dataDirPath = null;
-
-                using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice"))
-                {
-                    if (key != null)
-                    {
-                        Console.WriteLine("Found registry key. Values:");
-                        foreach (var valueName in key.GetValueNames())
-                        {
-                            var value = key.GetValue(valueName);
-                            Console.WriteLine($"  {valueName}: {value}");
-                            if (valueName == "ModelPath") modelPath = value as string;
-                            if (valueName == "TokensPath") tokensPath = value as string;
-                            if (valueName == "DataDirPath") dataDirPath = value as string;
-                        }
-
-                        Console.WriteLine("\nChecking if files exist:");
-                        if (modelPath != null)
-                        {
-                            Console.WriteLine($"Model file exists: {File.Exists(modelPath)} at {modelPath}");
-                        }
-                        if (tokensPath != null)
-                        {
-                            Console.WriteLine($"Tokens file exists: {File.Exists(tokensPath)} at {tokensPath}");
-                        }
-                        if (dataDirPath != null)
-                        {
-                            Console.WriteLine($"Data directory exists: {Directory.Exists(dataDirPath)} at {dataDirPath}");
-                            if (Directory.Exists(dataDirPath))
-                            {
-                                Console.WriteLine("Data directory contents:");
-                                foreach (var file in Directory.GetFiles(dataDirPath))
-                                {
-                                    Console.WriteLine($"  {Path.GetFileName(file)}");
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Registry key not found!");
-                    }
-                }
-
-                Console.WriteLine("\nAvailable voices:");
+                // First, list all available voices
                 using (var synth = new SpeechSynthesizer())
                 {
+                    Console.WriteLine("\nAvailable voices:");
                     foreach (var voice in synth.GetInstalledVoices())
                     {
                         var info = voice.VoiceInfo;
-                        Console.WriteLine($"Name: {info.Name}");
-                        Console.WriteLine($"  Culture: {info.Culture}");
-                        Console.WriteLine($"  Age: {info.Age}");
-                        Console.WriteLine($"  Gender: {info.Gender}");
-                        Console.WriteLine($"  Description: {info.Description}");
-                        Console.WriteLine();
+                        Console.WriteLine($"- {info.Name} ({info.Gender}, {info.Age}, {info.Culture})");
                     }
-
-                    // Try to find our voice
-                    var amyVoice = synth.GetInstalledVoices()
-                        .FirstOrDefault(v => v.VoiceInfo.Name.Equals("OpenSpeech Amy", StringComparison.OrdinalIgnoreCase));
-
-                    if (amyVoice != null)
+                    
+                    // Try to find a Sherpa ONNX voice
+                    var sherpaVoice = synth.GetInstalledVoices().FirstOrDefault(v => 
+                        v.VoiceInfo.Name.Contains("sherpa", StringComparison.OrdinalIgnoreCase) || 
+                        v.VoiceInfo.Name.Contains("openspeech", StringComparison.OrdinalIgnoreCase));
+                    
+                    if (sherpaVoice != null)
                     {
-                        Console.WriteLine("Found Amy voice, testing speech...");
-                        synth.SelectVoice(amyVoice.VoiceInfo.Name);
-                        synth.Rate = 0; // Normal speed
-                        synth.Volume = 100; // Full volume
-                        synth.Speak("Hello! This is a test of the OpenSpeech Amy voice using SAPI 5.");
+                        Console.WriteLine($"\nFound Sherpa ONNX voice: {sherpaVoice.VoiceInfo.Name}");
+                        synth.SelectVoice(sherpaVoice.VoiceInfo.Name);
                     }
                     else
                     {
-                        Console.WriteLine("Amy voice not found in installed voices!");
+                        Console.WriteLine("\nNo Sherpa ONNX voice found. Using default voice.");
                     }
+                    
+                    // Test speech synthesis
+                    Console.WriteLine("\nTesting speech synthesis...");
+                    
+                    // Set output to audio file
+                    string outputPath = Path.Combine(Environment.CurrentDirectory, "test_output.wav");
+                    synth.SetOutputToWaveFile(outputPath);
+                    
+                    // Speak some text
+                    string testText = "This is a test of the Sherpa ONNX text-to-speech system.";
+                    Console.WriteLine($"Speaking: \"{testText}\"");
+                    synth.Speak(testText);
+                    
+                    // Reset output to default
+                    synth.SetOutputToDefaultAudioDevice();
+                    
+                    Console.WriteLine($"\nSpeech saved to: {outputPath}");
+                    
+                    // Try speaking to the default audio device
+                    Console.WriteLine("\nNow testing speech to default audio device...");
+                    Console.WriteLine("Speaking: \"Hello, can you hear me?\"");
+                    synth.Speak("Hello, can you hear me?");
+                    
+                    Console.WriteLine("\nTest completed successfully!");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"\nError: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
             }
-
+            
             Console.WriteLine("\nPress any key to exit...");
-            try { Console.ReadKey(); } catch { }
+            Console.ReadKey();
         }
     }
 }

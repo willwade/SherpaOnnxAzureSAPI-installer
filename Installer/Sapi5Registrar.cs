@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Microsoft.Win32;
 using System.Globalization;
+using System.IO;
 
 namespace Installer
 {
@@ -110,9 +111,22 @@ namespace Installer
                         attributesKey.SetValue("Version", "1.0");
                         attributesKey.SetValue("Name", model.Name);
 
-                        // 3. Set model paths
+                        // 3. Set model paths with consistent naming
                         attributesKey.SetValue("Model Path", model.ModelPath);
                         attributesKey.SetValue("Tokens Path", model.TokensPath);
+                        
+                        // Add data directory path
+                        string dataDir = Path.GetDirectoryName(model.ModelPath);
+                        attributesKey.SetValue("Data Directory", dataDir);
+                    }
+                }
+
+                // 4. Register the CLSID token for the voice
+                using (var clsidKey = Registry.ClassesRoot.CreateSubKey(@"CLSID\{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"))
+                {
+                    using (var tokenKey = clsidKey.CreateSubKey("Token"))
+                    {
+                        tokenKey.SetValue("", model.Name);
                     }
                 }
 

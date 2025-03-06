@@ -32,6 +32,17 @@ This project contains a complete installer for TTS voices, integrating with Sher
    dotnet build TTSInstaller.csproj -c Release
    ```
 
+2.1 **Test the Installer**:
+   ```bash
+     dotnet run --project TTSInstaller.csproj install <model-id>
+   ```
+
+   then
+
+   ```bash
+      dotnet run --project SimpleTest/SimpleTest.csproj
+   ```
+
 3. **Publish the TTS Application**:
    ```bash
    dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
