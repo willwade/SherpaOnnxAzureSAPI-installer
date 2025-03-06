@@ -24,7 +24,6 @@ jobs:
       - name: Install WiX Toolset
         run: |
           dotnet tool install --global wix
-          dotnet tool install --global wix.tools
 
       - name: Restore Dependencies
         run: dotnet restore
