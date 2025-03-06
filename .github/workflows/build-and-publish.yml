@@ -30,8 +30,8 @@ jobs:
 
       - name: Build Project
         run: |
-          dotnet build -c Release
-          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+          dotnet build TTSInstaller.sln -c Release
+          dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 
       - name: Build WiX Installer
         run: dotnet build TTSInstaller.wixproj -c Release -p:Platform=x64
