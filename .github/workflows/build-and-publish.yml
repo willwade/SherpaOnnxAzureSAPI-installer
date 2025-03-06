@@ -38,7 +38,7 @@ jobs:
         run: dotnet build TTSInstaller.wixproj -c Release -p:Platform=x64
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: TTSInstaller
           path: |
