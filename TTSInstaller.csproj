@@ -23,6 +23,7 @@
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.9.12" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <ProjectReference Include="OpenSpeechTTS\OpenSpeechTTS.csproj" />
   </ItemGroup>
 
@@ -34,10 +35,12 @@
     <Compile Include="Installer\AzureTtsService.cs" />
     <Compile Include="Installer\AzureTtsModel.cs" />
     <Compile Include="Installer\AzureVoiceInstaller.cs" />
+    <Compile Include="Installer\AzureConfigManager.cs" />
     <Compile Include="Installer\Shared\LanguageInfo.cs" />
     <Compile Include="Installer\Shared\LanguageCodeConverter.cs" />
     <Compile Include="Installer\Shared\TtsModel.cs" />
     <Compile Include="Installer\Shared\AzureTtsModel.cs" />
+    <Compile Include="Installer\Shared\AzureConfig.cs" />
   </ItemGroup>
 
   <ItemGroup>

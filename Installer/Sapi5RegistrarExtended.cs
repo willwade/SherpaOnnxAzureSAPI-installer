@@ -8,7 +8,7 @@ using Installer.Shared;
 
 namespace Installer
 {
-    public class Sapi5RegistrarExtended
+    public class Sapi5RegistrarExtended : Sapi5Registrar
     {
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
         private const string SherpaOnnxClsid = "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}";

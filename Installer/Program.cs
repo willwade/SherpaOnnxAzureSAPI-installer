@@ -73,10 +73,29 @@ namespace Installer
                             }
                         }
 
+                        // If key or region not provided, try to load from config
+                        if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region))
+                        {
+                            var config = AzureConfigManager.LoadConfig();
+                            
+                            if (string.IsNullOrEmpty(subscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
+                            {
+                                subscriptionKey = config.DefaultKey;
+                                Console.WriteLine("Using subscription key from configuration file.");
+                            }
+                            
+                            if (string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(config.DefaultRegion))
+                            {
+                                region = config.DefaultRegion;
+                                Console.WriteLine("Using region from configuration file.");
+                            }
+                        }
+
                         if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region))
                         {
                             Console.WriteLine("Error: Azure subscription key and region are required.");
                             Console.WriteLine("Usage: Installer.exe install-azure <voice-name> --key <subscription-key> --region <region> [--style <style>] [--role <role>]");
+                            Console.WriteLine("Or set up a configuration file using: Installer.exe save-azure-config --key <subscription-key> --region <region>");
                             return;
                         }
 
@@ -102,14 +121,68 @@ namespace Installer
                             }
                         }
 
+                        // If key or region not provided, try to load from config
+                        if (string.IsNullOrEmpty(listSubscriptionKey) || string.IsNullOrEmpty(listRegion))
+                        {
+                            var config = AzureConfigManager.LoadConfig();
+                            
+                            if (string.IsNullOrEmpty(listSubscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
+                            {
+                                listSubscriptionKey = config.DefaultKey;
+                                Console.WriteLine("Using subscription key from configuration file.");
+                            }
+                            
+                            if (string.IsNullOrEmpty(listRegion) && !string.IsNullOrEmpty(config.DefaultRegion))
+                            {
+                                listRegion = config.DefaultRegion;
+                                Console.WriteLine("Using region from configuration file.");
+                            }
+                        }
+
                         if (string.IsNullOrEmpty(listSubscriptionKey) || string.IsNullOrEmpty(listRegion))
                         {
                             Console.WriteLine("Error: Azure subscription key and region are required.");
                             Console.WriteLine("Usage: Installer.exe list-azure-voices --key <subscription-key> --region <region>");
+                            Console.WriteLine("Or set up a configuration file using: Installer.exe save-azure-config --key <subscription-key> --region <region>");
                             return;
                         }
 
                         await ListAzureVoices(listSubscriptionKey, listRegion);
+                        return;
+
+                    case "save-azure-config":
+                        string configKey = null;
+                        string configRegion = null;
+                        bool secureStorage = true;
+                        
+                        // Parse additional arguments
+                        for (int i = 1; i < args.Length; i++)
+                        {
+                            if (args[i] == "--key" && i + 1 < args.Length)
+                            {
+                                configKey = args[i + 1];
+                                i++;
+                            }
+                            else if (args[i] == "--region" && i + 1 < args.Length)
+                            {
+                                configRegion = args[i + 1];
+                                i++;
+                            }
+                            else if (args[i] == "--secure" && i + 1 < args.Length)
+                            {
+                                bool.TryParse(args[i + 1], out secureStorage);
+                                i++;
+                            }
+                        }
+                        
+                        if (string.IsNullOrEmpty(configKey) || string.IsNullOrEmpty(configRegion))
+                        {
+                            Console.WriteLine("Error: Azure subscription key and region are required.");
+                            Console.WriteLine("Usage: Installer.exe save-azure-config --key <subscription-key> --region <region> [--secure <true|false>]");
+                            return;
+                        }
+                        
+                        AzureConfigManager.SaveConfig(configKey, configRegion, secureStorage);
                         return;
 
                     case "verify":
@@ -842,23 +915,72 @@ namespace Installer
             Console.WriteLine("Azure TTS Voice Installation");
             Console.WriteLine("===========================");
             
+            // Try to load config first
+            var config = AzureConfigManager.LoadConfig();
+            string defaultKey = config.DefaultKey;
+            string defaultRegion = config.DefaultRegion;
+            
             // Get Azure subscription key and region
-            Console.Write("Enter your Azure subscription key: ");
+            if (!string.IsNullOrEmpty(defaultKey))
+            {
+                Console.Write($"Enter your Azure subscription key (or press Enter to use saved key): ");
+            }
+            else
+            {
+                Console.Write("Enter your Azure subscription key: ");
+            }
+            
             string subscriptionKey = Console.ReadLine();
             
-            if (string.IsNullOrWhiteSpace(subscriptionKey))
+            if (string.IsNullOrEmpty(subscriptionKey) && !string.IsNullOrEmpty(defaultKey))
+            {
+                subscriptionKey = defaultKey;
+                Console.WriteLine("Using saved subscription key.");
+            }
+            
+            if (string.IsNullOrEmpty(subscriptionKey))
             {
                 Console.WriteLine("Subscription key is required. Aborting installation.");
                 return;
             }
             
-            Console.Write("Enter your Azure region (e.g., eastus, westus): ");
+            if (!string.IsNullOrEmpty(defaultRegion))
+            {
+                Console.Write($"Enter your Azure region (e.g., eastus, westus) (or press Enter to use saved region '{defaultRegion}'): ");
+            }
+            else
+            {
+                Console.Write("Enter your Azure region (e.g., eastus, westus): ");
+            }
+            
             string region = Console.ReadLine();
             
-            if (string.IsNullOrWhiteSpace(region))
+            if (string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(defaultRegion))
+            {
+                region = defaultRegion;
+                Console.WriteLine($"Using saved region: {region}");
+            }
+            
+            if (string.IsNullOrEmpty(region))
             {
                 Console.WriteLine("Region is required. Aborting installation.");
                 return;
+            }
+            
+            // Ask if user wants to save this configuration
+            if (subscriptionKey != defaultKey || region != defaultRegion)
+            {
+                Console.Write("Do you want to save this configuration for future use? (y/n): ");
+                string saveResponse = Console.ReadLine();
+                
+                if (saveResponse?.ToLower() == "y" || saveResponse?.ToLower() == "yes")
+                {
+                    Console.Write("Do you want to encrypt the subscription key? (y/n, default: y): ");
+                    string encryptResponse = Console.ReadLine();
+                    bool encrypt = encryptResponse?.ToLower() != "n" && encryptResponse?.ToLower() != "no";
+                    
+                    AzureConfigManager.SaveConfig(subscriptionKey, region, encrypt);
+                }
             }
             
             try
