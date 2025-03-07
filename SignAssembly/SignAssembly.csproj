@@ -7,6 +7,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <Import Project="GenerateKey.targets" />
-
 </Project>
