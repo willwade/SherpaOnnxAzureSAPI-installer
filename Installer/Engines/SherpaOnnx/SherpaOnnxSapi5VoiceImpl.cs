@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Installer.Core.Base;
 using Installer.Core.Interfaces;
 using Microsoft.Win32;
+using NAudio.Wave;
 
 namespace Installer.Engines.SherpaOnnx
 {
@@ -77,7 +78,17 @@ namespace Installer.Engines.SherpaOnnx
                 byte[] audioData = _sherpaTts.GenerateAudio(text);
                 
                 // Play audio
-                _sherpaTts.PlayAudio(audioData);
+                using (var ms = new MemoryStream(audioData))
+                using (var waveOut = new WaveOutEvent())
+                using (var waveReader = new WaveFileReader(ms))
+                {
+                    waveOut.Init(waveReader);
+                    waveOut.Play();
+                    while (waveOut.PlaybackState == PlaybackState.Playing)
+                    {
+                        System.Threading.Thread.Sleep(100);
+                    }
+                }
             }
             catch (Exception ex)
             {

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Installer.Core.Base;
 using Installer.Core.Interfaces;
 using Microsoft.Win32;
+using NAudio.Wave;
 
 namespace Installer.Engines.Azure
 {
@@ -77,7 +78,18 @@ namespace Installer.Engines.Azure
                 LogMessage($"Speaking text: {text}");
                 
                 // Generate and play audio
-                _azureTts.SpeakAsync(text).Wait();
+                byte[] audioData = _azureTts.SynthesizeSpeechAsync(text).Result;
+                using (var ms = new MemoryStream(audioData))
+                using (var waveOut = new WaveOutEvent())
+                using (var waveReader = new WaveFileReader(ms))
+                {
+                    waveOut.Init(waveReader);
+                    waveOut.Play();
+                    while (waveOut.PlaybackState == PlaybackState.Playing)
+                    {
+                        System.Threading.Thread.Sleep(100);
+                    }
+                }
             }
             catch (Exception ex)
             {
