@@ -28,13 +28,21 @@ namespace SimpleTest
                     
                     // Try to find a Sherpa ONNX voice
                     var sherpaVoice = synth.GetInstalledVoices().FirstOrDefault(v => 
-                        v.VoiceInfo.Name.Contains("sherpa", StringComparison.OrdinalIgnoreCase) || 
-                        v.VoiceInfo.Name.Contains("openspeech", StringComparison.OrdinalIgnoreCase));
+                        v.VoiceInfo.Name.ToLower() == "joe");
                     
                     if (sherpaVoice != null)
                     {
-                        Console.WriteLine($"\nFound Sherpa ONNX voice: {sherpaVoice.VoiceInfo.Name}");
-                        synth.SelectVoice(sherpaVoice.VoiceInfo.Name);
+                        Console.WriteLine($"\nFound our installed voice: {sherpaVoice.VoiceInfo.Name}");
+                        try
+                        {
+                            synth.SelectVoice(sherpaVoice.VoiceInfo.Name);
+                            Console.WriteLine("Successfully selected the voice!");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error selecting voice: {ex.Message}");
+                            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        }
                     }
                     else
                     {
