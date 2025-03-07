@@ -981,102 +981,97 @@ namespace Installer
                 Console.WriteLine(" - Gender (e.g., 'Male', 'Female')");
                 Console.WriteLine();
                 
-                while (true)
+                // Add search functionality
+                Console.WriteLine();
+                Console.WriteLine($"Found {voicesList.Count} voices. Enter search term to filter (or leave empty to show all):");
+                Console.Write("> ");
+                string searchTerm = Console.ReadLine() ?? "";
+                
+                var filteredVoiceList = voicesList;
+                if (!string.IsNullOrWhiteSpace(searchTerm))
                 {
-                    Console.Write("Enter a search term (or 'exit' to quit): ");
-                    string searchTerm = Console.ReadLine();
+                    filteredVoiceList = voicesList
+                        .Where(v => 
+                            v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
                     
-                    if (string.IsNullOrWhiteSpace(searchTerm))
-                        continue;
+                    Console.WriteLine($"Found {filteredVoiceList.Count} voices matching '{searchTerm}'.");
+                }
+                
+                Console.WriteLine();
+                Console.WriteLine("Available Voices:");
+                
+                for (int i = 0; i < filteredVoiceList.Count; i++)
+                {
+                    var voice = filteredVoiceList[i];
+                    string styles = voice.StyleList.Count > 0 ? $", Styles: {string.Join(", ", voice.StyleList.ToArray())}" : "";
+                    string roles = voice.RoleList.Count > 0 ? $", Roles: {string.Join(", ", voice.RoleList.ToArray())}" : "";
                     
-                    if (searchTerm.Equals("exit", StringComparison.OrdinalIgnoreCase))
-                        return;
+                    Console.WriteLine($"{i + 1}. {voice.ShortName} ({voice.DisplayName}, {voice.Locale}, {voice.Gender}{styles}{roles})");
+                }
+                
+                // Prompt user to select a voice
+                Console.Write("Enter the number of the voice to install (or 'search' to search again): ");
+                string selection = Console.ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(selection))
+                {
+                    Console.WriteLine("Please enter a selection.");
+                    return;
+                }
+                
+                if (int.TryParse(selection, out int selectedIndex) && selectedIndex >= 1 && selectedIndex <= filteredVoiceList.Count)
+                {
+                    var selectedVoice = filteredVoiceList[selectedIndex - 1];
                     
-                    // Filter voices
-                    var filteredVoices = voices.Where(voice =>
-                        voice.ShortName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        voice.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        voice.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        voice.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        // Use the language code converter for intelligent language matching
-                        LanguageCodeConverter.LocaleMatchesLanguage(voice.Locale, searchTerm)
-                    ).ToList(); // Convert to list before checking Count
-                    
-                    if (filteredVoices.Count == 0)
+                    // Handle style selection if available
+                    if (selectedVoice.StyleList.Count > 0)
                     {
-                        Console.WriteLine("No voices matched your search. Try again.");
-                        continue;
-                    }
-                    
-                    // Display filtered results
-                    Console.WriteLine("Matching voices:");
-                    for (int i = 0; i < filteredVoices.Count; i++)
-                    {
-                        var voice = filteredVoices[i];
-                        string styles = voice.StyleList.Count > 0 ? $", Styles: {string.Join(", ", voice.StyleList.ToArray())}" : "";
-                        string roles = voice.RoleList.Count > 0 ? $", Roles: {string.Join(", ", voice.RoleList.ToArray())}" : "";
+                        Console.WriteLine($"Available styles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.StyleList.ToArray())}");
+                        Console.Write("Enter a style to use (or press Enter for none): ");
+                        string style = Console.ReadLine();
                         
-                        Console.WriteLine($"{i + 1}. {voice.ShortName} ({voice.DisplayName}, {voice.Locale}, {voice.Gender}{styles}{roles})");
-                    }
-                    
-                    // Prompt user to select a voice
-                    Console.Write("Enter the number of the voice to install (or 'search' to search again): ");
-                    string selection = Console.ReadLine();
-                    
-                    if (selection.Equals("search", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    
-                    if (int.TryParse(selection, out int selectedIndex) && selectedIndex >= 1 && selectedIndex <= filteredVoices.Count)
-                    {
-                        var selectedVoice = filteredVoices[selectedIndex - 1];
-                        
-                        // Handle style selection if available
-                        if (selectedVoice.StyleList.Count > 0)
+                        if (!string.IsNullOrWhiteSpace(style) && selectedVoice.StyleList.Contains(style))
                         {
-                            Console.WriteLine($"Available styles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.StyleList.ToArray())}");
-                            Console.Write("Enter a style to use (or press Enter for none): ");
-                            string style = Console.ReadLine();
-                            
-                            if (!string.IsNullOrWhiteSpace(style) && selectedVoice.StyleList.Contains(style))
-                            {
-                                selectedVoice.SelectedStyle = style;
-                                Console.WriteLine($"Using style: {style}");
-                            }
-                            else if (!string.IsNullOrWhiteSpace(style))
-                            {
-                                Console.WriteLine($"Style '{style}' not available. No style will be used.");
-                            }
+                            selectedVoice.SelectedStyle = style;
+                            Console.WriteLine($"Using style: {style}");
                         }
-                        
-                        // Handle role selection if available
-                        if (selectedVoice.RoleList.Count > 0)
+                        else if (!string.IsNullOrWhiteSpace(style))
                         {
-                            Console.WriteLine($"Available roles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.RoleList.ToArray())}");
-                            Console.Write("Enter a role to use (or press Enter for none): ");
-                            string role = Console.ReadLine();
-                            
-                            if (!string.IsNullOrWhiteSpace(role) && selectedVoice.RoleList.Contains(role))
-                            {
-                                selectedVoice.SelectedRole = role;
-                                Console.WriteLine($"Using role: {role}");
-                            }
-                            else if (!string.IsNullOrWhiteSpace(role))
-                            {
-                                Console.WriteLine($"Role '{role}' not available. No role will be used.");
-                            }
+                            Console.WriteLine($"Style '{style}' not available. No style will be used.");
                         }
-                        
-                        // Register the voice
-                        Console.WriteLine($"Registering Azure voice: {selectedVoice.ShortName}");
-                        registrar.RegisterAzureVoice(selectedVoice, dllPath);
-                        
-                        Console.WriteLine($"Azure voice '{selectedVoice.ShortName}' installed successfully!");
-                        return;
                     }
-                    else
+                    
+                    // Handle role selection if available
+                    if (selectedVoice.RoleList.Count > 0)
                     {
-                        Console.WriteLine("Invalid selection. Please try again.");
+                        Console.WriteLine($"Available roles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.RoleList.ToArray())}");
+                        Console.Write("Enter a role to use (or press Enter for none): ");
+                        string role = Console.ReadLine();
+                        
+                        if (!string.IsNullOrWhiteSpace(role) && selectedVoice.RoleList.Contains(role))
+                        {
+                            selectedVoice.SelectedRole = role;
+                            Console.WriteLine($"Using role: {role}");
+                        }
+                        else if (!string.IsNullOrWhiteSpace(role))
+                        {
+                            Console.WriteLine($"Role '{role}' not available. No role will be used.");
+                        }
                     }
+                    
+                    // Register the voice
+                    Console.WriteLine($"Registering Azure voice: {selectedVoice.ShortName}");
+                    registrar.RegisterAzureVoice(selectedVoice, dllPath);
+                    
+                    Console.WriteLine($"Azure voice '{selectedVoice.ShortName}' installed successfully!");
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid selection. Please try again.");
                 }
             }
             catch (Exception ex)
@@ -1433,7 +1428,10 @@ namespace Installer
                         }
                         
                         // Find the engine for this voice type
-                        var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == voiceType);
+                        // Special handling for Azure voices which might have "neural" as voice type
+                        var engine = voiceType.ToLowerInvariant() == "neural" 
+                            ? _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == "AzureTTS")
+                            : _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == voiceType);
                         
                         if (engine == null)
                         {
@@ -1647,84 +1645,112 @@ namespace Installer
                 return;
             }
             
+            // Add search functionality
+            Console.WriteLine();
+            Console.WriteLine($"Found {voiceList.Count} voices. Enter search term to filter (or leave empty to show all):");
+            Console.Write("> ");
+            string searchTerm = Console.ReadLine() ?? "";
+            
+            var filteredVoiceList = voiceList;
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filteredVoiceList = voiceList
+                    .Where(v => 
+                        v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                
+                Console.WriteLine($"Found {filteredVoiceList.Count} voices matching '{searchTerm}'.");
+            }
+            
             Console.WriteLine();
             Console.WriteLine("Available Voices:");
             
-            for (int i = 0; i < voiceList.Count; i++)
+            for (int i = 0; i < filteredVoiceList.Count; i++)
             {
-                Console.WriteLine($"{i + 1}. {voiceList[i].Name} ({voiceList[i].Gender}, {voiceList[i].Locale})");
+                Console.WriteLine($"{i + 1}. {filteredVoiceList[i].Name} ({filteredVoiceList[i].Gender}, {filteredVoiceList[i].Locale})");
             }
             
             Console.WriteLine();
-            Console.Write("Select a voice (1-{0}): ", voiceList.Count);
+            Console.Write("Select a voice (1-{0}): ", filteredVoiceList.Count);
             
-            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > voiceList.Count)
+            string selection = Console.ReadLine();
+            
+            if (string.IsNullOrWhiteSpace(selection))
             {
-                Console.WriteLine("Invalid selection.");
+                Console.WriteLine("Please enter a selection.");
                 return;
             }
             
-            var selectedVoice = voiceList[voiceIndex - 1];
-            
-            // Configure voice-specific options
-            if (selectedVoice.SupportsStyles && selectedVoice.SupportedStyles.Count > 0)
+            if (int.TryParse(selection, out int selectedIndex) && selectedIndex >= 1 && selectedIndex <= filteredVoiceList.Count)
             {
-                Console.WriteLine();
-                Console.WriteLine("Available Styles:");
+                var selectedVoice = filteredVoiceList[selectedIndex - 1];
                 
-                for (int i = 0; i < selectedVoice.SupportedStyles.Count; i++)
+                // Configure voice-specific options
+                if (selectedVoice.SupportsStyles && selectedVoice.SupportedStyles.Count > 0)
                 {
-                    Console.WriteLine($"{i + 1}. {selectedVoice.SupportedStyles[i]}");
+                    Console.WriteLine();
+                    Console.WriteLine("Available Styles:");
+                    
+                    for (int i = 0; i < selectedVoice.SupportedStyles.Count; i++)
+                    {
+                        Console.WriteLine($"{i + 1}. {selectedVoice.SupportedStyles[i]}");
+                    }
+                    
+                    Console.WriteLine();
+                    Console.Write("Select a style (1-{0}, or 0 for none): ", selectedVoice.SupportedStyles.Count);
+                    
+                    if (int.TryParse(Console.ReadLine(), out int styleIndex) && styleIndex > 0 && styleIndex <= selectedVoice.SupportedStyles.Count)
+                    {
+                        selectedVoice.SelectedStyle = selectedVoice.SupportedStyles[styleIndex - 1];
+                    }
                 }
                 
-                Console.WriteLine();
-                Console.Write("Select a style (1-{0}, or 0 for none): ", selectedVoice.SupportedStyles.Count);
-                
-                if (int.TryParse(Console.ReadLine(), out int styleIndex) && styleIndex > 0 && styleIndex <= selectedVoice.SupportedStyles.Count)
+                if (selectedVoice.SupportsRoles && selectedVoice.SupportedRoles.Count > 0)
                 {
-                    selectedVoice.SelectedStyle = selectedVoice.SupportedStyles[styleIndex - 1];
+                    Console.WriteLine();
+                    Console.WriteLine("Available Roles:");
+                    
+                    for (int i = 0; i < selectedVoice.SupportedRoles.Count; i++)
+                    {
+                        Console.WriteLine($"{i + 1}. {selectedVoice.SupportedRoles[i]}");
+                    }
+                    
+                    Console.WriteLine();
+                    Console.Write("Select a role (1-{0}, or 0 for none): ", selectedVoice.SupportedRoles.Count);
+                    
+                    if (int.TryParse(Console.ReadLine(), out int roleIndex) && roleIndex > 0 && roleIndex <= selectedVoice.SupportedRoles.Count)
+                    {
+                        selectedVoice.SelectedRole = selectedVoice.SupportedRoles[roleIndex - 1];
+                    }
                 }
+                
+                // Test voice
+                Console.WriteLine();
+                Console.WriteLine($"Testing voice {selectedVoice.Name}...");
+                
+                bool testResult = await selectedEngine.TestVoiceAsync(selectedVoice.Id, config);
+                
+                if (!testResult)
+                {
+                    Console.WriteLine($"Voice test failed. Please check your configuration and try again.");
+                    return;
+                }
+                
+                // Register voice
+                Console.WriteLine();
+                Console.WriteLine($"Registering voice {selectedVoice.Name}...");
+                
+                selectedEngine.RegisterVoice(selectedVoice, config, _dllPath);
+                
+                Console.WriteLine();
+                Console.WriteLine($"Voice {selectedVoice.Name} installed successfully.");
             }
-            
-            if (selectedVoice.SupportsRoles && selectedVoice.SupportedRoles.Count > 0)
+            else
             {
-                Console.WriteLine();
-                Console.WriteLine("Available Roles:");
-                
-                for (int i = 0; i < selectedVoice.SupportedRoles.Count; i++)
-                {
-                    Console.WriteLine($"{i + 1}. {selectedVoice.SupportedRoles[i]}");
-                }
-                
-                Console.WriteLine();
-                Console.Write("Select a role (1-{0}, or 0 for none): ", selectedVoice.SupportedRoles.Count);
-                
-                if (int.TryParse(Console.ReadLine(), out int roleIndex) && roleIndex > 0 && roleIndex <= selectedVoice.SupportedRoles.Count)
-                {
-                    selectedVoice.SelectedRole = selectedVoice.SupportedRoles[roleIndex - 1];
-                }
+                Console.WriteLine("Invalid selection. Please try again.");
             }
-            
-            // Test voice
-            Console.WriteLine();
-            Console.WriteLine($"Testing voice {selectedVoice.Name}...");
-            
-            bool testResult = await selectedEngine.TestVoiceAsync(selectedVoice.Id, config);
-            
-            if (!testResult)
-            {
-                Console.WriteLine($"Voice test failed. Please check your configuration and try again.");
-                return;
-            }
-            
-            // Register voice
-            Console.WriteLine();
-            Console.WriteLine($"Registering voice {selectedVoice.Name}...");
-            
-            selectedEngine.RegisterVoice(selectedVoice, config, _dllPath);
-            
-            Console.WriteLine();
-            Console.WriteLine($"Voice {selectedVoice.Name} installed successfully.");
         }
 
         private static void UninstallVoiceInteractive()
