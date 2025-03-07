@@ -30,9 +30,14 @@
     <Compile Include="Installer\Program.cs" />
     <Compile Include="Installer\ModelInstaller.cs" />
     <Compile Include="Installer\Sapi5Registrar.cs" />
+    <Compile Include="Installer\Sapi5RegistrarExtended.cs" />
+    <Compile Include="Installer\AzureTtsService.cs" />
+    <Compile Include="Installer\AzureTtsModel.cs" />
+    <Compile Include="Installer\AzureVoiceInstaller.cs" />
     <Compile Include="Installer\Shared\LanguageInfo.cs" />
     <Compile Include="Installer\Shared\LanguageCodeConverter.cs" />
     <Compile Include="Installer\Shared\TtsModel.cs" />
+    <Compile Include="Installer\Shared\AzureTtsModel.cs" />
   </ItemGroup>
 
   <ItemGroup>

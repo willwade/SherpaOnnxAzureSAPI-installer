@@ -13,32 +13,34 @@ This document outlines the requirements and implementation details for adding Az
 - ✅ Created AzureSapi5VoiceImpl class for SAPI integration
 - ✅ Created Sapi5RegistrarExtended class to handle both voice types
 - ✅ Implemented proper registry structure for Azure voices
+- ✅ Added command-line options for Azure TTS installation
+- ✅ Implemented Azure subscription key and region parameters
+- ✅ Created an interactive menu for Azure voice selection
+- ✅ Added support for both Sherpa ONNX and Azure TTS voice types
+- ✅ Implemented fetching available Azure voices based on region
+- ✅ Added Azure voice selection UI in interactive mode
+- ✅ Added style and role selection for supported voices
+- ✅ Fixed integration issues with class references and collection handling
 
 ### 🔄 Remaining Tasks
 
-### 1. Installer/Program.cs Updates
-- Add command-line options for Azure TTS installation
-- Implement Azure subscription key and region parameters
-- Create an interactive menu for Azure voice selection
-- Support both Sherpa ONNX and Azure TTS voice types
-
-### 2. Azure Voice Management
-- Implement fetching available Azure voices based on region
-- Add Azure voice selection UI in interactive mode
-- Add style and role selection for supported voices
-
-### 3. Testing
+### 1. Testing
 - Update SimpleTest project to detect voice type
 - Add appropriate test code for each voice type
+
+### 2. Documentation
+- Update README with Azure TTS instructions
+- Document Azure key management options
+- Add troubleshooting section for Azure voices
 
 ## Implementation Details
 
 ### Azure Key Management Options
 Azure subscription keys can be managed in two ways:
 1. **User-provided at runtime**: 
-   - Command-line parameters for subscription key and region
-   - Interactive prompts for subscription key and region
-   - Stored in registry during voice installation
+   - Command-line parameters for subscription key and region ✅
+   - Interactive prompts for subscription key and region ✅
+   - Stored in registry during voice installation ✅
 
 2. **Configuration file option**:
    - Create a config file (azure_config.json) to store default keys
@@ -47,25 +49,26 @@ Azure subscription keys can be managed in two ways:
 
 ### Command-Line Interface Updates
 ```
-Installer.exe install-azure <voice-name> --key <subscription-key> --region <region>
-Installer.exe list-azure-voices --key <subscription-key> --region <region>
+Installer.exe install-azure <voice-name> --key <subscription-key> --region <region> [--style <style>] [--role <role>] ✅
+Installer.exe list-azure-voices --key <subscription-key> --region <region> ✅
 ```
 
 ### Interactive Mode Updates
-- Add option to select between Sherpa ONNX and Azure TTS
+- Add option to select between Sherpa ONNX and Azure TTS ✅
 - For Azure TTS:
-  - Prompt for subscription key and region
-  - Fetch and display available voices
-  - Allow voice selection with optional style/role parameters
+  - Prompt for subscription key and region ✅
+  - Fetch and display available voices ✅
+  - Allow voice selection with optional style/role parameters ✅
 
 ## Implementation Tasks
 
 ### 1. Update Program.cs
-- [ ] Add Azure TTS command-line options
-- [ ] Implement Azure voice listing functionality
-- [ ] Create Azure voice selection menu
-- [ ] Update installation logic to handle both voice types
-- [ ] Add Azure key and region management
+- [x] Add Azure TTS command-line options
+- [x] Implement Azure voice listing functionality
+- [x] Create Azure voice selection menu
+- [x] Update installation logic to handle both voice types
+- [x] Add Azure key and region management
+- [x] Fix integration issues with class references and collection handling
 
 ### 2. Update SimpleTest
 - [ ] Add voice type detection
@@ -102,7 +105,7 @@ HKLM\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\<voice-name>
 - Subscription keys should be stored securely
 - Consider encryption for stored keys
 - Provide option to use environment variables for keys
-- Implement key validation before installation
+- Implement key validation before installation ✅
 
 ## Testing Plan
 1. Test installation of Sherpa ONNX voices
@@ -110,3 +113,8 @@ HKLM\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\<voice-name>
 3. Test voice switching in applications
 4. Test uninstallation of both voice types
 5. Test with various Azure regions and voice styles
+
+## Next Steps
+1. Complete the SimpleTest project updates for testing both voice types
+2. Update documentation with Azure TTS instructions and troubleshooting information
+3. Consider implementing the configuration file option for Azure key management
