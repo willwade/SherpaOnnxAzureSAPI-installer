@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Platforms>x64</Platforms>
+    <AssemblyName>OpenSpeech.TTS.Plugins</AssemblyName>
+    <RootNamespace>OpenSpeech.TTS.Plugins</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ITtsEngine.cs" />
+    <Compile Include="TtsEngineBase.cs" />
+  </ItemGroup>
+
+</Project> 

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Platforms>x64</Platforms>
+    <AssemblyName>ElevenLabsPlugin</AssemblyName>
+    <RootNamespace>Plugins.ElevenLabs</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Installer\Installer.csproj" />
+    <ProjectReference Include="..\OpenSpeech.TTS.Plugins.csproj" />
+  </ItemGroup>
+
+</Project> 

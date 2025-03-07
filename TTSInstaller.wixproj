@@ -6,6 +6,7 @@
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
     <Platform>x64</Platform>
+    <ProductVersion>1.1.0.0</ProductVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,8 +20,19 @@
     </HarvestDirectory>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="config\engine-config.json" />
+    <Content Include="Plugins\**\*.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="Plugins\OpenSpeech.TTS.Plugins.csproj" />
+    <ProjectReference Include="Plugins\ElevenLabs\ElevenLabsPlugin.csproj" />
+    <ProjectReference Include="Plugins\PlayHT\PlayHTPlugin.csproj" />
+  </ItemGroup>
+
   <PropertyGroup>
-    <DefineConstants>PublishDir=bin\Release\net6.0-windows\win-x64\publish</DefineConstants>
+    <DefineConstants>PublishDir=bin\Release\net6.0-windows\win-x64\publish;Version=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

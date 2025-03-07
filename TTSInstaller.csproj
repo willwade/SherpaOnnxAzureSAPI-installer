@@ -40,6 +40,28 @@
     <Compile Include="Installer\Shared\TtsModel.cs" />
     <Compile Include="Installer\Shared\AzureTtsModel.cs" />
     <Compile Include="Installer\Shared\AzureConfig.cs" />
+    
+    <!-- Core Framework -->
+    <Compile Include="Installer\Core\Interfaces\ITtsEngine.cs" />
+    <Compile Include="Installer\Core\Interfaces\ISapiVoiceImpl.cs" />
+    <Compile Include="Installer\Core\Base\TtsEngineBase.cs" />
+    <Compile Include="Installer\Core\Base\SapiVoiceImplBase.cs" />
+    <Compile Include="Installer\Core\Models\TtsVoiceInfo.cs" />
+    <Compile Include="Installer\Core\Models\ConfigurationParameter.cs" />
+    <Compile Include="Installer\Core\Models\EngineConfiguration.cs" />
+    <Compile Include="Installer\Core\Managers\ConfigurationManager.cs" />
+    <Compile Include="Installer\Core\Managers\TtsEngineManager.cs" />
+    <Compile Include="Installer\Core\Managers\PluginLoader.cs" />
+    
+    <!-- Engine Implementations -->
+    <Compile Include="Installer\Engines\SherpaOnnx\SherpaOnnxEngine.cs" />
+    <Compile Include="Installer\Engines\SherpaOnnx\SherpaOnnxSapi5VoiceImpl.cs" />
+    <Compile Include="Installer\Engines\Azure\AzureTtsEngine.cs" />
+    <Compile Include="Installer\Engines\Azure\AzureSapi5VoiceImpl.cs" />
+    <Compile Include="Installer\Engines\ElevenLabs\ElevenLabsEngine.cs" />
+    <Compile Include="Installer\Engines\ElevenLabs\ElevenLabsSapi5VoiceImpl.cs" />
+    <Compile Include="Installer\Engines\PlayHT\PlayHTEngine.cs" />
+    <Compile Include="Installer\Engines\PlayHT\PlayHTSapi5VoiceImpl.cs" />
   </ItemGroup>
 
   <ItemGroup>

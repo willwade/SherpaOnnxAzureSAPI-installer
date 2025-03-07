@@ -8,6 +8,12 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Installer.Shared;
+using Installer.Core.Managers;
+using Installer.Core.Models;
+using Installer.Engines.SherpaOnnx;
+using Installer.Engines.Azure;
+using Installer.Engines.ElevenLabs;
+using Installer.Engines.PlayHT;
 
 namespace Installer
 {
@@ -15,6 +21,13 @@ namespace Installer
     {
         private const string OnlineJsonUrl = "https://github.com/willwade/tts-wrapper/raw/main/tts_wrapper/engines/sherpaonnx/merged_models.json";
         private const string LocalJsonPath = "./merged_models.json";
+        
+        // Plugin system components
+        private static ConfigurationManager _configManager;
+        private static TtsEngineManager _engineManager;
+        private static PluginLoader _pluginLoader;
+        private static string _pluginDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OpenAssistive", "OpenSpeech", "plugins");
+        private static string _dllPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OpenAssistive", "OpenSpeech", "OpenSpeechTTS.dll");
 
         static async Task Main(string[] args)
         {
@@ -24,223 +37,129 @@ namespace Installer
                 Console.WriteLine("Please run as administrator.");
                 return;
             }
-
-            var installer = new ModelInstaller();
-            var registrar = new Sapi5RegistrarExtended();
-            string dllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
+            
+            // Initialize plugin system
+            InitializePluginSystem();
 
             // Check for command line arguments
-            if (args.Length >= 2)
+            if (args.Length >= 1)
             {
                 string command = args[0].ToLower();
-                string modelId = args[1];
-
+                
                 switch (command)
                 {
-                    case "install":
-                        await InstallSpecificVoice(modelId, installer, registrar, dllPath);
+                    case "list-engines":
+                        ListEngines();
                         return;
-
-                    case "install-azure":
-                        string subscriptionKey = null;
-                        string region = null;
-                        string voiceName = modelId;
-                        string style = null;
-                        string role = null;
-
-                        // Parse additional arguments for Azure
-                        for (int i = 2; i < args.Length; i++)
-                        {
-                            if (args[i] == "--key" && i + 1 < args.Length)
-                            {
-                                subscriptionKey = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--region" && i + 1 < args.Length)
-                            {
-                                region = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--style" && i + 1 < args.Length)
-                            {
-                                style = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--role" && i + 1 < args.Length)
-                            {
-                                role = args[i + 1];
-                                i++;
-                            }
-                        }
-
-                        // If key or region not provided, try to load from config
-                        if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region))
-                        {
-                            var config = AzureConfigManager.LoadConfig();
-                            
-                            if (string.IsNullOrEmpty(subscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
-                            {
-                                subscriptionKey = config.DefaultKey;
-                                Console.WriteLine("Using subscription key from configuration file.");
-                            }
-                            
-                            if (string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(config.DefaultRegion))
-                            {
-                                region = config.DefaultRegion;
-                                Console.WriteLine("Using region from configuration file.");
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region))
-                        {
-                            Console.WriteLine("Error: Azure subscription key and region are required.");
-                            Console.WriteLine("Usage: Installer.exe install-azure <voice-name> --key <subscription-key> --region <region> [--style <style>] [--role <role>]");
-                            Console.WriteLine("Or set up a configuration file using: Installer.exe save-azure-config --key <subscription-key> --region <region>");
-                            return;
-                        }
-
-                        await InstallAzureVoice(voiceName, subscriptionKey, region, style, role, registrar, dllPath);
-                        return;
-
-                    case "list-azure-voices":
-                        string listSubscriptionKey = null;
-                        string listRegion = null;
-
-                        // Parse additional arguments for Azure
-                        for (int i = 2; i < args.Length; i++)
-                        {
-                            if (args[i] == "--key" && i + 1 < args.Length)
-                            {
-                                listSubscriptionKey = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--region" && i + 1 < args.Length)
-                            {
-                                listRegion = args[i + 1];
-                                i++;
-                            }
-                        }
-
-                        // If key or region not provided, try to load from config
-                        if (string.IsNullOrEmpty(listSubscriptionKey) || string.IsNullOrEmpty(listRegion))
-                        {
-                            var config = AzureConfigManager.LoadConfig();
-                            
-                            if (string.IsNullOrEmpty(listSubscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
-                            {
-                                listSubscriptionKey = config.DefaultKey;
-                                Console.WriteLine("Using subscription key from configuration file.");
-                            }
-                            
-                            if (string.IsNullOrEmpty(listRegion) && !string.IsNullOrEmpty(config.DefaultRegion))
-                            {
-                                listRegion = config.DefaultRegion;
-                                Console.WriteLine("Using region from configuration file.");
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(listSubscriptionKey) || string.IsNullOrEmpty(listRegion))
-                        {
-                            Console.WriteLine("Error: Azure subscription key and region are required.");
-                            Console.WriteLine("Usage: Installer.exe list-azure-voices --key <subscription-key> --region <region>");
-                            Console.WriteLine("Or set up a configuration file using: Installer.exe save-azure-config --key <subscription-key> --region <region>");
-                            return;
-                        }
-
-                        await ListAzureVoices(listSubscriptionKey, listRegion);
-                        return;
-
-                    case "save-azure-config":
-                        string configKey = null;
-                        string configRegion = null;
-                        bool secureStorage = true;
                         
-                        // Parse additional arguments
-                        for (int i = 1; i < args.Length; i++)
+                    case "list-params":
+                        if (args.Length >= 2)
                         {
-                            if (args[i] == "--key" && i + 1 < args.Length)
-                            {
-                                configKey = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--region" && i + 1 < args.Length)
-                            {
-                                configRegion = args[i + 1];
-                                i++;
-                            }
-                            else if (args[i] == "--secure" && i + 1 < args.Length)
-                            {
-                                bool.TryParse(args[i + 1], out secureStorage);
-                                i++;
-                            }
-                        }
-                        
-                        if (string.IsNullOrEmpty(configKey) || string.IsNullOrEmpty(configRegion))
-                        {
-                            Console.WriteLine("Error: Azure subscription key and region are required.");
-                            Console.WriteLine("Usage: Installer.exe save-azure-config --key <subscription-key> --region <region> [--secure <true|false>]");
-                            return;
-                        }
-                        
-                        AzureConfigManager.SaveConfig(configKey, configRegion, secureStorage);
-                        return;
-
-                    case "verify":
-                        await VerifyVoiceInstallation(modelId);
-                        return;
-
-                    case "uninstall":
-                        if (modelId == "all")
-                        {
-                            await UninstallVoicesAndDll(registrar, dllPath);
+                            string engineName = args[1];
+                            ListEngineParameters(engineName);
                         }
                         else
                         {
-                            await UninstallSpecificVoice(modelId, registrar);
+                            Console.WriteLine("Error: Engine name is required.");
+                            Console.WriteLine("Usage: Installer.exe list-params <engine-name>");
                         }
                         return;
-
-                    default:
-                        Console.WriteLine("Invalid command. Use 'install <model-id>', 'verify <model-id>', or 'uninstall <model-id|all>'");
+                        
+                    case "configure":
+                        if (args.Length >= 2)
+                        {
+                            string engineName = args[1];
+                            ConfigureEngine(engineName, args.Skip(2).ToArray());
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Engine name is required.");
+                            Console.WriteLine("Usage: Installer.exe configure <engine-name> --param1 value1 --param2 value2");
+                        }
+                        return;
+                        
+                    case "list-voices":
+                        if (args.Length >= 2)
+                        {
+                            string engineName = args[1];
+                            await ListVoices(engineName);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Engine name is required.");
+                            Console.WriteLine("Usage: Installer.exe list-voices <engine-name>");
+                        }
+                        return;
+                        
+                    case "install":
+                        if (args.Length >= 3)
+                        {
+                            string engineName = args[1];
+                            string voiceId = args[2];
+                            await InstallVoice(engineName, voiceId, args.Skip(3).ToArray());
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Engine name and voice ID are required.");
+                            Console.WriteLine("Usage: Installer.exe install <engine-name> <voice-id> [--param1 value1] [--param2 value2]");
+                        }
+                        return;
+                        
+                    case "uninstall":
+                        if (args.Length >= 2)
+                        {
+                            string voiceId = args[1];
+                            UninstallVoice(voiceId);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Voice ID is required.");
+                            Console.WriteLine("Usage: Installer.exe uninstall <voice-id>");
+                        }
+                        return;
+                        
+                    case "uninstall-engine":
+                        if (args.Length >= 2)
+                        {
+                            string engineName = args[1];
+                            UninstallEngine(engineName);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Engine name is required.");
+                            Console.WriteLine("Usage: Installer.exe uninstall-engine <engine-name>");
+                        }
+                        return;
+                        
+                    case "test":
+                        if (args.Length >= 2)
+                        {
+                            string voiceId = args[1];
+                            string text = "This is a test of the text-to-speech system.";
+                            
+                            // Check for text parameter
+                            for (int i = 2; i < args.Length; i++)
+                            {
+                                if (args[i] == "--text" && i + 1 < args.Length)
+                                {
+                                    text = args[i + 1];
+                                    break;
+                                }
+                            }
+                            
+                            TestVoice(voiceId, text);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Voice ID is required.");
+                            Console.WriteLine("Usage: Installer.exe test <voice-id> [--text \"Text to speak\"]");
+                        }
                         return;
                 }
             }
-
-            // Interactive mode
-            Console.WriteLine("OpenSpeech TTS SAPI Installer");
-            Console.WriteLine("============================");
-            Console.WriteLine();
-            Console.WriteLine("Select an option:");
-            Console.WriteLine("1. Install Sherpa ONNX voice");
-            Console.WriteLine("2. Install Azure TTS voice");
-            Console.WriteLine("3. Uninstall all voices");
-            Console.WriteLine("4. Exit");
-            Console.WriteLine();
-            Console.Write("Enter your choice (1-4): ");
             
-            string choice = Console.ReadLine();
-            
-            switch (choice)
-            {
-                case "1":
-                    await InstallSherpaOnnxVoiceInteractive(installer, registrar, dllPath);
-                    break;
-                    
-                case "2":
-                    await InstallAzureVoiceInteractive(registrar, dllPath);
-                    break;
-                    
-                case "3":
-                    await UninstallVoicesAndDll(registrar, dllPath);
-                    break;
-                    
-                case "4":
-                    return;
-                    
-                default:
-                    Console.WriteLine("Invalid choice. Please try again.");
-                    break;
-            }
+            // If no command or invalid command, run interactive mode
+            await RunInteractiveMode();
         }
 
         static async Task<Dictionary<string, TtsModel>> LoadModelsAsync()
@@ -1163,6 +1082,836 @@ namespace Installer
             catch (Exception ex)
             {
                 Console.WriteLine($"Error installing Azure voice: {ex.Message}");
+            }
+        }
+
+        private static void InitializePluginSystem()
+        {
+            try
+            {
+                Console.WriteLine("Initializing plugin system...");
+                
+                // Create plugin directory if it doesn't exist
+                if (!Directory.Exists(_pluginDirectory))
+                {
+                    Directory.CreateDirectory(_pluginDirectory);
+                }
+                
+                // Initialize configuration manager
+                _configManager = new ConfigurationManager();
+                
+                // Initialize engine manager
+                _engineManager = new TtsEngineManager(_configManager);
+                
+                // Initialize plugin loader
+                _pluginLoader = new PluginLoader(_pluginDirectory, _engineManager);
+                
+                // Register built-in engines
+                _engineManager.RegisterEngine(new SherpaOnnxEngine());
+                _engineManager.RegisterEngine(new AzureTtsEngine());
+                _engineManager.RegisterEngine(new ElevenLabsEngine());
+                _engineManager.RegisterEngine(new PlayHTEngine());
+                
+                // Load plugins
+                _pluginLoader.LoadAllEngines();
+                
+                Console.WriteLine("Plugin system initialized successfully.");
+                Console.WriteLine($"Registered engines: {string.Join(", ", _engineManager.GetEngineNames())}");
+                Console.WriteLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing plugin system: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+            }
+        }
+
+        private static void ListEngines()
+        {
+            Console.WriteLine("Available TTS Engines:");
+            Console.WriteLine("=====================");
+            
+            foreach (var engine in _engineManager.GetAllEngines())
+            {
+                Console.WriteLine($"Name: {engine.EngineName}");
+                Console.WriteLine($"Description: {engine.EngineDescription}");
+                Console.WriteLine($"Version: {engine.EngineVersion}");
+                Console.WriteLine($"Requires Authentication: {engine.RequiresAuthentication}");
+                Console.WriteLine($"Supports Offline Usage: {engine.SupportsOfflineUsage}");
+                Console.WriteLine($"Requires SSML: {engine.RequiresSsml}");
+                Console.WriteLine();
+            }
+        }
+
+        private static void ListEngineParameters(string engineName)
+        {
+            try
+            {
+                var engine = _engineManager.GetEngine(engineName);
+                var parameters = engine.GetRequiredParameters();
+                
+                Console.WriteLine($"Configuration Parameters for {engineName}:");
+                Console.WriteLine("=======================================");
+                
+                foreach (var param in parameters)
+                {
+                    Console.WriteLine($"Name: {param.Name}");
+                    Console.WriteLine($"Display Name: {param.DisplayName}");
+                    Console.WriteLine($"Description: {param.Description}");
+                    Console.WriteLine($"Required: {param.IsRequired}");
+                    Console.WriteLine($"Secret: {param.IsSecret}");
+                    
+                    if (!string.IsNullOrEmpty(param.DefaultValue))
+                    {
+                        Console.WriteLine($"Default Value: {param.DefaultValue}");
+                    }
+                    
+                    if (param.AllowedValues.Count > 0)
+                    {
+                        Console.WriteLine($"Allowed Values: {string.Join(", ", param.AllowedValues)}");
+                    }
+                    
+                    Console.WriteLine();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing parameters for engine {engineName}: {ex.Message}");
+            }
+        }
+
+        private static void ConfigureEngine(string engineName, string[] parameters)
+        {
+            try
+            {
+                var engine = _engineManager.GetEngine(engineName);
+                var config = new Dictionary<string, string>();
+                
+                // Parse parameters
+                for (int i = 0; i < parameters.Length; i += 2)
+                {
+                    if (i + 1 < parameters.Length)
+                    {
+                        string paramName = parameters[i].TrimStart('-');
+                        string paramValue = parameters[i + 1];
+                        config[paramName] = paramValue;
+                    }
+                }
+                
+                // Validate configuration
+                if (!engine.ValidateConfiguration(config))
+                {
+                    Console.WriteLine("Invalid configuration. Please check the parameters and try again.");
+                    return;
+                }
+                
+                // Save configuration
+                _configManager.UpdateEngineConfiguration(engineName, config);
+                
+                Console.WriteLine($"Configuration for {engineName} saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error configuring engine {engineName}: {ex.Message}");
+            }
+        }
+
+        private static async Task ListVoices(string engineName)
+        {
+            try
+            {
+                var engine = _engineManager.GetEngine(engineName);
+                var config = _configManager.GetEngineConfiguration(engineName);
+                
+                Console.WriteLine($"Retrieving voices for {engineName}...");
+                
+                var voices = await engine.GetAvailableVoicesAsync(config);
+                
+                Console.WriteLine($"Available Voices for {engineName}:");
+                Console.WriteLine("===============================");
+                
+                foreach (var voice in voices)
+                {
+                    Console.WriteLine($"ID: {voice.Id}");
+                    Console.WriteLine($"Name: {voice.Name}");
+                    Console.WriteLine($"Gender: {voice.Gender}");
+                    Console.WriteLine($"Locale: {voice.Locale}");
+                    
+                    if (voice.SupportsStyles)
+                    {
+                        Console.WriteLine($"Supported Styles: {string.Join(", ", voice.SupportedStyles)}");
+                    }
+                    
+                    if (voice.SupportsRoles)
+                    {
+                        Console.WriteLine($"Supported Roles: {string.Join(", ", voice.SupportedRoles)}");
+                    }
+                    
+                    Console.WriteLine();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing voices for engine {engineName}: {ex.Message}");
+            }
+        }
+
+        private static async Task InstallVoice(string engineName, string voiceId, string[] parameters)
+        {
+            try
+            {
+                var engine = _engineManager.GetEngine(engineName);
+                var config = _configManager.GetEngineConfiguration(engineName);
+                
+                // Parse additional parameters
+                var additionalParams = new Dictionary<string, string>();
+                for (int i = 0; i < parameters.Length; i += 2)
+                {
+                    if (i + 1 < parameters.Length)
+                    {
+                        string paramName = parameters[i].TrimStart('-');
+                        string paramValue = parameters[i + 1];
+                        additionalParams[paramName] = paramValue;
+                    }
+                }
+                
+                // Merge with existing configuration
+                foreach (var param in additionalParams)
+                {
+                    config[param.Key] = param.Value;
+                }
+                
+                // Get voice information
+                Console.WriteLine($"Retrieving voice information for {voiceId}...");
+                var voices = await engine.GetAvailableVoicesAsync(config);
+                var voice = voices.FirstOrDefault(v => v.Id == voiceId);
+                
+                if (voice == null)
+                {
+                    Console.WriteLine($"Voice {voiceId} not found for engine {engineName}.");
+                    return;
+                }
+                
+                // Test voice
+                Console.WriteLine($"Testing voice {voice.Name}...");
+                bool testResult = await engine.TestVoiceAsync(voiceId, config);
+                
+                if (!testResult)
+                {
+                    Console.WriteLine($"Voice test failed. Please check your configuration and try again.");
+                    return;
+                }
+                
+                // Register voice
+                Console.WriteLine($"Registering voice {voice.Name}...");
+                engine.RegisterVoice(voice, config, _dllPath);
+                
+                Console.WriteLine($"Voice {voice.Name} installed successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error installing voice {voiceId} for engine {engineName}: {ex.Message}");
+            }
+        }
+
+        private static void UninstallVoice(string voiceId)
+        {
+            try
+            {
+                // Find the engine for this voice
+                string engineName = null;
+                
+                foreach (var engine in _engineManager.GetAllEngines())
+                {
+                    try
+                    {
+                        engine.UnregisterVoice(voiceId);
+                        engineName = engine.EngineName;
+                        break;
+                    }
+                    catch
+                    {
+                        // Ignore errors and try the next engine
+                    }
+                }
+                
+                if (engineName != null)
+                {
+                    Console.WriteLine($"Voice {voiceId} uninstalled successfully.");
+                }
+                else
+                {
+                    Console.WriteLine($"Voice {voiceId} not found or could not be uninstalled.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uninstalling voice {voiceId}: {ex.Message}");
+            }
+        }
+
+        private static void UninstallEngine(string engineName)
+        {
+            try
+            {
+                var engine = _engineManager.GetEngine(engineName);
+                
+                // Get all voices for this engine
+                string registryPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
+                using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+                {
+                    if (key != null)
+                    {
+                        foreach (var voiceName in key.GetSubKeyNames())
+                        {
+                            using (var voiceKey = key.OpenSubKey(voiceName))
+                            {
+                                if (voiceKey != null)
+                                {
+                                    using (var attributesKey = voiceKey.OpenSubKey("Attributes"))
+                                    {
+                                        if (attributesKey != null)
+                                        {
+                                            string voiceType = (string)attributesKey.GetValue("VoiceType");
+                                            
+                                            if (voiceType == engineName)
+                                            {
+                                                try
+                                                {
+                                                    engine.UnregisterVoice(voiceName);
+                                                    Console.WriteLine($"Uninstalled voice: {voiceName}");
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    Console.WriteLine($"Error uninstalling voice {voiceName}: {ex.Message}");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Console.WriteLine($"All voices for engine {engineName} have been uninstalled.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uninstalling engine {engineName}: {ex.Message}");
+            }
+        }
+
+        private static void TestVoice(string voiceId, string text)
+        {
+            try
+            {
+                // Find the voice in the registry
+                string registryPath = $@"SOFTWARE\Microsoft\Speech\Voices\Tokens\{voiceId}";
+                using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+                {
+                    if (key == null)
+                    {
+                        Console.WriteLine($"Voice {voiceId} not found in registry.");
+                        return;
+                    }
+                    
+                    using (var attributesKey = key.OpenSubKey("Attributes"))
+                    {
+                        if (attributesKey == null)
+                        {
+                            Console.WriteLine($"Voice {voiceId} attributes not found in registry.");
+                            return;
+                        }
+                        
+                        string voiceType = (string)attributesKey.GetValue("VoiceType");
+                        
+                        if (string.IsNullOrEmpty(voiceType))
+                        {
+                            Console.WriteLine($"Voice {voiceId} type not found in registry.");
+                            return;
+                        }
+                        
+                        // Find the engine for this voice type
+                        var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == voiceType);
+                        
+                        if (engine == null)
+                        {
+                            Console.WriteLine($"Engine {voiceType} not found for voice {voiceId}.");
+                            return;
+                        }
+                        
+                        // Get configuration for this engine
+                        var config = _configManager.GetEngineConfiguration(voiceType);
+                        
+                        // Test the voice
+                        Console.WriteLine($"Testing voice {voiceId} with text: \"{text}\"");
+                        var result = engine.TestVoiceAsync(voiceId, config).GetAwaiter().GetResult();
+                        
+                        if (result)
+                        {
+                            Console.WriteLine($"Voice test successful.");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Voice test failed.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error testing voice {voiceId}: {ex.Message}");
+            }
+        }
+
+        private static async Task RunInteractiveMode()
+        {
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("OpenSpeech TTS SAPI Installer");
+                Console.WriteLine("============================");
+                Console.WriteLine();
+                Console.WriteLine("Select an option:");
+                Console.WriteLine("1. List installed engines");
+                Console.WriteLine("2. Configure an engine");
+                Console.WriteLine("3. Install a voice");
+                Console.WriteLine("4. Uninstall a voice");
+                Console.WriteLine("5. Test a voice");
+                Console.WriteLine("6. Exit");
+                Console.WriteLine();
+                Console.Write("Enter your choice (1-6): ");
+                
+                string choice = Console.ReadLine();
+                
+                switch (choice)
+                {
+                    case "1":
+                        ListEngines();
+                        break;
+                        
+                    case "2":
+                        await ConfigureEngineInteractive();
+                        break;
+                        
+                    case "3":
+                        await InstallVoiceInteractive();
+                        break;
+                        
+                    case "4":
+                        UninstallVoiceInteractive();
+                        break;
+                        
+                    case "5":
+                        TestVoiceInteractive();
+                        break;
+                        
+                    case "6":
+                        return;
+                        
+                    default:
+                        Console.WriteLine("Invalid choice. Please try again.");
+                        break;
+                }
+                
+                Console.WriteLine();
+                Console.WriteLine("Press any key to continue...");
+                Console.ReadKey();
+            }
+        }
+
+        private static async Task ConfigureEngineInteractive()
+        {
+            Console.Clear();
+            Console.WriteLine("Configure an Engine");
+            Console.WriteLine("==================");
+            Console.WriteLine();
+            
+            // List available engines
+            var engines = _engineManager.GetAllEngines().ToList();
+            
+            for (int i = 0; i < engines.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {engines[i].EngineName} - {engines[i].EngineDescription}");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select an engine (1-{0}): ", engines.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int engineIndex) || engineIndex < 1 || engineIndex > engines.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                return;
+            }
+            
+            var selectedEngine = engines[engineIndex - 1];
+            var parameters = selectedEngine.GetRequiredParameters().ToList();
+            var config = new Dictionary<string, string>();
+            
+            Console.WriteLine();
+            Console.WriteLine($"Configuring {selectedEngine.EngineName}");
+            Console.WriteLine();
+            
+            // Get current configuration
+            var currentConfig = _configManager.GetEngineConfiguration(selectedEngine.EngineName);
+            
+            // Prompt for each parameter
+            foreach (var param in parameters)
+            {
+                string defaultValue = currentConfig.ContainsKey(param.Name) ? currentConfig[param.Name] : param.DefaultValue;
+                string prompt = $"{param.DisplayName} ({param.Description})";
+                
+                if (!string.IsNullOrEmpty(defaultValue) && !param.IsSecret)
+                {
+                    prompt += $" [{defaultValue}]";
+                }
+                
+                Console.Write($"{prompt}: ");
+                
+                string value = Console.ReadLine();
+                
+                if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(defaultValue))
+                {
+                    value = defaultValue;
+                }
+                
+                if (param.IsRequired && string.IsNullOrEmpty(value))
+                {
+                    Console.WriteLine($"Error: {param.DisplayName} is required.");
+                    return;
+                }
+                
+                config[param.Name] = value;
+            }
+            
+            // Validate configuration
+            if (!selectedEngine.ValidateConfiguration(config))
+            {
+                Console.WriteLine("Invalid configuration. Please check the parameters and try again.");
+                return;
+            }
+            
+            // Save configuration
+            _configManager.UpdateEngineConfiguration(selectedEngine.EngineName, config);
+            
+            Console.WriteLine();
+            Console.WriteLine($"Configuration for {selectedEngine.EngineName} saved successfully.");
+        }
+
+        private static async Task InstallVoiceInteractive()
+        {
+            Console.Clear();
+            Console.WriteLine("Install a Voice");
+            Console.WriteLine("==============");
+            Console.WriteLine();
+            
+            // List available engines
+            var engines = _engineManager.GetAllEngines().ToList();
+            
+            for (int i = 0; i < engines.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {engines[i].EngineName} - {engines[i].EngineDescription}");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select an engine (1-{0}): ", engines.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int engineIndex) || engineIndex < 1 || engineIndex > engines.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                return;
+            }
+            
+            var selectedEngine = engines[engineIndex - 1];
+            var config = _configManager.GetEngineConfiguration(selectedEngine.EngineName);
+            
+            // Check if engine is configured
+            if (!selectedEngine.ValidateConfiguration(config))
+            {
+                Console.WriteLine($"Engine {selectedEngine.EngineName} is not properly configured.");
+                Console.WriteLine("Please configure the engine first.");
+                return;
+            }
+            
+            // Get available voices
+            Console.WriteLine();
+            Console.WriteLine($"Retrieving voices for {selectedEngine.EngineName}...");
+            
+            var voices = await selectedEngine.GetAvailableVoicesAsync(config);
+            var voiceList = voices.ToList();
+            
+            if (voiceList.Count == 0)
+            {
+                Console.WriteLine("No voices found for this engine.");
+                return;
+            }
+            
+            Console.WriteLine();
+            Console.WriteLine("Available Voices:");
+            
+            for (int i = 0; i < voiceList.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {voiceList[i].Name} ({voiceList[i].Gender}, {voiceList[i].Locale})");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select a voice (1-{0}): ", voiceList.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > voiceList.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                return;
+            }
+            
+            var selectedVoice = voiceList[voiceIndex - 1];
+            
+            // Configure voice-specific options
+            if (selectedVoice.SupportsStyles && selectedVoice.SupportedStyles.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Available Styles:");
+                
+                for (int i = 0; i < selectedVoice.SupportedStyles.Count; i++)
+                {
+                    Console.WriteLine($"{i + 1}. {selectedVoice.SupportedStyles[i]}");
+                }
+                
+                Console.WriteLine();
+                Console.Write("Select a style (1-{0}, or 0 for none): ", selectedVoice.SupportedStyles.Count);
+                
+                if (int.TryParse(Console.ReadLine(), out int styleIndex) && styleIndex > 0 && styleIndex <= selectedVoice.SupportedStyles.Count)
+                {
+                    selectedVoice.SelectedStyle = selectedVoice.SupportedStyles[styleIndex - 1];
+                }
+            }
+            
+            if (selectedVoice.SupportsRoles && selectedVoice.SupportedRoles.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Available Roles:");
+                
+                for (int i = 0; i < selectedVoice.SupportedRoles.Count; i++)
+                {
+                    Console.WriteLine($"{i + 1}. {selectedVoice.SupportedRoles[i]}");
+                }
+                
+                Console.WriteLine();
+                Console.Write("Select a role (1-{0}, or 0 for none): ", selectedVoice.SupportedRoles.Count);
+                
+                if (int.TryParse(Console.ReadLine(), out int roleIndex) && roleIndex > 0 && roleIndex <= selectedVoice.SupportedRoles.Count)
+                {
+                    selectedVoice.SelectedRole = selectedVoice.SupportedRoles[roleIndex - 1];
+                }
+            }
+            
+            // Test voice
+            Console.WriteLine();
+            Console.WriteLine($"Testing voice {selectedVoice.Name}...");
+            
+            bool testResult = await selectedEngine.TestVoiceAsync(selectedVoice.Id, config);
+            
+            if (!testResult)
+            {
+                Console.WriteLine($"Voice test failed. Please check your configuration and try again.");
+                return;
+            }
+            
+            // Register voice
+            Console.WriteLine();
+            Console.WriteLine($"Registering voice {selectedVoice.Name}...");
+            
+            selectedEngine.RegisterVoice(selectedVoice, config, _dllPath);
+            
+            Console.WriteLine();
+            Console.WriteLine($"Voice {selectedVoice.Name} installed successfully.");
+        }
+
+        private static void UninstallVoiceInteractive()
+        {
+            Console.Clear();
+            Console.WriteLine("Uninstall a Voice");
+            Console.WriteLine("================");
+            Console.WriteLine();
+            
+            // Get installed voices
+            var installedVoices = new List<(string VoiceId, string VoiceName, string EngineName)>();
+            
+            string registryPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
+            using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+            {
+                if (key != null)
+                {
+                    foreach (var voiceId in key.GetSubKeyNames())
+                    {
+                        using (var voiceKey = key.OpenSubKey(voiceId))
+                        {
+                            if (voiceKey != null)
+                            {
+                                string voiceName = (string)voiceKey.GetValue("");
+                                
+                                using (var attributesKey = voiceKey.OpenSubKey("Attributes"))
+                                {
+                                    if (attributesKey != null)
+                                    {
+                                        string engineName = (string)attributesKey.GetValue("VoiceType");
+                                        
+                                        if (!string.IsNullOrEmpty(engineName))
+                                        {
+                                            installedVoices.Add((voiceId, voiceName, engineName));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (installedVoices.Count == 0)
+            {
+                Console.WriteLine("No voices are installed.");
+                return;
+            }
+            
+            Console.WriteLine("Installed Voices:");
+            
+            for (int i = 0; i < installedVoices.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {installedVoices[i].VoiceName} ({installedVoices[i].EngineName})");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select a voice to uninstall (1-{0}): ", installedVoices.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > installedVoices.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                return;
+            }
+            
+            var selectedVoice = installedVoices[voiceIndex - 1];
+            
+            // Find the engine for this voice
+            var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
+            
+            if (engine == null)
+            {
+                Console.WriteLine($"Engine {selectedVoice.EngineName} not found for voice {selectedVoice.VoiceId}.");
+                return;
+            }
+            
+            // Unregister voice
+            Console.WriteLine();
+            Console.WriteLine($"Uninstalling voice {selectedVoice.VoiceName}...");
+            
+            engine.UnregisterVoice(selectedVoice.VoiceId);
+            
+            Console.WriteLine();
+            Console.WriteLine($"Voice {selectedVoice.VoiceName} uninstalled successfully.");
+        }
+
+        private static void TestVoiceInteractive()
+        {
+            Console.Clear();
+            Console.WriteLine("Test a Voice");
+            Console.WriteLine("===========");
+            Console.WriteLine();
+            
+            // Get installed voices
+            var installedVoices = new List<(string VoiceId, string VoiceName, string EngineName)>();
+            
+            string registryPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
+            using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+            {
+                if (key != null)
+                {
+                    foreach (var voiceId in key.GetSubKeyNames())
+                    {
+                        using (var voiceKey = key.OpenSubKey(voiceId))
+                        {
+                            if (voiceKey != null)
+                            {
+                                string voiceName = (string)voiceKey.GetValue("");
+                                
+                                using (var attributesKey = voiceKey.OpenSubKey("Attributes"))
+                                {
+                                    if (attributesKey != null)
+                                    {
+                                        string engineName = (string)attributesKey.GetValue("VoiceType");
+                                        
+                                        if (!string.IsNullOrEmpty(engineName))
+                                        {
+                                            installedVoices.Add((voiceId, voiceName, engineName));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (installedVoices.Count == 0)
+            {
+                Console.WriteLine("No voices are installed.");
+                return;
+            }
+            
+            Console.WriteLine("Installed Voices:");
+            
+            for (int i = 0; i < installedVoices.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {installedVoices[i].VoiceName} ({installedVoices[i].EngineName})");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select a voice to test (1-{0}): ", installedVoices.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > installedVoices.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                return;
+            }
+            
+            var selectedVoice = installedVoices[voiceIndex - 1];
+            
+            Console.WriteLine();
+            Console.Write("Enter text to speak: ");
+            string text = Console.ReadLine();
+            
+            if (string.IsNullOrEmpty(text))
+            {
+                text = "This is a test of the text-to-speech system.";
+            }
+            
+            // Find the engine for this voice
+            var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
+            
+            if (engine == null)
+            {
+                Console.WriteLine($"Engine {selectedVoice.EngineName} not found for voice {selectedVoice.VoiceId}.");
+                return;
+            }
+            
+            // Get configuration for this engine
+            var config = _configManager.GetEngineConfiguration(selectedVoice.EngineName);
+            
+            // Test the voice
+            Console.WriteLine();
+            Console.WriteLine($"Testing voice {selectedVoice.VoiceName} with text: \"{text}\"");
+            
+            var result = engine.TestVoiceAsync(selectedVoice.VoiceId, config).GetAwaiter().GetResult();
+            
+            if (result)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Voice test successful.");
+            }
+            else
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Voice test failed.");
             }
         }
     }

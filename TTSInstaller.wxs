@@ -3,11 +3,12 @@
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <?define TTSInstallerComponentGuid="5D58A0D3-5B8C-4C5C-B2D8-E06F7AA6A82E"?>
+  <?define Version="1.1.0.0"?>
 
   <!-- Main Package -->
   <Package Name="OpenSpeech TTS Installer" 
            Manufacturer="OpenSpeech" 
-           Version="1.0.0.0" 
+           Version="$(var.Version)" 
            UpgradeCode="52a9869a-b430-475f-909c-1db058ef74f9" 
            Scope="perMachine"
            InstallerVersion="500">
@@ -19,7 +20,45 @@
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="OpenSpeechFolder" Name="OpenSpeech">
+        <!-- Add plugins directory -->
+        <Directory Id="PluginsFolder" Name="plugins">
+          <!-- Plugin Core -->
+          <Component Id="PluginCore" Guid="*">
+            <File Id="PluginInterfaceDLL" Source="Plugins\bin\Release\net472\OpenSpeech.TTS.Plugins.dll" KeyPath="yes"/>
+          </Component>
+          
+          <!-- SherpaOnnx Plugin -->
+          <Component Id="SherpaOnnxPlugin" Guid="*">
+            <File Id="SherpaOnnxPluginDLL" Source="Plugins\SherpaOnnx\bin\Release\net472\SherpaOnnxPlugin.dll" KeyPath="yes"/>
+          </Component>
+          
+          <!-- Azure TTS Plugin -->
+          <Component Id="AzureTtsPlugin" Guid="*">
+            <File Id="AzureTtsPluginDLL" Source="Plugins\AzureTTS\bin\Release\net472\AzureTtsPlugin.dll" KeyPath="yes"/>
+          </Component>
+          
+          <!-- ElevenLabs Plugin -->
+          <Component Id="ElevenLabsPlugin" Guid="*">
+            <File Id="ElevenLabsPluginDLL" Source="Plugins\ElevenLabs\bin\Release\net472\ElevenLabsPlugin.dll" KeyPath="yes"/>
+            <File Id="ElevenLabsEngineDLL" Source="Installer\bin\Release\net472\Installer.dll" />
+          </Component>
+          
+          <!-- PlayHT Plugin -->
+          <Component Id="PlayHTPlugin" Guid="*">
+            <File Id="PlayHTPluginDLL" Source="Plugins\PlayHT\bin\Release\net472\PlayHTPlugin.dll" KeyPath="yes"/>
+            <File Id="PlayHTEngineDLL" Source="Installer\bin\Release\net472\Installer.dll" />
+          </Component>
+        </Directory>
+        
+        <!-- Configuration directory -->
+        <Directory Id="ConfigFolder" Name="config">
+          <Component Id="ConfigFiles" Guid="*">
+            <File Id="EngineConfigJSON" Source="config\engine-config.json" KeyPath="yes"/>
+          </Component>
+        </Directory>
+        
         <Directory Id="ModelsFolder" Name="models">
+          <!-- Sherpa ONNX Models -->
           <Directory Id="AmyModelFolder" Name="vits-piper-en_US-amy-low">
             <Directory Id="AmyEspeakData" Name="espeak-ng-data">
               <Component Id="AmyEspeakPhondata" Guid="*">
@@ -83,9 +122,17 @@
         <Component Id="SherpaOnnxDLL" Guid="*">
           <File Id="SherpaOnnxDLL" Source="OpenSpeechTTS\bin\Release\net472\sherpa-onnx.dll" KeyPath="yes"/>
         </Component>
+        
+        <Component Id="NewtonsoftJsonDLL" Guid="*">
+          <File Id="NewtonsoftJsonDLL" Source="OpenSpeechTTS\bin\Release\net472\Newtonsoft.Json.dll" KeyPath="yes"/>
+        </Component>
+        
+        <Component Id="SystemSecurityCryptographyDLL" Guid="*">
+          <File Id="SystemSecurityCryptographyDLL" Source="OpenSpeechTTS\bin\Release\net472\System.Security.Cryptography.ProtectedData.dll" KeyPath="yes"/>
+        </Component>
 
-        <!-- Registry Component -->
-        <Component Id="VoiceRegistryEntries" Guid="*">
+        <!-- Registry Component for Sherpa ONNX Voice -->
+        <Component Id="SherpaOnnxVoiceRegistry" Guid="*">
           <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice">
             <RegistryValue Type="string" Value="OpenSpeech Amy"/>
             <RegistryValue Type="string" Name="409" Value="OpenSpeech Amy"/>
@@ -98,6 +145,7 @@
             <RegistryValue Type="string" Name="Language" Value="409"/>
             <RegistryValue Type="string" Name="Gender" Value="Female"/>
             <RegistryValue Type="string" Name="Age" Value="Adult"/>
+            <RegistryValue Type="string" Name="Engine" Value="SherpaOnnx"/>
           </RegistryKey>
 
           <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\OpenSpeechAmyVoice\Attributes">
@@ -107,28 +155,64 @@
             <RegistryValue Type="string" Name="Language" Value="409"/>
             <RegistryValue Type="string" Name="Vendor" Value="OpenSpeech"/>
             <RegistryValue Type="string" Name="Version" Value="1.0"/>
+            <RegistryValue Type="string" Name="Engine" Value="SherpaOnnx"/>
+          </RegistryKey>
+        </Component>
+        
+        <!-- Registry Component for Engine Configuration -->
+        <Component Id="EngineConfigRegistry" Guid="*">
+          <RegistryKey Root="HKLM" Key="SOFTWARE\OpenSpeech\TTS">
+            <RegistryValue Type="string" Name="ConfigPath" Value="[ConfigFolder]engine-config.json" KeyPath="yes"/>
+            <RegistryValue Type="string" Name="PluginsPath" Value="[PluginsFolder]" />
+            <RegistryValue Type="string" Name="ModelsPath" Value="[ModelsFolder]" />
+            <RegistryValue Type="string" Name="Version" Value="$(var.Version)" />
           </RegistryKey>
         </Component>
       </Directory>
     </StandardDirectory>
 
     <!-- Features -->
-    <Feature Id="MainFeature" Title="TTS Installer" Level="1">
+    <Feature Id="CoreFeature" Title="OpenSpeech TTS Core" Level="1" Description="Core components required for all TTS engines" Display="expand">
       <ComponentRef Id="MainExecutable"/>
       <ComponentRef Id="OpenSpeechTTSDLL"/>
       <ComponentRef Id="NAudioDLL"/>
       <ComponentRef Id="NAudioCoreDLL"/>
       <ComponentRef Id="NAudioWasapiDLL"/>
-      <ComponentRef Id="SherpaOnnxDLL"/>
-      <ComponentRef Id="AmyOnnxModel"/>
-      <ComponentRef Id="AmyTokens"/>
-      <ComponentRef Id="AmyEspeakPhondata"/>
-      <ComponentRef Id="AmyEspeakPhondataManifest"/>
-      <ComponentRef Id="AmyEspeakPhonindex"/>
-      <ComponentRef Id="AmyEspeakPhontab"/>
-      <ComponentRef Id="AmyEspeakIntonations"/>
-      <ComponentRef Id="AmyEspeakEnDict"/>
-      <ComponentRef Id="VoiceRegistryEntries"/>
+      <ComponentRef Id="NewtonsoftJsonDLL"/>
+      <ComponentRef Id="SystemSecurityCryptographyDLL"/>
+      <ComponentRef Id="ConfigFiles"/>
+      <ComponentRef Id="EngineConfigRegistry"/>
+      <ComponentRef Id="PluginCore"/>
+      
+      <!-- Sherpa ONNX Feature -->
+      <Feature Id="SherpaOnnxFeature" Title="Sherpa ONNX Engine" Level="1" Description="Local TTS engine that runs offline">
+        <ComponentRef Id="SherpaOnnxDLL"/>
+        <ComponentRef Id="SherpaOnnxPlugin"/>
+        <ComponentRef Id="AmyOnnxModel"/>
+        <ComponentRef Id="AmyTokens"/>
+        <ComponentRef Id="AmyEspeakPhondata"/>
+        <ComponentRef Id="AmyEspeakPhondataManifest"/>
+        <ComponentRef Id="AmyEspeakPhonindex"/>
+        <ComponentRef Id="AmyEspeakPhontab"/>
+        <ComponentRef Id="AmyEspeakIntonations"/>
+        <ComponentRef Id="AmyEspeakEnDict"/>
+        <ComponentRef Id="SherpaOnnxVoiceRegistry"/>
+      </Feature>
+      
+      <!-- Azure TTS Feature -->
+      <Feature Id="AzureTtsFeature" Title="Azure TTS Engine" Level="1" Description="Microsoft Azure Cognitive Services TTS engine (requires API key)">
+        <ComponentRef Id="AzureTtsPlugin"/>
+      </Feature>
+      
+      <!-- ElevenLabs Feature -->
+      <Feature Id="ElevenLabsFeature" Title="ElevenLabs Engine" Level="1" Description="ElevenLabs AI voice generation (requires API key)">
+        <ComponentRef Id="ElevenLabsPlugin"/>
+      </Feature>
+      
+      <!-- PlayHT Feature -->
+      <Feature Id="PlayHTFeature" Title="PlayHT Engine" Level="1" Description="PlayHT AI voice generation (requires API key)">
+        <ComponentRef Id="PlayHTPlugin"/>
+      </Feature>
     </Feature>
 
     <!-- Custom Actions -->

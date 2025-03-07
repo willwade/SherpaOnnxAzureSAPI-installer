@@ -1,0 +1,48 @@
+{
+  "engines": {
+    "SherpaOnnx": {
+      "enabled": true,
+      "parameters": {
+        "modelsDirectory": "C:\\OpenSpeech\\models"
+      },
+      "testVoiceId": "vits-ljspeech",
+      "testText": "This is a test of the Sherpa ONNX text-to-speech engine."
+    },
+    "AzureTTS": {
+      "enabled": true,
+      "parameters": {
+        "subscriptionKey": "your-subscription-key",
+        "region": "eastus"
+      },
+      "testVoiceId": "en-US-JennyNeural",
+      "testText": "This is a test of the Azure text-to-speech engine."
+    },
+    "ElevenLabs": {
+      "enabled": true,
+      "parameters": {
+        "apiKey": "your-api-key",
+        "modelId": "eleven_monolingual_v1"
+      },
+      "testVoiceId": "21m00Tcm4TlvDq8ikWAM",
+      "testText": "This is a test of the ElevenLabs text-to-speech engine."
+    },
+    "PlayHT": {
+      "enabled": true,
+      "parameters": {
+        "apiKey": "your-api-key",
+        "userId": "your-user-id",
+        "quality": "premium"
+      },
+      "testVoiceId": "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-voice/manifest.json",
+      "testText": "This is a test of the PlayHT text-to-speech engine."
+    }
+  },
+  "testOptions": {
+    "runDirectTests": true,
+    "runSapiTests": true,
+    "runPluginTests": true,
+    "outputDirectory": "C:\\OpenSpeech\\TestOutput",
+    "sapiDllPath": "C:\\Program Files\\OpenAssistive\\OpenSpeech\\OpenSpeechTTS.dll",
+    "pluginDirectory": "C:\\Program Files\\OpenAssistive\\OpenSpeech\\plugins"
+  }
+} 
