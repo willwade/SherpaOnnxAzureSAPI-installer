@@ -33,7 +33,6 @@
     <Compile Include="Installer\Sapi5Registrar.cs" />
     <Compile Include="Installer\Sapi5RegistrarExtended.cs" />
     <Compile Include="Installer\AzureTtsService.cs" />
-    <Compile Include="Installer\AzureTtsModel.cs" />
     <Compile Include="Installer\AzureVoiceInstaller.cs" />
     <Compile Include="Installer\AzureConfigManager.cs" />
     <Compile Include="Installer\Shared\LanguageInfo.cs" />
