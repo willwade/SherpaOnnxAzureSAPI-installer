@@ -206,7 +206,7 @@ namespace MultiEngineTest
                     Console.WriteLine($"Generating audio for text: \"{text}\"");
                     
                     // Generate audio
-                    byte[] audioData = await tts.SynthesizeAudioAsync(text);
+                    byte[] audioData = await tts.SynthesizeSpeechAsync(text);
                     
                     // Save audio to file
                     string outputFile = Path.Combine(_outputDirectory, $"azure-direct-{voiceId}.wav");
