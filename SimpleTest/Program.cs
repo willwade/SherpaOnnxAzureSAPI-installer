@@ -156,26 +156,62 @@ namespace SimpleTest
                 
                 try
                 {
-                    synth.SelectVoice(info.Name);
-                    Console.WriteLine("Successfully selected the voice!");
-                    
-                    // Set output to audio file
-                    string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
-                    synth.SetOutputToWaveFile(outputPath);
-                    
-                    // Speak some text
-                    Console.WriteLine($"Speaking: \"{testText}\"");
-                    synth.Speak(testText);
-                    
-                    // Reset output to default
-                    synth.SetOutputToDefaultAudioDevice();
-                    
-                    Console.WriteLine($"Speech saved to: {outputPath}");
-                    
-                    // Try speaking to the default audio device
-                    Console.WriteLine("Now testing speech to default audio device...");
-                    Console.WriteLine($"Speaking: \"Hello, this is {info.Name}.\"");
-                    synth.Speak($"Hello, this is {info.Name}.");
+                    // For Azure voices, use SSML instead of SelectVoice
+                    if (voiceType == "Azure TTS")
+                    {
+                        // Set output to audio file
+                        string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
+                        synth.SetOutputToWaveFile(outputPath);
+                        
+                        // Create SSML for Azure voice
+                        string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+                            <voice name='{info.Name}'>
+                                {testText}
+                            </voice>
+                        </speak>";
+                        
+                        // Speak using SSML
+                        Console.WriteLine($"Speaking with SSML: \"{testText}\"");
+                        synth.SpeakSsml(ssml);
+                        
+                        // Reset output to default
+                        synth.SetOutputToDefaultAudioDevice();
+                        
+                        Console.WriteLine($"Speech saved to: {outputPath}");
+                        
+                        // Try speaking to the default audio device
+                        Console.WriteLine("Now testing speech to default audio device with SSML...");
+                        ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+                            <voice name='{info.Name}'>
+                                Hello, this is {info.Name}.
+                            </voice>
+                        </speak>";
+                        synth.SpeakSsml(ssml);
+                    }
+                    else
+                    {
+                        // For non-Azure voices, use the standard approach
+                        synth.SelectVoice(info.Name);
+                        Console.WriteLine("Successfully selected the voice!");
+                        
+                        // Set output to audio file
+                        string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
+                        synth.SetOutputToWaveFile(outputPath);
+                        
+                        // Speak some text
+                        Console.WriteLine($"Speaking: \"{testText}\"");
+                        synth.Speak(testText);
+                        
+                        // Reset output to default
+                        synth.SetOutputToDefaultAudioDevice();
+                        
+                        Console.WriteLine($"Speech saved to: {outputPath}");
+                        
+                        // Try speaking to the default audio device
+                        Console.WriteLine("Now testing speech to default audio device...");
+                        Console.WriteLine($"Speaking: \"Hello, this is {info.Name}.\"");
+                        synth.Speak($"Hello, this is {info.Name}.");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -324,9 +360,7 @@ namespace SimpleTest
                                 {
                                     try
                                     {
-                                        synth.SelectVoice(voiceName);
-                                        
-                                        // Set style using SSML
+                                        // Don't use SelectVoice, just use SSML directly
                                         string style = styles[0].Trim();
                                         string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
                                             <voice name='{voiceName}'>
@@ -338,6 +372,7 @@ namespace SimpleTest
                                         
                                         Console.WriteLine($"Testing Azure voice with style: {style}");
                                         synth.SpeakSsml(ssml);
+                                        Console.WriteLine("Style test completed successfully!");
                                     }
                                     catch (Exception ex)
                                     {
@@ -359,9 +394,7 @@ namespace SimpleTest
                                 {
                                     try
                                     {
-                                        synth.SelectVoice(voiceName);
-                                        
-                                        // Set role using SSML
+                                        // Don't use SelectVoice, just use SSML directly
                                         string role = roles[0].Trim();
                                         string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
                                             <voice name='{voiceName}'>
@@ -373,6 +406,7 @@ namespace SimpleTest
                                         
                                         Console.WriteLine($"Testing Azure voice with role: {role}");
                                         synth.SpeakSsml(ssml);
+                                        Console.WriteLine("Role test completed successfully!");
                                     }
                                     catch (Exception ex)
                                     {
