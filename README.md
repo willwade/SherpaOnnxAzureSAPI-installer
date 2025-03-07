@@ -32,23 +32,43 @@ This project contains a complete installer for TTS voices, integrating with Sher
    dotnet build TTSInstaller.csproj -c Release
    ```
 
-2.1 **Test the Installer**:
+3. **Sign the Sherpa-ONNX Assembly (if needed)**:
+   If you encounter strong name signing errors, you'll need to sign the sherpa-onnx assembly:
+   
+   a. Generate a strong name key:
    ```bash
-     dotnet run --project TTSInstaller.csproj install <model-id>
+   dotnet build KeyGenerator/KeyGenerator.csproj -t:GenerateKeyFile
+   ```
+   
+   b. Sign the assembly:
+   ```bash
+   dotnet run --project SignAssembly/SignAssembly.csproj
    ```
 
-   then
-
+4. **Install a Voice**:
    ```bash
-      dotnet run --project SimpleTest/SimpleTest.csproj
+   dotnet run --project TTSInstaller.csproj -- install <model-id>
    ```
+   
+   Available model IDs include:
+   - `piper-en-joe-medium` - Male English voice
+   - `piper-en-amy-medium` - Female English voice
+   
+   **Note**: Installation requires administrative privileges to register COM components.
 
-3. **Publish the TTS Application**:
+5. **Test the Installation**:
+   ```bash
+   dotnet run --project SimpleTest/SimpleTest.csproj
+   ```
+   
+   This will list all available voices and test speech synthesis with the installed voice.
+
+6. **Publish the TTS Application**:
    ```bash
    dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
    ```
 
-4. **Build the WiX Installer** (requires admin privileges):
+7. **Build the WiX Installer** (requires admin privileges):
    ```bash
    wix build TTSInstaller.wxs -o TTSInstaller.msi -b .
    ```
@@ -77,19 +97,37 @@ To uninstall:
   ```
 
 ## Troubleshooting
-- If you encounter build errors, ensure all prerequisites are installed
-- Check the Windows Event Viewer for installation errors
-- Review the install.log file in the project directory for detailed logs
-- For permission errors during build, ensure you're running as Administrator
 
+### Common Issues and Solutions
 
-## whats not working?
+#### Strong Name Signing Errors
+If you see errors like:
+```
+Could not load file or assembly 'sherpa-onnx, Version=1.9.12.0, Culture=neutral, PublicKeyToken=null' or one of its dependencies. A strongly-named assembly is required.
+```
 
-- voice isnt showing up in sapi applications eg balabolka
-- basic test synth not working. should do
-- we have a error about strong tyoes in nuget sherpa onnx. ive dine wacky workarounds but not sure its needed
+Follow the signing steps in the "Building the Project" section to sign the sherpa-onnx assembly.
 
+#### Voice Not Appearing in SAPI Applications
+1. Verify the COM registration:
+   ```bash
+   reg query "HKLM\SOFTWARE\Microsoft\Speech\Voices\Tokens\<voice-name>" /s
+   ```
+   
+2. Check the registry entries for the voice attributes:
+   ```bash
+   reg query "HKLM\SOFTWARE\Microsoft\Speech\Voices\Tokens\<voice-name>\Attributes" /s
+   ```
 
+3. Ensure the COM DLL is properly registered:
+   ```bash
+   & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll" /codebase
+   ```
+
+#### Debugging Logs
+Check the log files at:
+- `C:\OpenSpeech\sherpa_debug.log` - General debug information
+- `C:\OpenSpeech\sherpa_error.log` - Error details
 
 ## License
 This project is licensed under Apache 2.0.
