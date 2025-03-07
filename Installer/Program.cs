@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Principal;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using Installer;
 
@@ -205,8 +206,11 @@ class Program
     {
         try
         {
+            // Find the regasm path
+            string regasmPath = FindRegasmPath();
+            
             var process = new Process();
-            process.StartInfo.FileName = "regasm";
+            process.StartInfo.FileName = regasmPath;
             process.StartInfo.Arguments = $"/unregister \"{dllPath}\"";
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.UseShellExecute = false;
@@ -276,7 +280,114 @@ class Program
         }
     }
 
-    // Add a method to register the COM DLL
+    // Helper method to find the regasm path
+    private static string FindRegasmPath()
+    {
+        // First try to get the path from the registry
+        string regasmPath = GetRegasmPathFromRegistry();
+        if (!string.IsNullOrEmpty(regasmPath) && File.Exists(regasmPath))
+        {
+            return regasmPath;
+        }
+
+        // If registry lookup fails, try common installation paths
+        // Try 64-bit .NET Framework 4.x
+        regasmPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Microsoft.NET", "Framework64", "v4.0.30319", "regasm.exe");
+
+        if (File.Exists(regasmPath))
+        {
+            return regasmPath;
+        }
+
+        // Try 32-bit .NET Framework 4.x
+        regasmPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Microsoft.NET", "Framework", "v4.0.30319", "regasm.exe");
+
+        if (File.Exists(regasmPath))
+        {
+            return regasmPath;
+        }
+
+        // If we still can't find it, look for any version in Framework64 directory
+        string frameworkDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Microsoft.NET", "Framework64");
+
+        if (Directory.Exists(frameworkDir))
+        {
+            foreach (var dir in Directory.GetDirectories(frameworkDir, "v*")
+                                .OrderByDescending(d => d)) // Get newest version first
+            {
+                regasmPath = Path.Combine(dir, "regasm.exe");
+                if (File.Exists(regasmPath))
+                {
+                    return regasmPath;
+                }
+            }
+        }
+
+        // Try the same with 32-bit Framework directory
+        frameworkDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "Microsoft.NET", "Framework");
+
+        if (Directory.Exists(frameworkDir))
+        {
+            foreach (var dir in Directory.GetDirectories(frameworkDir, "v*")
+                                .OrderByDescending(d => d)) // Get newest version first
+            {
+                regasmPath = Path.Combine(dir, "regasm.exe");
+                if (File.Exists(regasmPath))
+                {
+                    return regasmPath;
+                }
+            }
+        }
+
+        // If we still can't find it, throw an exception
+        throw new FileNotFoundException(
+            "Could not find regasm.exe. Please ensure that .NET Framework 4.x is installed on this system.");
+    }
+
+    private static string GetRegasmPathFromRegistry()
+    {
+        try
+        {
+            // Look for the .NET Framework installation directory in the registry
+            using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\.NETFramework"))
+            {
+                if (key != null)
+                {
+                    var installRoot = key.GetValue("InstallRoot") as string;
+                    if (!string.IsNullOrEmpty(installRoot))
+                    {
+                        // Try to find the v4.0.30319 directory (or the latest version)
+                        var frameworkDirs = Directory.GetDirectories(installRoot, "v*")
+                                                    .OrderByDescending(d => d);
+                        
+                        foreach (var dir in frameworkDirs)
+                        {
+                            var regasmPath = Path.Combine(dir, "regasm.exe");
+                            if (File.Exists(regasmPath))
+                            {
+                                return regasmPath;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error looking up regasm path in registry: {ex.Message}");
+        }
+        
+        return null;
+    }
+
     private static void RegisterComDll(string dllPath)
     {
         try
@@ -296,9 +407,12 @@ class Program
                 throw new FileNotFoundException($"DLL not found: {dllPath}");
             }
             
+            // Find the regasm path
+            string regasmPath = FindRegasmPath();
+            
             // Register the DLL with regasm
             var process = new Process();
-            process.StartInfo.FileName = "regasm";
+            process.StartInfo.FileName = regasmPath;
             process.StartInfo.Arguments = $"/codebase \"{dllPath}\"";
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.RedirectStandardError = true;
