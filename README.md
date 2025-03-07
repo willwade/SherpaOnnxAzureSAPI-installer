@@ -166,6 +166,29 @@ Example with style:
 dotnet run --project TTSInstaller.csproj -- install-azure en-US-AriaNeural --key YOUR_KEY --region eastus --style cheerful
 ```
 
+### SSML Requirement for Azure Voices
+
+**Important Note**: Azure TTS voices require SSML (Speech Synthesis Markup Language) to work properly. This means:
+
+1. In applications that support SSML, Azure voices will work correctly.
+2. In applications that only use the standard `SelectVoice()` method without SSML, Azure voices may not work.
+
+This is a limitation of how Azure TTS integrates with SAPI, as Azure voices require additional parameters (subscription key, region, etc.) that are only accessible through SSML.
+
+For developers integrating with these voices, we recommend using SSML for all Azure voice interactions:
+
+```csharp
+// Example SSML for Azure voice
+string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+    <voice name='Microsoft Server Speech Text to Speech Voice (en-GB, OliverNeural)'>
+        This is a test of the Azure voice.
+    </voice>
+</speak>";
+
+// Use SSML with the speech synthesizer
+speechSynthesizer.SpeakSsml(ssml);
+```
+
 ### Security Considerations
 - Azure subscription keys are stored in the Windows Registry and/or configuration file
 - Keys in the configuration file are encrypted by default using Windows DPAPI
@@ -236,6 +259,8 @@ Follow the signing steps in the "Building the Project" section to sign the sherp
    & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\regasm.exe" "C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll" /codebase
    ```
 
+4. For Azure voices, remember they require SSML to work properly. Applications that don't use SSML may not be able to use Azure voices.
+
 #### Azure TTS Specific Issues
 
 ##### Invalid Subscription Key or Region
@@ -256,6 +281,12 @@ If you see "Warning: Style/Role 'X' not available for this voice":
 1. Not all voices support all styles and roles
 2. Use the `list-azure-voices` command to see available styles and roles
 3. Check the Azure documentation for voice capabilities
+
+##### Azure Voice Not Working in Applications
+If Azure voices don't work in certain applications:
+1. Check if the application supports SSML - Azure voices require SSML to work properly
+2. Try using the voice with SSML in our SimpleTest application to verify it works
+3. For applications that don't support SSML, Azure voices may not be usable
 
 ##### Configuration File Issues
 If you're having issues with the configuration file:
