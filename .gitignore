@@ -3,7 +3,7 @@ bin/
 obj/
 Debug/
 Release/
-models/
+/models/
 *.wixpdb
 *.msi
 *.cab
