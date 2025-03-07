@@ -1919,7 +1919,12 @@ namespace Installer
             
             for (int i = 0; i < filteredVoices.Count; i++)
             {
-                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({filteredVoices[i].EngineName})");
+                // Display AzureTTS instead of Neural for Azure voices
+                string displayEngineName = filteredVoices[i].EngineName.ToLowerInvariant() == "neural" 
+                    ? "AzureTTS" 
+                    : filteredVoices[i].EngineName;
+                
+                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({displayEngineName})");
             }
             
             Console.WriteLine();
@@ -2051,7 +2056,12 @@ namespace Installer
             
             for (int i = 0; i < filteredVoices.Count; i++)
             {
-                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({filteredVoices[i].EngineName})");
+                // Display AzureTTS instead of Neural for Azure voices
+                string displayEngineName = filteredVoices[i].EngineName.ToLowerInvariant() == "neural" 
+                    ? "AzureTTS" 
+                    : filteredVoices[i].EngineName;
+                
+                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({displayEngineName})");
             }
             
             Console.WriteLine();

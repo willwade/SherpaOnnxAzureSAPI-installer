@@ -101,7 +101,7 @@ namespace Installer.Engines.Azure
                             ["VoiceName"] = voice.ShortName,
                             ["LocalName"] = voice.LocalName,
                             ["SampleRateHertz"] = voice.SampleRateHertz,
-                            ["VoiceType"] = voice.VoiceType,
+                            ["VoiceType"] = "AzureTTS",
                             ["Status"] = voice.Status,
                             ["SubscriptionKey"] = subscriptionKey,
                             ["Region"] = region
