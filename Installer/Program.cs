@@ -14,6 +14,7 @@ using Installer.Engines.SherpaOnnx;
 using Installer.Engines.Azure;
 using Installer.Engines.ElevenLabs;
 using Installer.Engines.PlayHT;
+using System.Globalization;
 
 namespace Installer
 {
@@ -983,7 +984,13 @@ namespace Installer
                 
                 // Add search functionality
                 Console.WriteLine();
-                Console.WriteLine($"Found {voicesList.Count} voices. Enter search term to filter (or leave empty to show all):");
+                Console.WriteLine($"Found {voicesList.Count} voices. You can search by:");
+                Console.WriteLine(" - Language name (e.g., 'English', 'Spanish', 'French')");
+                Console.WriteLine(" - Voice name or ID (e.g., 'Guy', 'Aria', 'Sonia')");
+                Console.WriteLine(" - Locale code (e.g., 'en-US', 'es-ES')");
+                Console.WriteLine(" - Gender (e.g., 'Male', 'Female')");
+                Console.WriteLine();
+                Console.WriteLine("Enter search term to filter (or leave empty to show all):");
                 Console.Write("> ");
                 string searchTerm = Console.ReadLine() ?? "";
                 
@@ -992,9 +999,35 @@ namespace Installer
                 {
                     filteredVoiceList = voicesList
                         .Where(v => 
-                            v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                            v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                            (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            // Standard search by name, ID, and locale
+                            bool basicMatch = 
+                                v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                v.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                v.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+                            
+                            if (basicMatch) return true;
+                            
+                            // Advanced search by language name using CultureInfo
+                            try
+                            {
+                                // Try to get the culture info from the locale
+                                CultureInfo cultureInfo = CultureInfo.GetCultureInfo(v.Locale);
+                                
+                                // Check if the search term matches the display name, native name, or English name
+                                return 
+                                    cultureInfo.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                    cultureInfo.NativeName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                    cultureInfo.EnglishName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
+                            }
+                            catch
+                            {
+                                // If we can't get culture info, just return the basic match result
+                                return false;
+                            }
+                        })
                         .ToList();
                     
                     Console.WriteLine($"Found {filteredVoiceList.Count} voices matching '{searchTerm}'.");
@@ -1006,10 +1039,21 @@ namespace Installer
                 for (int i = 0; i < filteredVoiceList.Count; i++)
                 {
                     var voice = filteredVoiceList[i];
-                    string styles = voice.StyleList.Count > 0 ? $", Styles: {string.Join(", ", voice.StyleList.ToArray())}" : "";
-                    string roles = voice.RoleList.Count > 0 ? $", Roles: {string.Join(", ", voice.RoleList.ToArray())}" : "";
+                    string languageName = "Unknown";
                     
-                    Console.WriteLine($"{i + 1}. {voice.ShortName} ({voice.DisplayName}, {voice.Locale}, {voice.Gender}{styles}{roles})");
+                    try
+                    {
+                        // Try to get the culture info from the locale
+                        CultureInfo cultureInfo = CultureInfo.GetCultureInfo(voice.Locale);
+                        languageName = cultureInfo.EnglishName;
+                    }
+                    catch
+                    {
+                        // If we can't get culture info, just use the locale
+                        languageName = voice.Locale;
+                    }
+                    
+                    Console.WriteLine($"{i + 1}. {voice.Name} ({voice.Gender}, {languageName})");
                 }
                 
                 // Prompt user to select a voice
@@ -1647,7 +1691,13 @@ namespace Installer
             
             // Add search functionality
             Console.WriteLine();
-            Console.WriteLine($"Found {voiceList.Count} voices. Enter search term to filter (or leave empty to show all):");
+            Console.WriteLine($"Found {voiceList.Count} voices. You can search by:");
+            Console.WriteLine(" - Language name (e.g., 'English', 'Spanish', 'French')");
+            Console.WriteLine(" - Voice name or ID (e.g., 'Guy', 'Aria', 'Sonia')");
+            Console.WriteLine(" - Locale code (e.g., 'en-US', 'es-ES')");
+            Console.WriteLine(" - Gender (e.g., 'Male', 'Female')");
+            Console.WriteLine();
+            Console.WriteLine("Enter search term to filter (or leave empty to show all):");
             Console.Write("> ");
             string searchTerm = Console.ReadLine() ?? "";
             
@@ -1656,9 +1706,35 @@ namespace Installer
             {
                 filteredVoiceList = voiceList
                     .Where(v => 
-                        v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Standard search by name, ID, and locale
+                        bool basicMatch = 
+                            v.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            v.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            v.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            v.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            (v.DisplayName != null && v.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+                            
+                        if (basicMatch) return true;
+                        
+                        // Advanced search by language name using CultureInfo
+                        try
+                        {
+                            // Try to get the culture info from the locale
+                            CultureInfo cultureInfo = CultureInfo.GetCultureInfo(v.Locale);
+                            
+                            // Check if the search term matches the display name, native name, or English name
+                            return 
+                                cultureInfo.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                cultureInfo.NativeName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                cultureInfo.EnglishName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
+                        }
+                        catch
+                        {
+                            // If we can't get culture info, just return the basic match result
+                            return false;
+                        }
+                    })
                     .ToList();
                 
                 Console.WriteLine($"Found {filteredVoiceList.Count} voices matching '{searchTerm}'.");
@@ -1669,7 +1745,22 @@ namespace Installer
             
             for (int i = 0; i < filteredVoiceList.Count; i++)
             {
-                Console.WriteLine($"{i + 1}. {filteredVoiceList[i].Name} ({filteredVoiceList[i].Gender}, {filteredVoiceList[i].Locale})");
+                var voice = filteredVoiceList[i];
+                string languageName = "Unknown";
+                
+                try
+                {
+                    // Try to get the culture info from the locale
+                    CultureInfo cultureInfo = CultureInfo.GetCultureInfo(voice.Locale);
+                    languageName = cultureInfo.EnglishName;
+                }
+                catch
+                {
+                    // If we can't get culture info, just use the locale
+                    languageName = voice.Locale;
+                }
+                
+                Console.WriteLine($"{i + 1}. {voice.Name} ({voice.Gender}, {languageName})");
             }
             
             Console.WriteLine();
@@ -1800,26 +1891,62 @@ namespace Installer
                 return;
             }
             
-            Console.WriteLine("Installed Voices:");
+            // Add search functionality
+            Console.WriteLine();
+            Console.WriteLine($"Found {installedVoices.Count} voices. You can search by:");
+            Console.WriteLine(" - Voice name (e.g., 'Guy', 'Aria', 'Sonia')");
+            Console.WriteLine(" - Engine name (e.g., 'AzureTTS', 'SherpaOnnx')");
+            Console.WriteLine();
+            Console.WriteLine("Enter search term to filter (or leave empty to show all):");
+            Console.Write("> ");
+            string searchTerm = Console.ReadLine() ?? "";
             
-            for (int i = 0; i < installedVoices.Count; i++)
+            var filteredVoices = installedVoices;
+            if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                Console.WriteLine($"{i + 1}. {installedVoices[i].VoiceName} ({installedVoices[i].EngineName})");
+                filteredVoices = installedVoices
+                    .Where(v => 
+                        v.VoiceId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        v.VoiceName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        v.EngineName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                Console.WriteLine($"Found {filteredVoices.Count} voices matching '{searchTerm}'.");
             }
             
             Console.WriteLine();
-            Console.Write("Select a voice to uninstall (1-{0}): ", installedVoices.Count);
+            Console.WriteLine("Installed Voices:");
             
-            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > installedVoices.Count)
+            for (int i = 0; i < filteredVoices.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({filteredVoices[i].EngineName})");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select a voice to test (1-{0}): ", filteredVoices.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > filteredVoices.Count)
             {
                 Console.WriteLine("Invalid selection.");
                 return;
             }
             
-            var selectedVoice = installedVoices[voiceIndex - 1];
+            var selectedVoice = filteredVoices[voiceIndex - 1];
+            
+            Console.WriteLine();
+            Console.Write("Enter text to speak: ");
+            string text = Console.ReadLine();
+            
+            if (string.IsNullOrEmpty(text))
+            {
+                text = "This is a test of the text-to-speech system.";
+            }
             
             // Find the engine for this voice
-            var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
+            // Special handling for Azure voices which might have "neural" as voice type
+            var engine = selectedVoice.EngineName.ToLowerInvariant() == "neural" 
+                ? _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == "AzureTTS")
+                : _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
             
             if (engine == null)
             {
@@ -1827,14 +1954,25 @@ namespace Installer
                 return;
             }
             
-            // Unregister voice
-            Console.WriteLine();
-            Console.WriteLine($"Uninstalling voice {selectedVoice.VoiceName}...");
+            // Get configuration for this engine
+            var config = _configManager.GetEngineConfiguration(engine.EngineName);
             
-            engine.UnregisterVoice(selectedVoice.VoiceId);
-            
+            // Test the voice
             Console.WriteLine();
-            Console.WriteLine($"Voice {selectedVoice.VoiceName} uninstalled successfully.");
+            Console.WriteLine($"Testing voice {selectedVoice.VoiceName} with text: \"{text}\"");
+            
+            var result = engine.TestVoiceAsync(selectedVoice.VoiceId, config).GetAwaiter().GetResult();
+            
+            if (result)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Voice test successful.");
+            }
+            else
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Voice test failed.");
+            }
         }
 
         private static void TestVoiceInteractive()
@@ -1884,23 +2022,48 @@ namespace Installer
                 return;
             }
             
-            Console.WriteLine("Installed Voices:");
+            // Add search functionality
+            Console.WriteLine();
+            Console.WriteLine($"Found {installedVoices.Count} voices. You can search by:");
+            Console.WriteLine(" - Voice name (e.g., 'Guy', 'Aria', 'Sonia')");
+            Console.WriteLine(" - Engine name (e.g., 'AzureTTS', 'SherpaOnnx')");
+            Console.WriteLine(" - Language (e.g., 'English', 'Spanish')");
+            Console.WriteLine();
+            Console.WriteLine("Enter search term to filter (or leave empty to show all):");
+            Console.Write("> ");
+            string searchTerm = Console.ReadLine() ?? "";
             
-            for (int i = 0; i < installedVoices.Count; i++)
+            var filteredVoices = installedVoices;
+            if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                Console.WriteLine($"{i + 1}. {installedVoices[i].VoiceName} ({installedVoices[i].EngineName})");
+                filteredVoices = installedVoices
+                    .Where(v => 
+                        v.VoiceId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        v.VoiceName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        v.EngineName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                Console.WriteLine($"Found {filteredVoices.Count} voices matching '{searchTerm}'.");
             }
             
             Console.WriteLine();
-            Console.Write("Select a voice to test (1-{0}): ", installedVoices.Count);
+            Console.WriteLine("Installed Voices:");
             
-            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > installedVoices.Count)
+            for (int i = 0; i < filteredVoices.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {filteredVoices[i].VoiceName} ({filteredVoices[i].EngineName})");
+            }
+            
+            Console.WriteLine();
+            Console.Write("Select a voice to test (1-{0}): ", filteredVoices.Count);
+            
+            if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > filteredVoices.Count)
             {
                 Console.WriteLine("Invalid selection.");
                 return;
             }
             
-            var selectedVoice = installedVoices[voiceIndex - 1];
+            var selectedVoice = filteredVoices[voiceIndex - 1];
             
             Console.WriteLine();
             Console.Write("Enter text to speak: ");
@@ -1912,7 +2075,10 @@ namespace Installer
             }
             
             // Find the engine for this voice
-            var engine = _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
+            // Special handling for Azure voices which might have "neural" as voice type
+            var engine = selectedVoice.EngineName.ToLowerInvariant() == "neural" 
+                ? _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == "AzureTTS")
+                : _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
             
             if (engine == null)
             {
@@ -1921,7 +2087,7 @@ namespace Installer
             }
             
             // Get configuration for this engine
-            var config = _configManager.GetEngineConfiguration(selectedVoice.EngineName);
+            var config = _configManager.GetEngineConfiguration(engine.EngineName);
             
             // Test the voice
             Console.WriteLine();
