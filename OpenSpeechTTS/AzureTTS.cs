@@ -12,14 +12,15 @@ namespace OpenSpeechTTS
     /// <summary>
     /// Implements text-to-speech functionality using Azure Cognitive Services
     /// </summary>
-    public class AzureTTS
+    public class AzureTTS : IDisposable
     {
         private readonly string _subscriptionKey;
         private readonly string _region;
         private readonly string _voiceName;
+        private readonly string _selectedStyle;
+        private readonly string _selectedRole;
         private readonly HttpClient _httpClient;
-        private string _accessToken;
-        private DateTime _tokenExpiration;
+        private bool _disposed;
 
         /// <summary>
         /// Creates a new instance of the AzureTTS class
@@ -27,13 +28,27 @@ namespace OpenSpeechTTS
         /// <param name="subscriptionKey">Azure Cognitive Services subscription key</param>
         /// <param name="region">Azure region (e.g., "eastus")</param>
         /// <param name="voiceName">Azure voice name (e.g., "en-US-AriaNeural")</param>
-        public AzureTTS(string subscriptionKey, string region, string voiceName)
+        /// <param name="selectedStyle">Optional style for the voice</param>
+        /// <param name="selectedRole">Optional role for the voice</param>
+        public AzureTTS(string subscriptionKey, string region, string voiceName, string selectedStyle = null, string selectedRole = null)
         {
+            if (string.IsNullOrEmpty(subscriptionKey))
+                throw new ArgumentNullException(nameof(subscriptionKey));
+            
+            if (string.IsNullOrEmpty(region))
+                throw new ArgumentNullException(nameof(region));
+            
+            if (string.IsNullOrEmpty(voiceName))
+                throw new ArgumentNullException(nameof(voiceName));
+
             _subscriptionKey = subscriptionKey;
             _region = region;
             _voiceName = voiceName;
+            _selectedStyle = selectedStyle;
+            _selectedRole = selectedRole;
+            
             _httpClient = new HttpClient();
-            _tokenExpiration = DateTime.MinValue;
+            _httpClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _subscriptionKey);
         }
 
         /// <summary>
@@ -43,31 +58,29 @@ namespace OpenSpeechTTS
         /// <param name="outputStream">The stream to write the WAV data to</param>
         public void SpeakToWaveStream(string text, Stream outputStream)
         {
-            // Ensure we have a valid access token
-            EnsureTokenAsync().Wait();
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(AzureTTS));
 
-            // Create SSML document
-            string ssml = GenerateSsml(text);
-
-            // Set up the request
-            var request = new HttpRequestMessage(HttpMethod.Post, 
-                $"https://{_region}.tts.speech.microsoft.com/cognitiveservices/v1");
-            
-            request.Headers.Add("Authorization", $"Bearer {_accessToken}");
-            request.Headers.Add("X-Microsoft-OutputFormat", "riff-24khz-16bit-mono-pcm");
-            request.Headers.Add("User-Agent", "OpenSpeechTTS");
-            
-            request.Content = new StringContent(ssml, Encoding.UTF8, "application/ssml+xml");
-
-            // Send the request and get the audio
-            var response = _httpClient.SendAsync(request).Result;
-            response.EnsureSuccessStatusCode();
-
-            // Copy the audio data to the output stream
-            using (var audioStream = response.Content.ReadAsStreamAsync().Result)
+            try
             {
-                audioStream.CopyTo(outputStream);
-                outputStream.Position = 0;
+                // Get the audio data asynchronously but wait for it to complete
+                byte[] audioData = SynthesizeSpeechAsync(text).GetAwaiter().GetResult();
+                
+                // Write the audio data directly to the stream
+                // Azure TTS already returns WAV format data
+                outputStream.Write(audioData, 0, audioData.Length);
+            }
+            catch (Exception ex)
+            {
+                // Log the error for debugging
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\azure_error.log", 
+                        $"{DateTime.Now}: Error in SpeakToWaveStream: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
+                }
+                catch { }
+                
+                throw;
             }
         }
 
@@ -160,6 +173,111 @@ namespace OpenSpeechTTS
             
             // Tokens are valid for 10 minutes, but we'll refresh after 9 minutes to be safe
             _tokenExpiration = DateTime.UtcNow.AddMinutes(9);
+        }
+
+        public async Task<byte[]> SynthesizeSpeechAsync(string text, string locale = "en-US")
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(AzureTTS));
+
+            try
+            {
+                string endpoint = $"https://{_region}.tts.speech.microsoft.com/cognitiveservices/v1";
+                
+                var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+                request.Headers.Add("X-Microsoft-OutputFormat", "riff-24khz-16bit-mono-pcm");
+                
+                // Build SSML
+                var ssml = new StringBuilder();
+                ssml.Append("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='");
+                ssml.Append(locale);
+                ssml.Append("'><voice name='");
+                ssml.Append(_voiceName);
+                ssml.Append("'>");
+                
+                // Add style if specified
+                if (!string.IsNullOrEmpty(_selectedStyle))
+                {
+                    ssml.Append("<mstts:express-as style='");
+                    ssml.Append(_selectedStyle);
+                    ssml.Append("'>");
+                }
+                
+                // Add role if specified
+                if (!string.IsNullOrEmpty(_selectedRole))
+                {
+                    ssml.Append("<mstts:express-as role='");
+                    ssml.Append(_selectedRole);
+                    ssml.Append("'>");
+                }
+                
+                ssml.Append(text);
+                
+                // Close tags in reverse order
+                if (!string.IsNullOrEmpty(_selectedRole))
+                {
+                    ssml.Append("</mstts:express-as>");
+                }
+                
+                if (!string.IsNullOrEmpty(_selectedStyle))
+                {
+                    ssml.Append("</mstts:express-as>");
+                }
+                
+                ssml.Append("</voice></speak>");
+                
+                request.Content = new StringContent(ssml.ToString(), Encoding.UTF8, "application/ssml+xml");
+                
+                var response = await _httpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                
+                return await response.Content.ReadAsByteArrayAsync();
+            }
+            catch (Exception ex)
+            {
+                // Log the error for debugging
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\azure_error.log", 
+                        $"{DateTime.Now}: Error in SynthesizeSpeechAsync: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
+                }
+                catch { }
+                
+                throw;
+            }
+        }
+
+        public byte[] GenerateAudio(string text, string locale = "en-US")
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(AzureTTS));
+
+            try
+            {
+                // Get the audio data asynchronously but wait for it to complete
+                return SynthesizeSpeechAsync(text, locale).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                // Log the error for debugging
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\azure_error.log", 
+                        $"{DateTime.Now}: Error in GenerateAudio: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
+                }
+                catch { }
+                
+                throw;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _httpClient?.Dispose();
+                _disposed = true;
+            }
         }
     }
 }
