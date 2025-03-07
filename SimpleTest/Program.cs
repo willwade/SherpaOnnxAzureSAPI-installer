@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using System.IO;
 using System.Threading;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace SimpleTest
 {
@@ -69,6 +70,17 @@ namespace SimpleTest
                     {
                         Console.WriteLine("\n=== Testing Azure TTS Voice ===");
                         TestVoice(synth, azureVoices[0], "This is a test of the Azure text-to-speech system.", "azure_output.wav");
+                        
+                        // Try direct test with a standard voice first to verify SAPI is working
+                        if (otherVoices.Count > 0)
+                        {
+                            Console.WriteLine("\n=== Testing Standard Voice for Comparison ===");
+                            TestVoice(synth, otherVoices[0], "This is a test of a standard voice.", "standard_output.wav");
+                        }
+                        
+                        // Try alternative approach for Azure voice
+                        Console.WriteLine("\n=== Testing Azure TTS Voice (Alternative Method) ===");
+                        TestAzureVoiceAlternative(azureVoices[0].VoiceInfo.Name);
                         
                         // Test Azure voice with style and role if available
                         TestAzureVoiceWithStyleAndRole(azureVoices[0].VoiceInfo.Name);
@@ -135,30 +147,156 @@ namespace SimpleTest
                 var info = voice.VoiceInfo;
                 Console.WriteLine($"Testing voice: {info.Name}");
                 
-                synth.SelectVoice(info.Name);
-                Console.WriteLine("Successfully selected the voice!");
+                // Print registry information for debugging
+                string voiceType = GetVoiceType(info.Name);
+                if (voiceType == "Sherpa ONNX" || voiceType == "Azure TTS")
+                {
+                    PrintRegistryInfo(info.Name);
+                }
                 
-                // Set output to audio file
-                string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
-                synth.SetOutputToWaveFile(outputPath);
-                
-                // Speak some text
-                Console.WriteLine($"Speaking: \"{testText}\"");
-                synth.Speak(testText);
-                
-                // Reset output to default
-                synth.SetOutputToDefaultAudioDevice();
-                
-                Console.WriteLine($"Speech saved to: {outputPath}");
-                
-                // Try speaking to the default audio device
-                Console.WriteLine("Now testing speech to default audio device...");
-                Console.WriteLine($"Speaking: \"Hello, this is {info.Name}.\"");
-                synth.Speak($"Hello, this is {info.Name}.");
+                try
+                {
+                    synth.SelectVoice(info.Name);
+                    Console.WriteLine("Successfully selected the voice!");
+                    
+                    // Set output to audio file
+                    string outputPath = Path.Combine(Environment.CurrentDirectory, outputFileName);
+                    synth.SetOutputToWaveFile(outputPath);
+                    
+                    // Speak some text
+                    Console.WriteLine($"Speaking: \"{testText}\"");
+                    synth.Speak(testText);
+                    
+                    // Reset output to default
+                    synth.SetOutputToDefaultAudioDevice();
+                    
+                    Console.WriteLine($"Speech saved to: {outputPath}");
+                    
+                    // Try speaking to the default audio device
+                    Console.WriteLine("Now testing speech to default audio device...");
+                    Console.WriteLine($"Speaking: \"Hello, this is {info.Name}.\"");
+                    synth.Speak($"Hello, this is {info.Name}.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error selecting or using voice: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    
+                    // Try to get more information about the voice
+                    Console.WriteLine($"Voice info: ID={info.Id}, Name={info.Name}, Culture={info.Culture}, Gender={info.Gender}, Age={info.Age}, Enabled={voice.Enabled}");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error testing voice {voice.VoiceInfo.Name}: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+        
+        static void PrintRegistryInfo(string voiceName)
+        {
+            try
+            {
+                Console.WriteLine("Registry values read:");
+                string registryPath = $@"SOFTWARE\Microsoft\SPEECH\Voices\Tokens\{voiceName}\Attributes";
+                using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+                {
+                    if (key != null)
+                    {
+                        foreach (var valueName in key.GetValueNames())
+                        {
+                            var value = key.GetValue(valueName);
+                            Console.WriteLine($"  {valueName}: {value}");
+                            
+                            // For Sherpa ONNX, check if files exist
+                            if (valueName == "Model Path" || valueName == "Tokens Path" || valueName == "Data Directory")
+                            {
+                                string path = value.ToString();
+                                bool exists = File.Exists(path) || Directory.Exists(path);
+                                Console.WriteLine($"  {valueName} exists: {exists}");
+                            }
+                            
+                            // For Azure TTS, check subscription key and region
+                            if (valueName == "SubscriptionKey" || valueName == "Region" || valueName == "VoiceName")
+                            {
+                                Console.WriteLine($"  {valueName}: {value}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading registry: {ex.Message}");
+            }
+        }
+        
+        static void TestAzureVoiceAlternative(string voiceName)
+        {
+            try
+            {
+                Console.WriteLine($"Testing Azure voice using alternative method: {voiceName}");
+                
+                // Get Azure voice details from registry
+                string subscriptionKey = null;
+                string region = null;
+                string azureVoiceName = null;
+                
+                string registryPath = $@"SOFTWARE\Microsoft\SPEECH\Voices\Tokens\{voiceName}\Attributes";
+                using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
+                {
+                    if (key != null)
+                    {
+                        subscriptionKey = key.GetValue("SubscriptionKey") as string;
+                        region = key.GetValue("Region") as string;
+                        azureVoiceName = key.GetValue("VoiceName") as string;
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region) || string.IsNullOrEmpty(azureVoiceName))
+                {
+                    Console.WriteLine("Missing required Azure voice information in registry.");
+                    return;
+                }
+                
+                Console.WriteLine($"Using Azure voice: {azureVoiceName}, Region: {region}");
+                
+                // Create a process to run a simple test using the OpenSpeechTTS.dll directly
+                string dllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
+                if (!File.Exists(dllPath))
+                {
+                    Console.WriteLine($"DLL not found at path: {dllPath}");
+                    return;
+                }
+                
+                Console.WriteLine("DLL exists, attempting to use it directly...");
+                
+                // Try to use the voice through SAPI directly
+                using (var synth = new SpeechSynthesizer())
+                {
+                    // Try with SSML
+                    string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+                        <voice name='{voiceName}'>
+                            This is a direct test of the Azure voice.
+                        </voice>
+                    </speak>";
+                    
+                    try
+                    {
+                        Console.WriteLine("Testing with SSML...");
+                        synth.SpeakSsml(ssml);
+                        Console.WriteLine("SSML test completed successfully!");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error with SSML test: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in alternative Azure voice test: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
             }
         }
         
@@ -184,20 +322,27 @@ namespace SimpleTest
                             {
                                 using (var synth = new SpeechSynthesizer())
                                 {
-                                    synth.SelectVoice(voiceName);
-                                    
-                                    // Set style using SSML
-                                    string style = styles[0].Trim();
-                                    string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
-                                        <voice name='{voiceName}'>
-                                            <mstts:express-as style='{style}'>
-                                                This is a test of the Azure voice with the {style} style.
-                                            </mstts:express-as>
-                                        </voice>
-                                    </speak>";
-                                    
-                                    Console.WriteLine($"Testing Azure voice with style: {style}");
-                                    synth.SpeakSsml(ssml);
+                                    try
+                                    {
+                                        synth.SelectVoice(voiceName);
+                                        
+                                        // Set style using SSML
+                                        string style = styles[0].Trim();
+                                        string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
+                                            <voice name='{voiceName}'>
+                                                <mstts:express-as style='{style}'>
+                                                    This is a test of the Azure voice with the {style} style.
+                                                </mstts:express-as>
+                                            </voice>
+                                        </speak>";
+                                        
+                                        Console.WriteLine($"Testing Azure voice with style: {style}");
+                                        synth.SpeakSsml(ssml);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"Error testing style: {ex.Message}");
+                                    }
                                 }
                             }
                         }
@@ -212,20 +357,27 @@ namespace SimpleTest
                             {
                                 using (var synth = new SpeechSynthesizer())
                                 {
-                                    synth.SelectVoice(voiceName);
-                                    
-                                    // Set role using SSML
-                                    string role = roles[0].Trim();
-                                    string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
-                                        <voice name='{voiceName}'>
-                                            <mstts:express-as role='{role}'>
-                                                This is a test of the Azure voice with the {role} role.
-                                            </mstts:express-as>
-                                        </voice>
-                                    </speak>";
-                                    
-                                    Console.WriteLine($"Testing Azure voice with role: {role}");
-                                    synth.SpeakSsml(ssml);
+                                    try
+                                    {
+                                        synth.SelectVoice(voiceName);
+                                        
+                                        // Set role using SSML
+                                        string role = roles[0].Trim();
+                                        string ssml = $@"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-US'>
+                                            <voice name='{voiceName}'>
+                                                <mstts:express-as role='{role}'>
+                                                    This is a test of the Azure voice with the {role} role.
+                                                </mstts:express-as>
+                                            </voice>
+                                        </speak>";
+                                        
+                                        Console.WriteLine($"Testing Azure voice with role: {role}");
+                                        synth.SpeakSsml(ssml);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"Error testing role: {ex.Message}");
+                                    }
                                 }
                             }
                         }
@@ -235,6 +387,7 @@ namespace SimpleTest
             catch (Exception ex)
             {
                 Console.WriteLine($"Error testing Azure voice with style/role: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
             }
         }
     }
