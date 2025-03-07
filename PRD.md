@@ -5,6 +5,17 @@ This document outlines the requirements and implementation details for adding Az
 
 ## Key Components
 
+### ✅ Completed Components
+
+- ✅ Created AzureTtsModel class to represent Azure voice models
+- ✅ Created AzureTtsService class to handle Azure TTS API interactions
+- ✅ Created AzureTTS class for speech synthesis with Azure
+- ✅ Created AzureSapi5VoiceImpl class for SAPI integration
+- ✅ Created Sapi5RegistrarExtended class to handle both voice types
+- ✅ Implemented proper registry structure for Azure voices
+
+### 🔄 Remaining Tasks
+
 ### 1. Installer/Program.cs Updates
 - Add command-line options for Azure TTS installation
 - Implement Azure subscription key and region parameters
@@ -12,16 +23,11 @@ This document outlines the requirements and implementation details for adding Az
 - Support both Sherpa ONNX and Azure TTS voice types
 
 ### 2. Azure Voice Management
-- Fetch available Azure voices based on region
-- Store Azure voice metadata
-- Handle Azure voice registration
+- Implement fetching available Azure voices based on region
+- Add Azure voice selection UI in interactive mode
+- Add style and role selection for supported voices
 
-### 3. SAPI Registration
-- Use Sapi5RegistrarExtended class instead of Sapi5Registrar
-- Register both types of voices with appropriate CLSID values
-- Store Azure-specific parameters in registry
-
-### 4. Testing
+### 3. Testing
 - Update SimpleTest project to detect voice type
 - Add appropriate test code for each voice type
 
@@ -61,17 +67,12 @@ Installer.exe list-azure-voices --key <subscription-key> --region <region>
 - [ ] Update installation logic to handle both voice types
 - [ ] Add Azure key and region management
 
-### 2. Use Sapi5RegistrarExtended
-- [ ] Replace Sapi5Registrar with Sapi5RegistrarExtended
-- [ ] Update voice registration calls to use type-specific methods
-- [ ] Ensure proper CLSID usage for each voice type
-
-### 3. Update SimpleTest
+### 2. Update SimpleTest
 - [ ] Add voice type detection
 - [ ] Implement appropriate testing for each voice type
 - [ ] Add Azure-specific parameter testing
 
-### 4. Documentation
+### 3. Documentation
 - [ ] Update README with Azure TTS instructions
 - [ ] Document Azure key management options
 - [ ] Add troubleshooting section for Azure voices
