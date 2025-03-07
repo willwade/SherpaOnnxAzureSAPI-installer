@@ -267,22 +267,63 @@ namespace Installer
             }
         }
 
-        private static async Task UninstallVoicesAndDll(Sapi5Registrar registrar, string dllPath)
+        private static async Task UninstallVoicesAndDll(Sapi5RegistrarExtended registrar, string dllPath)
         {
             Console.WriteLine("Uninstalling voices...");
 
+            // Uninstall Sherpa ONNX voices
             var models = await LoadModelsAsync();
             foreach (var model in models.Values)
             {
                 try
                 {
                     registrar.UnregisterVoice(model.Id);
-                    Console.WriteLine($"Unregistered voice: {model.Name}");
+                    Console.WriteLine($"Unregistered Sherpa ONNX voice: {model.Name}");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error uninstalling {model.Name}: {ex.Message}");
                 }
+            }
+            
+            // Uninstall Azure voices
+            try
+            {
+                // Get all registry keys under SPEECH\Voices\Tokens
+                using (var voicesKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\SPEECH\Voices\Tokens", false))
+                {
+                    if (voicesKey != null)
+                    {
+                        string[] voiceNames = voicesKey.GetSubKeyNames();
+                        foreach (string voiceName in voiceNames)
+                        {
+                            try
+                            {
+                                // Check if this is an Azure voice by looking for the Azure CLSID
+                                using (var voiceKey = voicesKey.OpenSubKey(voiceName))
+                                {
+                                    if (voiceKey != null)
+                                    {
+                                        string clsid = voiceKey.GetValue("CLSID") as string;
+                                        if (clsid == "{3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3}") // Azure CLSID
+                                        {
+                                            registrar.UnregisterVoice(voiceName);
+                                            Console.WriteLine($"Unregistered Azure voice: {voiceName}");
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error uninstalling voice {voiceName}: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uninstalling Azure voices: {ex.Message}");
             }
 
             // Check if any models remain in Program Files
@@ -305,11 +346,23 @@ namespace Installer
                         Directory.Delete(modelsDir, true);
                         Console.WriteLine($"Cleaned up models directory: {modelsDir}");
                     }
+                    
+                    // Try to clean up parent directory if it's empty
+                    string openSpeechDir = Path.GetDirectoryName(modelsDir);
+                    if (Directory.Exists(openSpeechDir) && Directory.GetFileSystemEntries(openSpeechDir).Length == 0)
+                    {
+                        Directory.Delete(openSpeechDir);
+                        Console.WriteLine($"Cleaned up OpenSpeech directory: {openSpeechDir}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error cleaning up models directory: {ex.Message}");
+                    Console.WriteLine($"Error cleaning up directories: {ex.Message}");
                 }
+            }
+            else
+            {
+                Console.WriteLine("Some models remain installed. DLL not unregistered.");
             }
         }
 
@@ -1025,7 +1078,9 @@ namespace Installer
                         voice.ShortName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         voice.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         voice.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        voice.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                        voice.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        // Use the language code converter for intelligent language matching
+                        LanguageCodeConverter.LocaleMatchesLanguage(voice.Locale, searchTerm)
                     ).ToList(); // Convert to list before checking Count
                     
                     if (filteredVoices.Count == 0)
