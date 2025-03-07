@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.Win32;
 using System.Globalization;
 using System.IO;
+using Installer.Shared;
 
 namespace Installer
 {

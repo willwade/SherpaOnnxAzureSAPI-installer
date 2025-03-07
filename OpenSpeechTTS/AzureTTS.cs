@@ -21,6 +21,8 @@ namespace OpenSpeechTTS
         private readonly string _selectedRole;
         private readonly HttpClient _httpClient;
         private bool _disposed;
+        private string _accessToken;
+        private DateTime _tokenExpiration;
 
         /// <summary>
         /// Creates a new instance of the AzureTTS class

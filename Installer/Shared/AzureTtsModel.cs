@@ -26,6 +26,11 @@ namespace Installer.Shared
         public string SelectedStyle { get; set; }
         public string SelectedRole { get; set; }
         
+        // Additional properties needed by AzureVoiceInstaller
+        public string VoiceName { get; set; }
+        public List<LanguageInfo> Language { get; set; } = new List<LanguageInfo>();
+        public string Developer { get; set; } = "Microsoft";
+        
         public AzureTtsModel()
         {
         }
