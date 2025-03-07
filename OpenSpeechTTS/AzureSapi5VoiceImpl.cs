@@ -5,20 +5,21 @@ using Microsoft.Win32;
 
 namespace OpenSpeechTTS
 {
-    [Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")]
+    [Guid("3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3")]
     [ComVisible(true)]
-    public class Sapi5VoiceImpl : ISpTTSEngine
+    public class AzureSapi5VoiceImpl : ISpTTSEngine
     {
-        private SherpaTTS _sherpaTts;
+        private AzureTTS _azureTts;
         private bool _initialized;
+        private string _locale;
 
-        public Sapi5VoiceImpl()
+        public AzureSapi5VoiceImpl()
         {
             try
             {
                 // Get the voice token from the registry
                 string voiceToken = null;
-                using (var key = Registry.ClassesRoot.OpenSubKey(@"CLSID\{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}\Token"))
+                using (var key = Registry.ClassesRoot.OpenSubKey(@"CLSID\{3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3}\Token"))
                 {
                     if (key != null)
                     {
@@ -41,32 +42,36 @@ namespace OpenSpeechTTS
                 if (attributesKey == null)
                     throw new Exception("Voice attributes not found in registry");
 
-                var modelPath = (string)attributesKey.GetValue("Model Path");
-                var tokensPath = (string)attributesKey.GetValue("Tokens Path");
+                // Get Azure TTS parameters
+                var subscriptionKey = (string)attributesKey.GetValue("SubscriptionKey");
+                var region = (string)attributesKey.GetValue("Region");
+                var voiceName = (string)attributesKey.GetValue("VoiceName");
+                var selectedStyle = (string)attributesKey.GetValue("SelectedStyle");
+                var selectedRole = (string)attributesKey.GetValue("SelectedRole");
+                
+                // Get locale from language LCID
+                var lcid = (string)attributesKey.GetValue("Language");
+                _locale = GetLocaleFromLcid(lcid);
 
-                if (string.IsNullOrEmpty(modelPath))
-                    throw new Exception("ModelPath not found in registry");
-                if (string.IsNullOrEmpty(tokensPath))
-                    throw new Exception("TokensPath not found in registry");
+                if (string.IsNullOrEmpty(subscriptionKey))
+                    throw new Exception("SubscriptionKey not found in registry");
+                if (string.IsNullOrEmpty(region))
+                    throw new Exception("Region not found in registry");
+                if (string.IsNullOrEmpty(voiceName))
+                    throw new Exception("VoiceName not found in registry");
 
-                // Get the directory containing the model as the data directory
-                string dataDirPath = Path.GetDirectoryName(modelPath);
-                if (string.IsNullOrEmpty(dataDirPath))
-                {
-                    dataDirPath = Path.GetDirectoryName(tokensPath);
-                }
-
-                _sherpaTts = new SherpaTTS(modelPath, tokensPath, "", dataDirPath);
+                _azureTts = new AzureTTS(subscriptionKey, region, voiceName, selectedStyle, selectedRole);
                 _initialized = true;
                 
                 // Log successful initialization
                 try
                 {
                     File.AppendAllText("C:\\OpenSpeech\\sapi_init.log", 
-                        $"{DateTime.Now}: Successfully initialized Sherpa ONNX TTS engine\n" +
+                        $"{DateTime.Now}: Successfully initialized Azure TTS engine\n" +
                         $"Voice: {voiceToken}\n" +
-                        $"Model: {modelPath}\n" +
-                        $"Tokens: {tokensPath}\n\n");
+                        $"Azure Voice: {voiceName}\n" +
+                        $"Region: {region}\n" +
+                        $"Locale: {_locale}\n\n");
                 }
                 catch { }
             }
@@ -76,12 +81,33 @@ namespace OpenSpeechTTS
                 try
                 {
                     File.AppendAllText("C:\\OpenSpeech\\sapi_error.log", 
-                        $"{DateTime.Now}: Error in Sapi5VoiceImpl constructor: {ex.Message}\n{ex.StackTrace}\n\n");
+                        $"{DateTime.Now}: Error in AzureSapi5VoiceImpl constructor: {ex.Message}\n{ex.StackTrace}\n\n");
                 }
                 catch { }
                 
-                throw new Exception($"Error in Sapi5VoiceImpl constructor: {ex.Message}", ex);
+                throw new Exception($"Error in AzureSapi5VoiceImpl constructor: {ex.Message}", ex);
             }
+        }
+
+        private string GetLocaleFromLcid(string lcid)
+        {
+            // Convert LCID from hex to decimal
+            if (int.TryParse(lcid, System.Globalization.NumberStyles.HexNumber, null, out int lcidValue))
+            {
+                try
+                {
+                    var culture = System.Globalization.CultureInfo.GetCultureInfo(lcidValue);
+                    return culture.Name;
+                }
+                catch
+                {
+                    // Default to en-US if conversion fails
+                    return "en-US";
+                }
+            }
+            
+            // Default to en-US if parsing fails
+            return "en-US";
         }
 
         public void Speak(string text, uint flags, IntPtr reserved)
@@ -95,14 +121,12 @@ namespace OpenSpeechTTS
                 try
                 {
                     File.AppendAllText("C:\\OpenSpeech\\sapi_speak.log", 
-                        $"{DateTime.Now}: Speaking text: {text}\nFlags: {flags}\nReserved: {reserved}\n\n");
+                        $"{DateTime.Now}: Speaking text with Azure TTS: {text}\nFlags: {flags}\nReserved: {reserved}\n\n");
                 }
                 catch { }
 
                 // Generate audio data
-                var memoryStream = new MemoryStream();
-                _sherpaTts.SpeakToWaveStream(text, memoryStream);
-                var buffer = memoryStream.ToArray();
+                var buffer = _azureTts.GenerateAudio(text, _locale);
                 
                 // Log the audio generation result
                 try
@@ -135,25 +159,25 @@ namespace OpenSpeechTTS
                 try
                 {
                     File.AppendAllText("C:\\OpenSpeech\\sapi_error.log", 
-                        $"{DateTime.Now}: Error in Speak: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
+                        $"{DateTime.Now}: Error in Azure Speak: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
                 }
                 catch { }
                 
-                throw new Exception($"Error in Speak: {ex.Message}", ex);
+                throw new Exception($"Error in Azure Speak: {ex.Message}", ex);
             }
         }
 
         public void GetOutputFormat(ref Guid targetFormatId, ref WaveFormatEx targetFormat, out Guid actualFormatId, out WaveFormatEx actualFormat)
         {
-            // Initialize output format
+            // Initialize output format for Azure TTS (24kHz)
             actualFormat = new WaveFormatEx
             {
                 wFormatTag = 1, // PCM
                 nChannels = 1, // Mono
-                nSamplesPerSec = 22050, // Sample rate
+                nSamplesPerSec = 24000, // Sample rate
                 wBitsPerSample = 16,
                 nBlockAlign = 2, // (nChannels * wBitsPerSample) / 8
-                nAvgBytesPerSec = 22050 * 2, // nSamplesPerSec * nBlockAlign
+                nAvgBytesPerSec = 24000 * 2, // nSamplesPerSec * nBlockAlign
                 cbSize = 0
             };
 
