@@ -1513,12 +1513,24 @@ namespace Installer
                             Console.WriteLine($"DEBUG:   {configItem.Key}: {configItem.Value}");
                         }
                         
+                        // For Azure voices, use the VoiceName attribute instead of the voice ID
+                        string effectiveVoiceId = voiceId;
+                        if (engine.EngineName == "AzureTTS")
+                        {
+                            string azureVoiceName = (string)attributesKey.GetValue("VoiceName");
+                            if (!string.IsNullOrEmpty(azureVoiceName))
+                            {
+                                effectiveVoiceId = azureVoiceName;
+                                Console.WriteLine($"DEBUG: Using Azure voice name: {azureVoiceName} instead of voice ID: {voiceId}");
+                            }
+                        }
+                        
                         // Test the voice
                         Console.WriteLine($"Testing voice {voiceId} with text: \"{text}\"");
                         
                         try
                         {
-                            var result = engine.TestVoiceAsync(voiceId, config).GetAwaiter().GetResult();
+                            var result = engine.TestVoiceAsync(effectiveVoiceId, config).GetAwaiter().GetResult();
                             
                             if (result)
                             {

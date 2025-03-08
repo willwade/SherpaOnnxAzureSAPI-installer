@@ -130,11 +130,23 @@ namespace Installer.Engines.Azure
                 string selectedStyle = parameters.ContainsKey("selectedStyle") ? parameters["selectedStyle"] : null;
                 string selectedRole = parameters.ContainsKey("selectedRole") ? parameters["selectedRole"] : null;
                 
+                Console.WriteLine($"DEBUG: AzureTtsEngine.SynthesizeSpeechAsync - Voice ID: {voiceId}");
+                Console.WriteLine($"DEBUG: AzureTtsEngine.SynthesizeSpeechAsync - Region: {region}");
+                Console.WriteLine($"DEBUG: AzureTtsEngine.SynthesizeSpeechAsync - Style: {selectedStyle}");
+                Console.WriteLine($"DEBUG: AzureTtsEngine.SynthesizeSpeechAsync - Role: {selectedRole}");
+                
+                // Ensure voice ID is in the correct format (e.g., en-US-GuyNeural)
+                if (!voiceId.Contains("-"))
+                {
+                    Console.WriteLine($"WARNING: Voice ID '{voiceId}' does not appear to be in the correct format for Azure TTS. Expected format: 'en-US-GuyNeural'");
+                }
+                
                 // Get access token
                 string accessToken = await GetAccessTokenAsync(subscriptionKey, region);
                 
                 // Create SSML
                 string ssml = CreateSsml(text, voiceId, selectedStyle, selectedRole);
+                Console.WriteLine($"DEBUG: AzureTtsEngine.SynthesizeSpeechAsync - SSML: {ssml}");
                 
                 // Synthesize speech
                 return await SynthesizeSpeechAsync(accessToken, region, ssml);
@@ -142,6 +154,8 @@ namespace Installer.Engines.Azure
             catch (Exception ex)
             {
                 LogError($"Error synthesizing speech for voice {voiceId}", ex);
+                Console.WriteLine($"ERROR: AzureTtsEngine.SynthesizeSpeechAsync - {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
                 return new byte[0];
             }
         }
