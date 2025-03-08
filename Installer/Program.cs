@@ -1445,8 +1445,12 @@ namespace Installer
         {
             try
             {
+                Console.WriteLine($"DEBUG: Testing voice with ID: {voiceId}");
+                
                 // Find the voice in the registry
                 string registryPath = $@"SOFTWARE\Microsoft\Speech\Voices\Tokens\{voiceId}";
+                Console.WriteLine($"DEBUG: Looking for voice in registry at: {registryPath}");
+                
                 using (var key = Registry.LocalMachine.OpenSubKey(registryPath))
                 {
                     if (key == null)
@@ -1454,6 +1458,9 @@ namespace Installer
                         Console.WriteLine($"Voice {voiceId} not found in registry.");
                         return;
                     }
+                    
+                    string displayName = (string)key.GetValue("");
+                    Console.WriteLine($"DEBUG: Voice display name: {displayName}");
                     
                     using (var attributesKey = key.OpenSubKey("Attributes"))
                     {
@@ -1464,11 +1471,19 @@ namespace Installer
                         }
                         
                         string voiceType = (string)attributesKey.GetValue("VoiceType");
+                        Console.WriteLine($"DEBUG: Voice type: {voiceType}");
                         
                         if (string.IsNullOrEmpty(voiceType))
                         {
                             Console.WriteLine($"Voice {voiceId} type not found in registry.");
                             return;
+                        }
+                        
+                        // Print all attributes for debugging
+                        Console.WriteLine("DEBUG: Voice attributes:");
+                        foreach (var attributeName in attributesKey.GetValueNames())
+                        {
+                            Console.WriteLine($"DEBUG:   {attributeName}: {attributesKey.GetValue(attributeName)}");
                         }
                         
                         // Find the engine for this voice type
@@ -1480,23 +1495,44 @@ namespace Installer
                         if (engine == null)
                         {
                             Console.WriteLine($"Engine {voiceType} not found for voice {voiceId}.");
+                            Console.WriteLine("DEBUG: Available engines:");
+                            foreach (var availableEngine in _engineManager.GetAllEngines())
+                            {
+                                Console.WriteLine($"DEBUG:   {availableEngine.EngineName}");
+                            }
                             return;
                         }
                         
+                        Console.WriteLine($"DEBUG: Found engine: {engine.EngineName}");
+                        
                         // Get configuration for this engine
                         var config = _configManager.GetEngineConfiguration(voiceType);
+                        Console.WriteLine("DEBUG: Engine configuration:");
+                        foreach (var configItem in config)
+                        {
+                            Console.WriteLine($"DEBUG:   {configItem.Key}: {configItem.Value}");
+                        }
                         
                         // Test the voice
                         Console.WriteLine($"Testing voice {voiceId} with text: \"{text}\"");
-                        var result = engine.TestVoiceAsync(voiceId, config).GetAwaiter().GetResult();
                         
-                        if (result)
+                        try
                         {
-                            Console.WriteLine($"Voice test successful.");
+                            var result = engine.TestVoiceAsync(voiceId, config).GetAwaiter().GetResult();
+                            
+                            if (result)
+                            {
+                                Console.WriteLine($"Voice test successful.");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Voice test failed.");
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Console.WriteLine($"Voice test failed.");
+                            Console.WriteLine($"ERROR during voice test: {ex.Message}");
+                            Console.WriteLine($"DEBUG: Exception details: {ex}");
                         }
                     }
                 }
@@ -1504,6 +1540,7 @@ namespace Installer
             catch (Exception ex)
             {
                 Console.WriteLine($"Error testing voice {voiceId}: {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
             }
         }
 
@@ -1764,7 +1801,7 @@ namespace Installer
             }
             
             Console.WriteLine();
-            Console.Write("Select a voice (1-{0}): ", filteredVoiceList.Count);
+            Console.Write("Select a voice to install (1-{0}): ", filteredVoiceList.Count);
             
             string selection = Console.ReadLine();
             
@@ -1928,7 +1965,7 @@ namespace Installer
             }
             
             Console.WriteLine();
-            Console.Write("Select a voice to test (1-{0}): ", filteredVoices.Count);
+            Console.Write("Select a voice to uninstall (1-{0}): ", filteredVoices.Count);
             
             if (!int.TryParse(Console.ReadLine(), out int voiceIndex) || voiceIndex < 1 || voiceIndex > filteredVoices.Count)
             {
@@ -1937,15 +1974,6 @@ namespace Installer
             }
             
             var selectedVoice = filteredVoices[voiceIndex - 1];
-            
-            Console.WriteLine();
-            Console.Write("Enter text to speak: ");
-            string text = Console.ReadLine();
-            
-            if (string.IsNullOrEmpty(text))
-            {
-                text = "This is a test of the text-to-speech system.";
-            }
             
             // Find the engine for this voice
             // Special handling for Azure voices which might have "neural" as voice type
@@ -1959,24 +1987,19 @@ namespace Installer
                 return;
             }
             
-            // Get configuration for this engine
-            var config = _configManager.GetEngineConfiguration(engine.EngineName);
-            
-            // Test the voice
+            // Uninstall the voice
             Console.WriteLine();
-            Console.WriteLine($"Testing voice {selectedVoice.VoiceName} with text: \"{text}\"");
+            Console.WriteLine($"Uninstalling voice {selectedVoice.VoiceName}...");
             
-            var result = engine.TestVoiceAsync(selectedVoice.VoiceId, config).GetAwaiter().GetResult();
-            
-            if (result)
+            try
             {
-                Console.WriteLine();
-                Console.WriteLine($"Voice test successful.");
+                engine.UnregisterVoice(selectedVoice.VoiceId);
+                Console.WriteLine($"Voice {selectedVoice.VoiceName} uninstalled successfully.");
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine();
-                Console.WriteLine($"Voice test failed.");
+                Console.WriteLine($"Error uninstalling voice {selectedVoice.VoiceName}: {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
             }
         }
 

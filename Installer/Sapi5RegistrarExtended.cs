@@ -172,7 +172,9 @@ namespace Installer
 
         public void RegisterAzureVoice(AzureTtsModel model, string dllPath)
         {
-            string voiceRegistryPath = $@"{RegistryBasePath}\{model.Name}";
+            // Create a standardized voice name that includes the locale
+            string fullVoiceName = $"Microsoft Server Speech Text to Speech Voice ({model.Locale}, {model.ShortName})";
+            string voiceRegistryPath = $@"{RegistryBasePath}\{fullVoiceName}";
 
             try
             {
@@ -184,8 +186,8 @@ namespace Installer
                 using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
                 {
                     // 1. Register the SAPI voice
-                    voiceKey.SetValue("", model.Name);
-                    voiceKey.SetValue(lcid, model.Name); // Register for the specific language
+                    voiceKey.SetValue("", fullVoiceName);
+                    voiceKey.SetValue(lcid, fullVoiceName); // Register for the specific language
                     voiceKey.SetValue("CLSID", AzureTtsClsid);
                     voiceKey.SetValue("Path", dllPath);
 
@@ -197,7 +199,7 @@ namespace Installer
                         attributesKey.SetValue("Age", "Adult");
                         attributesKey.SetValue("Vendor", "Microsoft");
                         attributesKey.SetValue("Version", "1.0");
-                        attributesKey.SetValue("Name", model.Name);
+                        attributesKey.SetValue("Name", fullVoiceName);
                         attributesKey.SetValue("VoiceType", "AzureTTS");
 
                         // 3. Set Azure-specific attributes
