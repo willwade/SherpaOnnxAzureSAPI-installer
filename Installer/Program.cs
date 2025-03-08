@@ -2107,37 +2107,8 @@ namespace Installer
                 text = "This is a test of the text-to-speech system.";
             }
             
-            // Find the engine for this voice
-            // Special handling for Azure voices which might have "neural" as voice type
-            var engine = selectedVoice.EngineName.ToLowerInvariant() == "neural" 
-                ? _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == "AzureTTS")
-                : _engineManager.GetAllEngines().FirstOrDefault(e => e.EngineName == selectedVoice.EngineName);
-            
-            if (engine == null)
-            {
-                Console.WriteLine($"Engine {selectedVoice.EngineName} not found for voice {selectedVoice.VoiceId}.");
-                return;
-            }
-            
-            // Get configuration for this engine
-            var config = _configManager.GetEngineConfiguration(engine.EngineName);
-            
-            // Test the voice
-            Console.WriteLine();
-            Console.WriteLine($"Testing voice {selectedVoice.VoiceName} with text: \"{text}\"");
-            
-            var result = engine.TestVoiceAsync(selectedVoice.VoiceId, config).GetAwaiter().GetResult();
-            
-            if (result)
-            {
-                Console.WriteLine();
-                Console.WriteLine($"Voice test successful.");
-            }
-            else
-            {
-                Console.WriteLine();
-                Console.WriteLine($"Voice test failed.");
-            }
+            // Use the TestVoice method to test the voice
+            TestVoice(selectedVoice.VoiceId, text);
         }
     }
 }
