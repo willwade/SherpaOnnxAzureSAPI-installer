@@ -165,15 +165,37 @@ namespace Installer.Engines.Azure
         {
             string tokenUrl = $"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken";
             
-            using (var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl))
+            Console.WriteLine($"DEBUG: Getting access token from {tokenUrl}");
+            
+            try
             {
-                request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
-                
-                using (var response = await _httpClient.SendAsync(request))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl))
                 {
-                    response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsStringAsync();
+                    request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+                    
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        try
+                        {
+                            response.EnsureSuccessStatusCode();
+                            Console.WriteLine("DEBUG: Successfully obtained access token");
+                            return await response.Content.ReadAsStringAsync();
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            string responseContent = await response.Content.ReadAsStringAsync();
+                            Console.WriteLine($"ERROR: Failed to get access token. Status code: {response.StatusCode}");
+                            Console.WriteLine($"ERROR: Response content: {responseContent}");
+                            throw new Exception($"Failed to get access token: {response.StatusCode} - {responseContent}", ex);
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: Exception getting access token: {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
+                throw;
             }
         }
         
@@ -181,16 +203,46 @@ namespace Installer.Engines.Azure
         {
             string voicesUrl = $"https://{region}.tts.speech.microsoft.com/cognitiveservices/voices/list";
             
-            using (var request = new HttpRequestMessage(HttpMethod.Get, voicesUrl))
+            Console.WriteLine($"DEBUG: Getting voices from {voicesUrl}");
+            
+            try
             {
-                request.Headers.Add("Authorization", $"Bearer {accessToken}");
-                
-                using (var response = await _httpClient.SendAsync(request))
+                using (var request = new HttpRequestMessage(HttpMethod.Get, voicesUrl))
                 {
-                    response.EnsureSuccessStatusCode();
-                    string json = await response.Content.ReadAsStringAsync();
-                    return JsonConvert.DeserializeObject<List<AzureVoice>>(json);
+                    request.Headers.Add("Authorization", $"Bearer {accessToken}");
+                    
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        try
+                        {
+                            response.EnsureSuccessStatusCode();
+                            var json = await response.Content.ReadAsStringAsync();
+                            var voices = JsonConvert.DeserializeObject<List<AzureVoice>>(json);
+                            Console.WriteLine($"DEBUG: Retrieved {voices.Count} voices from Azure");
+                            return voices;
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            string responseContent = await response.Content.ReadAsStringAsync();
+                            Console.WriteLine($"ERROR: Failed to get voices. Status code: {response.StatusCode}");
+                            Console.WriteLine($"ERROR: Response content: {responseContent}");
+                            throw new Exception($"Failed to get voices: {response.StatusCode} - {responseContent}", ex);
+                        }
+                        catch (JsonException ex)
+                        {
+                            string responseContent = await response.Content.ReadAsStringAsync();
+                            Console.WriteLine($"ERROR: Failed to parse voices response: {ex.Message}");
+                            Console.WriteLine($"ERROR: Response content: {responseContent}");
+                            throw new Exception($"Failed to parse voices response: {ex.Message}", ex);
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: Exception getting voices: {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
+                throw;
             }
         }
         
@@ -251,19 +303,46 @@ namespace Installer.Engines.Azure
         {
             string synthesisUrl = $"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1";
             
-            using (var request = new HttpRequestMessage(HttpMethod.Post, synthesisUrl))
+            Console.WriteLine($"DEBUG: Sending request to Azure TTS service at {synthesisUrl}");
+            
+            try
             {
-                request.Headers.Add("Authorization", $"Bearer {accessToken}");
-                request.Headers.Add("X-Microsoft-OutputFormat", "riff-24khz-16bit-mono-pcm");
-                request.Headers.Add("User-Agent", "OpenSpeechTTS");
-                
-                request.Content = new StringContent(ssml, Encoding.UTF8, "application/ssml+xml");
-                
-                using (var response = await _httpClient.SendAsync(request))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, synthesisUrl))
                 {
-                    response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsByteArrayAsync();
+                    request.Headers.Add("Authorization", $"Bearer {accessToken}");
+                    request.Headers.Add("X-Microsoft-OutputFormat", "riff-24khz-16bit-mono-pcm");
+                    request.Headers.Add("User-Agent", "OpenSpeechTTS");
+                    
+                    request.Content = new StringContent(ssml, Encoding.UTF8, "application/ssml+xml");
+                    
+                    Console.WriteLine("DEBUG: Sending HTTP request to Azure TTS service...");
+                    using (var response = await _httpClient.SendAsync(request))
+                    {
+                        try
+                        {
+                            response.EnsureSuccessStatusCode();
+                            Console.WriteLine($"DEBUG: Received successful response from Azure TTS service (Status: {response.StatusCode})");
+                            
+                            var audioData = await response.Content.ReadAsByteArrayAsync();
+                            Console.WriteLine($"DEBUG: Received {audioData.Length} bytes of audio data");
+                            
+                            return audioData;
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            string responseContent = await response.Content.ReadAsStringAsync();
+                            Console.WriteLine($"ERROR: Azure TTS service returned error status code: {response.StatusCode}");
+                            Console.WriteLine($"ERROR: Response content: {responseContent}");
+                            throw new Exception($"Azure TTS service returned error: {response.StatusCode} - {responseContent}", ex);
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR: Exception during Azure TTS synthesis: {ex.Message}");
+                Console.WriteLine($"DEBUG: Exception details: {ex}");
+                throw;
             }
         }
         

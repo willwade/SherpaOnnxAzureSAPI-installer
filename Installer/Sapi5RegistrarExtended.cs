@@ -172,9 +172,19 @@ namespace Installer
 
         public void RegisterAzureVoice(AzureTtsModel model, string dllPath)
         {
-            // Create a standardized voice name that includes the locale
+            // Ensure the voice name includes the locale for better identification
+            // Format: Microsoft Server Speech Text to Speech Voice (en-GB, OliverNeural)
             string fullVoiceName = $"Microsoft Server Speech Text to Speech Voice ({model.Locale}, {model.ShortName})";
-            string voiceRegistryPath = $@"{RegistryBasePath}\{fullVoiceName}";
+            
+            // Use the ShortName as the registry key, but remove "Neural" suffix if present
+            // This makes the voice ID more user-friendly while still being unique
+            string voiceId = model.ShortName;
+            if (voiceId.EndsWith("Neural", StringComparison.OrdinalIgnoreCase))
+            {
+                voiceId = voiceId.Substring(0, voiceId.Length - 6);
+            }
+            
+            string voiceRegistryPath = $@"{RegistryBasePath}\{voiceId}";
 
             try
             {
@@ -182,6 +192,9 @@ namespace Installer
                 string lcid = GetLcidFromLocale(model.Locale);
 
                 Console.WriteLine($"Registering Azure TTS voice with LCID: {lcid}");
+                Console.WriteLine($"Voice ID: {voiceId}");
+                Console.WriteLine($"Full voice name: {fullVoiceName}");
+                Console.WriteLine($"Azure voice name: {model.ShortName}");
 
                 using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
                 {
@@ -199,7 +212,7 @@ namespace Installer
                         attributesKey.SetValue("Age", "Adult");
                         attributesKey.SetValue("Vendor", "Microsoft");
                         attributesKey.SetValue("Version", "1.0");
-                        attributesKey.SetValue("Name", fullVoiceName);
+                        attributesKey.SetValue("Name", voiceId);
                         attributesKey.SetValue("VoiceType", "AzureTTS");
 
                         // 3. Set Azure-specific attributes

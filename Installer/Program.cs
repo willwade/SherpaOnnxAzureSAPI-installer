@@ -2111,12 +2111,12 @@ namespace Installer
             var selectedVoice = filteredVoices[voiceIndex - 1];
             
             Console.WriteLine();
-            Console.Write("Enter text to speak: ");
+            Console.Write("Enter text to speak (or press Enter for default 'Hello world'): ");
             string text = Console.ReadLine();
             
             if (string.IsNullOrEmpty(text))
             {
-                text = "This is a test of the text-to-speech system.";
+                text = "Hello world";
             }
             
             // Use the TestVoice method to test the voice
