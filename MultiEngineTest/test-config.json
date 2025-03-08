@@ -1,48 +1,36 @@
 {
+  "version": "1.1.0",
   "engines": {
     "SherpaOnnx": {
       "enabled": true,
       "parameters": {
-        "modelsDirectory": "C:\\OpenSpeech\\models"
-      },
-      "testVoiceId": "vits-ljspeech",
-      "testText": "This is a test of the Sherpa ONNX text-to-speech engine."
+        "modelsDirectory": "C:\\Program Files\\OpenSpeech\\models"
+      }
     },
     "AzureTTS": {
-      "enabled": true,
+      "enabled": false,
       "parameters": {
-        "subscriptionKey": "your-subscription-key",
-        "region": "eastus"
-      },
-      "testVoiceId": "en-US-JennyNeural",
-      "testText": "This is a test of the Azure text-to-speech engine."
+        "subscriptionKey": "b14f8945b0f1459f9964bdd72c42c2cc",
+        "region": "uksouth"
+      }
     },
     "ElevenLabs": {
-      "enabled": true,
+      "enabled": false,
       "parameters": {
-        "apiKey": "your-api-key",
+        "apiKey": "",
         "modelId": "eleven_monolingual_v1"
-      },
-      "testVoiceId": "21m00Tcm4TlvDq8ikWAM",
-      "testText": "This is a test of the ElevenLabs text-to-speech engine."
+      }
     },
     "PlayHT": {
-      "enabled": true,
+      "enabled": false,
       "parameters": {
-        "apiKey": "your-api-key",
-        "userId": "your-user-id",
+        "apiKey": "",
+        "userId": "",
         "quality": "premium"
-      },
-      "testVoiceId": "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-voice/manifest.json",
-      "testText": "This is a test of the PlayHT text-to-speech engine."
+      }
     }
   },
-  "testOptions": {
-    "runDirectTests": true,
-    "runSapiTests": true,
-    "runPluginTests": true,
-    "outputDirectory": "C:\\OpenSpeech\\TestOutput",
-    "sapiDllPath": "C:\\Program Files\\OpenAssistive\\OpenSpeech\\OpenSpeechTTS.dll",
-    "pluginDirectory": "C:\\Program Files\\OpenAssistive\\OpenSpeech\\plugins"
-  }
+  "defaultEngine": "SherpaOnnx",
+  "pluginDirectory": "C:\\Program Files\\OpenSpeech\\plugins",
+  "lastUpdated": ""
 } 
