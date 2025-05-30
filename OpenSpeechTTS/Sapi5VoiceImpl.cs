@@ -648,9 +648,9 @@ namespace OpenSpeechTTS
                     LogMessage($"Using model path: {modelPath}");
                     LogMessage($"Using tokens path: {tokensPath}");
 
-                    // TEMPORARY: Skip SherpaTTS initialization to test SAPI bridge
-                    LogMessage("TEMPORARY: Skipping SherpaTTS initialization for testing");
-                    //_sherpaTts = new SherpaTTS(modelPath, tokensPath, "", Path.GetDirectoryName(modelPath));
+                    // Initialize SherpaTTS with real TTS capability
+                    LogMessage("Initializing SherpaTTS...");
+                    _sherpaTts = new SherpaTTS(modelPath, tokensPath, "", Path.GetDirectoryName(modelPath));
 
                     _initialized = true;
                     LogMessage("Voice initialization completed successfully");

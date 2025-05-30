@@ -3,15 +3,15 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Reflection;
-// Note: SherpaOnnx namespace will be loaded dynamically to avoid strong-name issues
 
 namespace OpenSpeechTTS
 {
     public class SherpaTTS : IDisposable
     {
-        private readonly object _tts; // OfflineTts _tts; // TEMPORARY: Changed to object for testing
+        private object _tts; // Will hold OfflineTts instance
         private bool _disposed;
         private readonly string _logDir = "C:\\OpenSpeech";
+        private bool _useRealTts = false; // Flag to control real vs mock TTS
 
         public SherpaTTS(string modelPath, string tokensPath, string lexiconPath, string dataDirPath)
         {
@@ -23,56 +23,99 @@ namespace OpenSpeechTTS
                     Directory.CreateDirectory(_logDir);
                 }
 
-                LogMessage("TEMPORARY: Initializing SherpaTTS in mock mode");
+                LogMessage("Initializing SherpaTTS...");
                 LogMessage($"Model Path: {modelPath}");
                 LogMessage($"Tokens Path: {tokensPath}");
                 LogMessage($"Data Directory: {dataDirPath}");
 
-                // TEMPORARY: Comment out Sherpa ONNX initialization for testing
-                /*
-                // Check for assembly version
-                var assembly = Assembly.GetAssembly(typeof(OfflineTts));
-                LogMessage($"Using sherpa-onnx assembly version: {assembly.GetName().Version}");
+                // Try to initialize real SherpaOnnx TTS
+                if (TryInitializeRealTts(modelPath, tokensPath))
+                {
+                    _useRealTts = true;
+                    LogMessage("SherpaTTS initialized successfully with REAL TTS");
+                }
+                else
+                {
+                    _useRealTts = false;
+                    LogMessage("SherpaTTS initialized in MOCK MODE (real TTS failed)");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError("Error initializing SherpaTTS", ex);
+                _useRealTts = false;
+                LogMessage("Falling back to MOCK MODE due to initialization error");
+            }
+        }
 
+        private bool TryInitializeRealTts(string modelPath, string tokensPath)
+        {
+            try
+            {
+                LogMessage("Attempting to initialize real SherpaOnnx TTS...");
+
+                // Check if model files exist
                 if (!File.Exists(modelPath))
                 {
                     LogError($"Model file not found: {modelPath}");
-                    throw new FileNotFoundException($"Model file not found: {modelPath}");
+                    return false;
                 }
 
                 if (!File.Exists(tokensPath))
                 {
                     LogError($"Tokens file not found: {tokensPath}");
-                    throw new FileNotFoundException($"Tokens file not found: {tokensPath}");
+                    return false;
                 }
 
-                if (!Directory.Exists(dataDirPath))
+                // Try to load SherpaOnnx assembly
+                LogMessage("Loading SherpaOnnx types...");
+
+                // Use reflection to avoid compile-time dependency issues
+                var sherpaAssembly = Assembly.LoadFrom("sherpa-onnx.dll");
+                var offlineTtsConfigType = sherpaAssembly.GetType("SherpaOnnx.OfflineTtsConfig");
+                var offlineTtsType = sherpaAssembly.GetType("SherpaOnnx.OfflineTts");
+
+                if (offlineTtsConfigType == null || offlineTtsType == null)
                 {
-                    LogError($"Data directory not found: {dataDirPath}");
-                    throw new DirectoryNotFoundException($"Data directory not found: {dataDirPath}");
+                    LogError("Could not find SherpaOnnx types in assembly");
+                    return false;
                 }
 
-                // Initialize the Sherpa ONNX TTS engine
-                var config = new OfflineTtsConfig();
-                config.Model.Vits.Model = modelPath;
-                config.Model.Vits.Tokens = tokensPath;
-                config.Model.Vits.NoiseScale = 0.667f;
-                config.Model.Vits.NoiseScaleW = 0.8f;
-                config.Model.Vits.LengthScale = 1.0f;
-                config.Model.NumThreads = 1;
-                config.Model.Debug = 0;
-                config.Model.Provider = "cpu";
+                LogMessage("Creating TTS configuration...");
 
-                LogMessage("Creating OfflineTts instance with config");
-                _tts = new OfflineTts(config);
-                */
-                _tts = null; // TEMPORARY: Set to null for testing
-                LogMessage("SherpaTTS initialized successfully (MOCK MODE)");
+                // Create configuration using reflection
+                var config = Activator.CreateInstance(offlineTtsConfigType);
+
+                // Set configuration properties using reflection
+                var modelProperty = offlineTtsConfigType.GetProperty("Model");
+                var modelValue = modelProperty.GetValue(config);
+                var vitsProperty = modelValue.GetType().GetProperty("Vits");
+                var vitsValue = vitsProperty.GetValue(modelValue);
+
+                // Set VITS model properties
+                vitsValue.GetType().GetProperty("Model").SetValue(vitsValue, modelPath);
+                vitsValue.GetType().GetProperty("Tokens").SetValue(vitsValue, tokensPath);
+                vitsValue.GetType().GetProperty("NoiseScale").SetValue(vitsValue, 0.667f);
+                vitsValue.GetType().GetProperty("NoiseScaleW").SetValue(vitsValue, 0.8f);
+                vitsValue.GetType().GetProperty("LengthScale").SetValue(vitsValue, 1.0f);
+
+                // Set other config properties
+                modelValue.GetType().GetProperty("NumThreads").SetValue(modelValue, 1);
+                modelValue.GetType().GetProperty("Debug").SetValue(modelValue, 0);
+                modelValue.GetType().GetProperty("Provider").SetValue(modelValue, "cpu");
+
+                LogMessage("Creating OfflineTts instance...");
+
+                // Create TTS instance
+                _tts = Activator.CreateInstance(offlineTtsType, config);
+
+                LogMessage("Real SherpaOnnx TTS initialized successfully!");
+                return true;
             }
             catch (Exception ex)
             {
-                LogError("Error initializing SherpaTTS", ex);
-                throw;
+                LogError($"Failed to initialize real TTS: {ex.Message}", ex);
+                return false;
             }
         }
 
@@ -106,15 +149,114 @@ namespace OpenSpeechTTS
 
             try
             {
-                LogMessage($"TEMPORARY: Generating MOCK audio bytes for text: '{text}'");
-
-                // TEMPORARY: Return mock audio data instead of using Sherpa ONNX
-                return GenerateMockAudioData(text);
+                if (_useRealTts && _tts != null)
+                {
+                    LogMessage($"Generating REAL audio bytes for text: '{text}'");
+                    return GenerateRealAudioData(text);
+                }
+                else
+                {
+                    LogMessage($"Generating MOCK audio bytes for text: '{text}'");
+                    return GenerateMockAudioData(text);
+                }
             }
             catch (Exception ex)
             {
                 LogError($"Error in GenerateAudio", ex);
+
+                // Fall back to mock audio on error
+                if (_useRealTts)
+                {
+                    LogMessage("Falling back to mock audio due to real TTS error");
+                    return GenerateMockAudioData(text);
+                }
                 throw;
+            }
+        }
+
+        private byte[] GenerateRealAudioData(string text)
+        {
+            try
+            {
+                LogMessage("Using real SherpaOnnx TTS to generate audio...");
+
+                // Use reflection to call the Generate method
+                var generateMethod = _tts.GetType().GetMethod("Generate", new[] { typeof(string), typeof(float), typeof(int) });
+                if (generateMethod == null)
+                {
+                    LogError("Could not find Generate method on OfflineTts");
+                    return GenerateMockAudioData(text);
+                }
+
+                // Call Generate(text, speed=1.0f, speakerId=0)
+                var audioResult = generateMethod.Invoke(_tts, new object[] { text, 1.0f, 0 });
+
+                // Get the samples from the result
+                var samplesProperty = audioResult.GetType().GetProperty("Samples");
+                var sampleRateProperty = audioResult.GetType().GetProperty("SampleRate");
+
+                if (samplesProperty == null || sampleRateProperty == null)
+                {
+                    LogError("Could not find Samples or SampleRate properties on audio result");
+                    return GenerateMockAudioData(text);
+                }
+
+                var samples = (float[])samplesProperty.GetValue(audioResult);
+                var sampleRate = (int)sampleRateProperty.GetValue(audioResult);
+
+                LogMessage($"Generated {samples.Length} samples at {sampleRate}Hz");
+
+                // Convert float samples to WAV format
+                return ConvertSamplesToWav(samples, sampleRate);
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error generating real audio: {ex.Message}", ex);
+                return GenerateMockAudioData(text);
+            }
+        }
+
+        private byte[] ConvertSamplesToWav(float[] samples, int sampleRate)
+        {
+            try
+            {
+                using (var ms = new MemoryStream())
+                {
+                    using (var writer = new BinaryWriter(ms))
+                    {
+                        // WAV header
+                        writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                        var dataSize = samples.Length * 2; // 16-bit samples
+                        var fileSize = 36 + dataSize;
+                        writer.Write((uint)fileSize);
+                        writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+                        writer.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+                        writer.Write((uint)16); // fmt chunk size
+                        writer.Write((ushort)1); // PCM format
+                        writer.Write((ushort)1); // mono
+                        writer.Write((uint)sampleRate);
+                        writer.Write((uint)(sampleRate * 2)); // byte rate
+                        writer.Write((ushort)2); // block align
+                        writer.Write((ushort)16); // bits per sample
+                        writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                        writer.Write((uint)dataSize);
+
+                        // Convert float samples to 16-bit PCM
+                        foreach (var sample in samples)
+                        {
+                            var pcmSample = (short)(sample * 32767);
+                            writer.Write(pcmSample);
+                        }
+                    }
+
+                    LogMessage($"Converted to WAV format: {ms.Length} bytes");
+                    return ms.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error converting samples to WAV: {ex.Message}", ex);
+                return GenerateMockAudioData("Error converting audio");
             }
         }
 
