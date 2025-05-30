@@ -33,7 +33,7 @@ namespace OpenSpeechTTS
                 }
 
                 string registryPath = $@"SOFTWARE\Microsoft\Speech\Voices\Tokens\{voiceToken}";
-                
+
                 var voiceKey = Registry.LocalMachine.OpenSubKey(registryPath);
                 if (voiceKey == null)
                     throw new Exception($"Voice registry key not found: {registryPath}");
@@ -48,7 +48,7 @@ namespace OpenSpeechTTS
                 var voiceName = (string)attributesKey.GetValue("VoiceName");
                 var selectedStyle = (string)attributesKey.GetValue("SelectedStyle");
                 var selectedRole = (string)attributesKey.GetValue("SelectedRole");
-                
+
                 // Get locale from language LCID
                 var lcid = (string)attributesKey.GetValue("Language");
                 _locale = GetLocaleFromLcid(lcid);
@@ -62,11 +62,11 @@ namespace OpenSpeechTTS
 
                 _azureTts = new AzureTTS(subscriptionKey, region, voiceName, selectedStyle, selectedRole);
                 _initialized = true;
-                
+
                 // Log successful initialization
                 try
                 {
-                    File.AppendAllText("C:\\OpenSpeech\\sapi_init.log", 
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_init.log",
                         $"{DateTime.Now}: Successfully initialized Azure TTS engine\n" +
                         $"Voice: {voiceToken}\n" +
                         $"Azure Voice: {voiceName}\n" +
@@ -80,11 +80,11 @@ namespace OpenSpeechTTS
                 // Log the error to a file for debugging
                 try
                 {
-                    File.AppendAllText("C:\\OpenSpeech\\sapi_error.log", 
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_error.log",
                         $"{DateTime.Now}: Error in AzureSapi5VoiceImpl constructor: {ex.Message}\n{ex.StackTrace}\n\n");
                 }
                 catch { }
-                
+
                 throw new Exception($"Error in AzureSapi5VoiceImpl constructor: {ex.Message}", ex);
             }
         }
@@ -105,84 +105,114 @@ namespace OpenSpeechTTS
                     return "en-US";
                 }
             }
-            
+
             // Default to en-US if parsing fails
             return "en-US";
         }
 
-        public void Speak(string text, uint flags, IntPtr reserved)
+        // Updated SAPI5 Speak method implementation for Azure
+        public int Speak(uint dwSpeakFlags, ref Guid rguidFormatId, ref WaveFormatEx pWaveFormatEx,
+                        ref SpTTSFragList pTextFragList, IntPtr pOutputSite)
         {
             if (!_initialized)
-                throw new Exception("TTS engine not initialized");
+                return unchecked((int)0x80004005); // E_FAIL
 
             try
             {
+                // Extract text from fragment list
+                string text = ExtractTextFromFragList(ref pTextFragList);
+                if (string.IsNullOrEmpty(text))
+                    return 0; // S_OK
+
                 // Log the speak request for debugging
                 try
                 {
-                    File.AppendAllText("C:\\OpenSpeech\\sapi_speak.log", 
-                        $"{DateTime.Now}: Speaking text with Azure TTS: {text}\nFlags: {flags}\nReserved: {reserved}\n\n");
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_speak.log",
+                        $"{DateTime.Now}: Azure TTS Speaking: {text}\n");
                 }
                 catch { }
 
-                // Generate audio data
+                // Get the output site interface
+                if (pOutputSite == IntPtr.Zero)
+                    return unchecked((int)0x80070057); // E_INVALIDARG
+
+                var outputSite = Marshal.GetObjectForIUnknown(pOutputSite) as ISpTTSEngineSite;
+                if (outputSite == null)
+                    return unchecked((int)0x80004005); // E_FAIL
+
+                // Generate audio using Azure TTS
                 var buffer = _azureTts.GenerateAudio(text, _locale);
-                
-                // Log the audio generation result
-                try
-                {
-                    File.AppendAllText("C:\\OpenSpeech\\sapi_speak.log", 
-                        $"Generated {buffer.Length} bytes of audio data\n\n");
-                }
-                catch { }
-                
-                // Copy the buffer to the reserved memory location if provided
-                if (reserved != IntPtr.Zero)
-                {
-                    Marshal.Copy(buffer, 0, reserved, buffer.Length);
-                }
-                else
-                {
-                    // If no reserved memory is provided, we can't output the audio
-                    // This is a common issue with SAPI5 integration
-                    try
-                    {
-                        File.AppendAllText("C:\\OpenSpeech\\sapi_speak.log", 
-                            $"Warning: No reserved memory provided for audio output\n\n");
-                    }
-                    catch { }
-                }
+
+                // Write audio data to output site
+                uint bytesWritten = 0;
+                int hr = outputSite.Write(Marshal.UnsafeAddrOfPinnedArrayElement(buffer, 0),
+                                         (uint)buffer.Length, out bytesWritten);
+
+                return hr;
             }
             catch (Exception ex)
             {
                 // Log the error for debugging
                 try
                 {
-                    File.AppendAllText("C:\\OpenSpeech\\sapi_error.log", 
-                        $"{DateTime.Now}: Error in Azure Speak: {ex.Message}\nText: {text}\n{ex.StackTrace}\n\n");
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_error.log",
+                        $"{DateTime.Now}: Error in Azure Speak: {ex.Message}\n{ex.StackTrace}\n\n");
                 }
                 catch { }
-                
-                throw new Exception($"Error in Azure Speak: {ex.Message}", ex);
+
+                return unchecked((int)0x80004005); // E_FAIL
             }
         }
 
-        public void GetOutputFormat(ref Guid targetFormatId, ref WaveFormatEx targetFormat, out Guid actualFormatId, out WaveFormatEx actualFormat)
+        public int GetOutputFormat(ref Guid pTargetFormatId, ref WaveFormatEx pTargetWaveFormatEx,
+                                  out Guid pOutputFormatId, out IntPtr ppCoMemOutputWaveFormatEx)
         {
-            // Initialize output format for Azure TTS (24kHz)
-            actualFormat = new WaveFormatEx
+            try
             {
-                wFormatTag = 1, // PCM
-                nChannels = 1, // Mono
-                nSamplesPerSec = 24000, // Sample rate
-                wBitsPerSample = 16,
-                nBlockAlign = 2, // (nChannels * wBitsPerSample) / 8
-                nAvgBytesPerSec = 24000 * 2, // nSamplesPerSec * nBlockAlign
-                cbSize = 0
-            };
+                // Set our preferred format
+                pOutputFormatId = new Guid("C31ADBAE-527F-4ff5-A230-F62BB61FF70C"); // SPDFID_WaveFormatEx
 
-            // Use the same format ID as the target
-            actualFormatId = targetFormatId;
+                // Allocate memory for WaveFormatEx
+                int waveFormatSize = Marshal.SizeOf<WaveFormatEx>();
+                ppCoMemOutputWaveFormatEx = Marshal.AllocCoTaskMem(waveFormatSize);
+
+                // Initialize output format for Azure TTS (24kHz)
+                var format = new WaveFormatEx
+                {
+                    wFormatTag = 1, // PCM
+                    nChannels = 1, // Mono
+                    nSamplesPerSec = 24000, // Sample rate
+                    wBitsPerSample = 16,
+                    nBlockAlign = 2, // (nChannels * wBitsPerSample) / 8
+                    nAvgBytesPerSec = 24000 * 2, // nSamplesPerSec * nBlockAlign
+                    cbSize = 0
+                };
+
+                Marshal.StructureToPtr(format, ppCoMemOutputWaveFormatEx, false);
+                return 0; // S_OK
+            }
+            catch
+            {
+                pOutputFormatId = Guid.Empty;
+                ppCoMemOutputWaveFormatEx = IntPtr.Zero;
+                return unchecked((int)0x80004005); // E_FAIL
+            }
+        }
+
+        // Helper method to extract text from SAPI fragment list
+        private string ExtractTextFromFragList(ref SpTTSFragList fragList)
+        {
+            try
+            {
+                if (fragList.pTextStart == IntPtr.Zero || fragList.ulTextLen == 0)
+                    return string.Empty;
+
+                return Marshal.PtrToStringUni(fragList.pTextStart, (int)fragList.ulTextLen);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

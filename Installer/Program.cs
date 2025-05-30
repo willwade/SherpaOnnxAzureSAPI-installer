@@ -77,13 +77,13 @@ namespace Installer
                         if (string.IsNullOrEmpty(subscriptionKey) || string.IsNullOrEmpty(region))
                         {
                             var config = AzureConfigManager.LoadConfig();
-                            
+
                             if (string.IsNullOrEmpty(subscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
                             {
                                 subscriptionKey = config.DefaultKey;
                                 Console.WriteLine("Using subscription key from configuration file.");
                             }
-                            
+
                             if (string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(config.DefaultRegion))
                             {
                                 region = config.DefaultRegion;
@@ -125,13 +125,13 @@ namespace Installer
                         if (string.IsNullOrEmpty(listSubscriptionKey) || string.IsNullOrEmpty(listRegion))
                         {
                             var config = AzureConfigManager.LoadConfig();
-                            
+
                             if (string.IsNullOrEmpty(listSubscriptionKey) && !string.IsNullOrEmpty(config.DefaultKey))
                             {
                                 listSubscriptionKey = config.DefaultKey;
                                 Console.WriteLine("Using subscription key from configuration file.");
                             }
-                            
+
                             if (string.IsNullOrEmpty(listRegion) && !string.IsNullOrEmpty(config.DefaultRegion))
                             {
                                 listRegion = config.DefaultRegion;
@@ -154,7 +154,7 @@ namespace Installer
                         string configKey = null;
                         string configRegion = null;
                         bool secureStorage = true;
-                        
+
                         // Parse additional arguments
                         for (int i = 1; i < args.Length; i++)
                         {
@@ -174,14 +174,14 @@ namespace Installer
                                 i++;
                             }
                         }
-                        
+
                         if (string.IsNullOrEmpty(configKey) || string.IsNullOrEmpty(configRegion))
                         {
                             Console.WriteLine("Error: Azure subscription key and region are required.");
                             Console.WriteLine("Usage: Installer.exe save-azure-config --key <subscription-key> --region <region> [--secure <true|false>]");
                             return;
                         }
-                        
+
                         AzureConfigManager.SaveConfig(configKey, configRegion, secureStorage);
                         return;
 
@@ -217,26 +217,26 @@ namespace Installer
             Console.WriteLine("4. Exit");
             Console.WriteLine();
             Console.Write("Enter your choice (1-4): ");
-            
+
             string choice = Console.ReadLine();
-            
+
             switch (choice)
             {
                 case "1":
                     await InstallSherpaOnnxVoiceInteractive(installer, registrar, dllPath);
                     break;
-                    
+
                 case "2":
                     await InstallAzureVoiceInteractive(registrar, dllPath);
                     break;
-                    
+
                 case "3":
                     await UninstallVoicesAndDll(registrar, dllPath);
                     break;
-                    
+
                 case "4":
                     return;
-                    
+
                 default:
                     Console.WriteLine("Invalid choice. Please try again.");
                     break;
@@ -285,7 +285,7 @@ namespace Installer
                     Console.WriteLine($"Error uninstalling {model.Name}: {ex.Message}");
                 }
             }
-            
+
             // Uninstall Azure voices
             try
             {
@@ -346,7 +346,7 @@ namespace Installer
                         Directory.Delete(modelsDir, true);
                         Console.WriteLine($"Cleaned up models directory: {modelsDir}");
                     }
-                    
+
                     // Try to clean up parent directory if it's empty
                     string openSpeechDir = Path.GetDirectoryName(modelsDir);
                     if (Directory.Exists(openSpeechDir) && Directory.GetFileSystemEntries(openSpeechDir).Length == 0)
@@ -372,7 +372,7 @@ namespace Installer
             {
                 // Find the regasm path
                 string regasmPath = FindRegasmPath();
-                
+
                 var process = new Process();
                 process.StartInfo.FileName = regasmPath;
                 process.StartInfo.Arguments = $"/unregister \"{dllPath}\"";
@@ -422,13 +422,13 @@ namespace Installer
                 {
                     Console.WriteLine($"Downloading and installing {model.Name}...");
                     await installer.DownloadAndExtractModelAsync(model);
-                    
-                    // Register the COM DLL first
-                    RegisterComDll(dllPath);
-                    
+
+                    // Copy and register the COM DLL first
+                    CopyAndRegisterComDll(dllPath);
+
                     // Then register the voice
                     registrar.RegisterVoice(model, dllPath);
-                    
+
                     Console.WriteLine($"Successfully installed voice: {model.Name}");
                 }
                 catch (Exception ex)
@@ -531,7 +531,7 @@ namespace Installer
                             // Try to find the v4.0.30319 directory (or the latest version)
                             var frameworkDirs = Directory.GetDirectories(installRoot, "v*")
                                                         .OrderByDescending(d => d);
-                            
+
                             foreach (var dir in frameworkDirs)
                             {
                                 var regasmPath = Path.Combine(dir, "regasm.exe");
@@ -548,8 +548,118 @@ namespace Installer
             {
                 Console.WriteLine($"Error looking up regasm path in registry: {ex.Message}");
             }
-            
+
             return null;
+        }
+
+        private static void CopyAndRegisterComDll(string targetDllPath)
+        {
+            try
+            {
+                Console.WriteLine($"Copying and registering COM DLL to: {targetDllPath}");
+
+                // Find the source DLL in the build output
+                string sourceDllPath = FindSourceDllPath();
+                if (string.IsNullOrEmpty(sourceDllPath) || !File.Exists(sourceDllPath))
+                {
+                    throw new FileNotFoundException($"Source DLL not found. Expected at: {sourceDllPath}");
+                }
+
+                Console.WriteLine($"Source DLL found at: {sourceDllPath}");
+
+                // Ensure the target directory exists
+                string targetDir = Path.GetDirectoryName(targetDllPath);
+                if (!Directory.Exists(targetDir))
+                {
+                    Directory.CreateDirectory(targetDir);
+                    Console.WriteLine($"Created directory: {targetDir}");
+                }
+
+                // Copy the DLL and its dependencies
+                CopyDllAndDependencies(sourceDllPath, targetDllPath);
+
+                // Register the DLL
+                RegisterComDll(targetDllPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error copying and registering COM DLL: {ex.Message}");
+                throw;
+            }
+        }
+
+        private static string FindSourceDllPath()
+        {
+            // Get the directory where the installer is running from
+            string installerDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+
+            // Look for OpenSpeechTTS.dll in the same directory
+            string dllPath = Path.Combine(installerDir, "OpenSpeechTTS.dll");
+            if (File.Exists(dllPath))
+            {
+                return dllPath;
+            }
+
+            // If not found, try relative paths from the installer location
+            string[] possiblePaths = {
+                Path.Combine(installerDir, "..", "..", "..", "OpenSpeechTTS", "bin", "Debug", "net472", "OpenSpeechTTS.dll"),
+                Path.Combine(installerDir, "..", "..", "..", "OpenSpeechTTS", "bin", "Release", "net472", "OpenSpeechTTS.dll"),
+                Path.Combine(installerDir, "OpenSpeechTTS.dll")
+            };
+
+            foreach (string path in possiblePaths)
+            {
+                string fullPath = Path.GetFullPath(path);
+                if (File.Exists(fullPath))
+                {
+                    return fullPath;
+                }
+            }
+
+            return null;
+        }
+
+        private static void CopyDllAndDependencies(string sourceDllPath, string targetDllPath)
+        {
+            try
+            {
+                // Copy the main DLL
+                File.Copy(sourceDllPath, targetDllPath, true);
+                Console.WriteLine($"Copied DLL: {sourceDllPath} -> {targetDllPath}");
+
+                // Copy dependencies
+                string sourceDir = Path.GetDirectoryName(sourceDllPath);
+                string targetDir = Path.GetDirectoryName(targetDllPath);
+
+                // List of dependencies to copy
+                string[] dependencies = {
+                    "sherpa-onnx.dll",
+                    "SherpaNative.dll",
+                    "onnxruntime.dll",
+                    "onnxruntime_providers_shared.dll"
+                };
+
+                foreach (string dep in dependencies)
+                {
+                    string sourceDep = Path.Combine(sourceDir, dep);
+                    string targetDep = Path.Combine(targetDir, dep);
+
+                    if (File.Exists(sourceDep))
+                    {
+                        File.Copy(sourceDep, targetDep, true);
+                        Console.WriteLine($"Copied dependency: {dep}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Warning: Dependency not found: {sourceDep}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error copying DLL and dependencies: {ex.Message}");
+                throw;
+            }
         }
 
         private static void RegisterComDll(string dllPath)
@@ -557,23 +667,16 @@ namespace Installer
             try
             {
                 Console.WriteLine($"Registering COM DLL: {dllPath}");
-                
-                // Ensure the directory exists
-                string dllDir = Path.GetDirectoryName(dllPath);
-                if (!Directory.Exists(dllDir))
-                {
-                    Directory.CreateDirectory(dllDir);
-                }
-                
+
                 // Check if the DLL exists
                 if (!File.Exists(dllPath))
                 {
                     throw new FileNotFoundException($"DLL not found: {dllPath}");
                 }
-                
+
                 // Find the regasm path
                 string regasmPath = FindRegasmPath();
-                
+
                 // Register the DLL with regasm
                 var process = new Process();
                 process.StartInfo.FileName = regasmPath;
@@ -582,19 +685,19 @@ namespace Installer
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.CreateNoWindow = true;
-                
+
                 process.Start();
                 string output = process.StandardOutput.ReadToEnd();
                 string error = process.StandardError.ReadToEnd();
                 process.WaitForExit();
-                
+
                 if (process.ExitCode != 0)
                 {
                     Console.WriteLine($"regasm output: {output}");
                     Console.WriteLine($"regasm error: {error}");
                     throw new Exception($"Failed to register COM DLL. Exit code: {process.ExitCode}");
                 }
-                
+
                 Console.WriteLine("COM DLL registered successfully");
             }
             catch (Exception ex)
@@ -687,13 +790,13 @@ namespace Installer
                     if (key != null)
                     {
                         Console.WriteLine("✓ Voice registry key exists");
-                        
+
                         var lang = key.GetValue("Lang");
                         Console.WriteLine($"Language ID: {lang}");
-                        
+
                         var gender = key.GetValue("Gender");
                         Console.WriteLine($"Gender: {gender}");
-                        
+
                         var vendor = key.GetValue("Vendor");
                         Console.WriteLine($"Vendor: {vendor}");
 
@@ -726,7 +829,7 @@ namespace Installer
                     var synth = new System.Speech.Synthesis.SpeechSynthesizer();
                     var voices = synth.GetInstalledVoices();
                     var voice = voices.FirstOrDefault(v => v.VoiceInfo.Name == model.Name);
-                    
+
                     if (voice != null)
                     {
                         Console.WriteLine($"✓ Voice found in SAPI");
@@ -735,7 +838,7 @@ namespace Installer
                         Console.WriteLine($"  Culture: {voice.VoiceInfo.Culture}");
                         Console.WriteLine($"  Gender: {voice.VoiceInfo.Gender}");
                         Console.WriteLine($"  Age: {voice.VoiceInfo.Age}");
-                        
+
                         Console.WriteLine("\nTesting speech synthesis...");
                         synth.SelectVoice(model.Name);
                         synth.SetOutputToDefaultAudioDevice();
@@ -772,10 +875,10 @@ namespace Installer
             try
             {
                 Console.WriteLine($"Installing Azure voice: {voiceName}");
-                
+
                 // Create Azure TTS service
                 var azureService = new AzureTtsService(subscriptionKey, region);
-                
+
                 // Validate subscription
                 Console.WriteLine("Validating Azure subscription...");
                 bool isValid = await azureService.ValidateSubscriptionAsync();
@@ -784,16 +887,16 @@ namespace Installer
                     Console.WriteLine("Error: Invalid Azure subscription key or region.");
                     return;
                 }
-                
+
                 // Get available voices
                 Console.WriteLine("Fetching available Azure voices...");
                 var voices = await azureService.GetAvailableVoicesAsync();
-                
+
                 // Find the requested voice
-                var voice = voices.FirstOrDefault(v => 
-                    v.ShortName.Equals(voiceName, StringComparison.OrdinalIgnoreCase) || 
+                var voice = voices.FirstOrDefault(v =>
+                    v.ShortName.Equals(voiceName, StringComparison.OrdinalIgnoreCase) ||
                     v.Name.Equals(voiceName, StringComparison.OrdinalIgnoreCase));
-                
+
                 if (voice == null)
                 {
                     Console.WriteLine($"Error: Azure voice '{voiceName}' not found.");
@@ -804,7 +907,7 @@ namespace Installer
                     }
                     return;
                 }
-                
+
                 // Set style and role if specified
                 if (!string.IsNullOrEmpty(style))
                 {
@@ -818,7 +921,7 @@ namespace Installer
                         Console.WriteLine($"Warning: Style '{style}' not available for this voice. Available styles: {string.Join(", ", voice.StyleList.ToArray())}");
                     }
                 }
-                
+
                 if (!string.IsNullOrEmpty(role))
                 {
                     if (voice.RoleList.Contains(role))
@@ -831,11 +934,11 @@ namespace Installer
                         Console.WriteLine($"Warning: Role '{role}' not available for this voice. Available roles: {string.Join(", ", voice.RoleList.ToArray())}");
                     }
                 }
-                
+
                 // Register the voice
                 Console.WriteLine($"Registering Azure voice: {voice.ShortName}");
                 registrar.RegisterAzureVoice(voice, dllPath);
-                
+
                 Console.WriteLine($"Azure voice '{voice.ShortName}' installed successfully.");
             }
             catch (Exception ex)
@@ -849,10 +952,10 @@ namespace Installer
             try
             {
                 Console.WriteLine("Fetching available Azure voices...");
-                
+
                 // Create Azure TTS service
                 var azureService = new AzureTtsService(subscriptionKey, region);
-                
+
                 // Validate subscription
                 Console.WriteLine("Validating Azure subscription...");
                 bool isValid = await azureService.ValidateSubscriptionAsync();
@@ -861,21 +964,21 @@ namespace Installer
                     Console.WriteLine("Error: Invalid Azure subscription key or region.");
                     return;
                 }
-                
+
                 // Get available voices
                 var voices = await azureService.GetAvailableVoicesAsync();
                 var voicesList = voices.ToList(); // Convert to list before accessing Count
-                
+
                 // Display voices
                 Console.WriteLine($"Found {voicesList.Count} Azure voices:");
                 Console.WriteLine("ID | Name | Locale | Gender | Styles | Roles");
                 Console.WriteLine("---|------|--------|--------|--------|------");
-                
+
                 foreach (var voice in voicesList)
                 {
                     string styles = voice.StyleList.Count > 0 ? string.Join(", ", voice.StyleList.ToArray()) : "None";
                     string roles = voice.RoleList.Count > 0 ? string.Join(", ", voice.RoleList.ToArray()) : "None";
-                    
+
                     Console.WriteLine($"{voice.ShortName} | {voice.DisplayName} | {voice.Locale} | {voice.Gender} | {styles} | {roles}");
                 }
             }
@@ -967,12 +1070,12 @@ namespace Installer
         {
             Console.WriteLine("Azure TTS Voice Installation");
             Console.WriteLine("===========================");
-            
+
             // Try to load config first
             var config = AzureConfigManager.LoadConfig();
             string defaultKey = config.DefaultKey;
             string defaultRegion = config.DefaultRegion;
-            
+
             // Get Azure subscription key and region
             if (!string.IsNullOrEmpty(defaultKey))
             {
@@ -982,21 +1085,21 @@ namespace Installer
             {
                 Console.Write("Enter your Azure subscription key: ");
             }
-            
+
             string subscriptionKey = Console.ReadLine();
-            
+
             if (string.IsNullOrEmpty(subscriptionKey) && !string.IsNullOrEmpty(defaultKey))
             {
                 subscriptionKey = defaultKey;
                 Console.WriteLine("Using saved subscription key.");
             }
-            
+
             if (string.IsNullOrEmpty(subscriptionKey))
             {
                 Console.WriteLine("Subscription key is required. Aborting installation.");
                 return;
             }
-            
+
             if (!string.IsNullOrEmpty(defaultRegion))
             {
                 Console.Write($"Enter your Azure region (e.g., eastus, westus) (or press Enter to use saved region '{defaultRegion}'): ");
@@ -1005,42 +1108,42 @@ namespace Installer
             {
                 Console.Write("Enter your Azure region (e.g., eastus, westus): ");
             }
-            
+
             string region = Console.ReadLine();
-            
+
             if (string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(defaultRegion))
             {
                 region = defaultRegion;
                 Console.WriteLine($"Using saved region: {region}");
             }
-            
+
             if (string.IsNullOrEmpty(region))
             {
                 Console.WriteLine("Region is required. Aborting installation.");
                 return;
             }
-            
+
             // Ask if user wants to save this configuration
             if (subscriptionKey != defaultKey || region != defaultRegion)
             {
                 Console.Write("Do you want to save this configuration for future use? (y/n): ");
                 string saveResponse = Console.ReadLine();
-                
+
                 if (saveResponse?.ToLower() == "y" || saveResponse?.ToLower() == "yes")
                 {
                     Console.Write("Do you want to encrypt the subscription key? (y/n, default: y): ");
                     string encryptResponse = Console.ReadLine();
                     bool encrypt = encryptResponse?.ToLower() != "n" && encryptResponse?.ToLower() != "no";
-                    
+
                     AzureConfigManager.SaveConfig(subscriptionKey, region, encrypt);
                 }
             }
-            
+
             try
             {
                 // Create Azure TTS service
                 var azureService = new AzureTtsService(subscriptionKey, region);
-                
+
                 // Validate subscription
                 Console.WriteLine("Validating Azure subscription...");
                 bool isValid = await azureService.ValidateSubscriptionAsync();
@@ -1049,30 +1152,30 @@ namespace Installer
                     Console.WriteLine("Error: Invalid Azure subscription key or region.");
                     return;
                 }
-                
+
                 // Get available voices
                 Console.WriteLine("Fetching available Azure voices...");
                 var voices = await azureService.GetAvailableVoicesAsync();
                 var voicesList = voices.ToList(); // Convert to list before accessing Count
-                
+
                 Console.WriteLine($"Found {voicesList.Count} Azure voices.");
                 Console.WriteLine("You can search for voices by:");
                 Console.WriteLine(" - Language (e.g., 'English', 'Spanish')");
                 Console.WriteLine(" - Voice name (e.g., 'Guy', 'Aria')");
                 Console.WriteLine(" - Gender (e.g., 'Male', 'Female')");
                 Console.WriteLine();
-                
+
                 while (true)
                 {
                     Console.Write("Enter a search term (or 'exit' to quit): ");
                     string searchTerm = Console.ReadLine();
-                    
+
                     if (string.IsNullOrWhiteSpace(searchTerm))
                         continue;
-                    
+
                     if (searchTerm.Equals("exit", StringComparison.OrdinalIgnoreCase))
                         return;
-                    
+
                     // Filter voices
                     var filteredVoices = voices.Where(voice =>
                         voice.ShortName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
@@ -1082,13 +1185,13 @@ namespace Installer
                         // Use the language code converter for intelligent language matching
                         LanguageCodeConverter.LocaleMatchesLanguage(voice.Locale, searchTerm)
                     ).ToList(); // Convert to list before checking Count
-                    
+
                     if (filteredVoices.Count == 0)
                     {
                         Console.WriteLine("No voices matched your search. Try again.");
                         continue;
                     }
-                    
+
                     // Display filtered results
                     Console.WriteLine("Matching voices:");
                     for (int i = 0; i < filteredVoices.Count; i++)
@@ -1096,28 +1199,28 @@ namespace Installer
                         var voice = filteredVoices[i];
                         string styles = voice.StyleList.Count > 0 ? $", Styles: {string.Join(", ", voice.StyleList.ToArray())}" : "";
                         string roles = voice.RoleList.Count > 0 ? $", Roles: {string.Join(", ", voice.RoleList.ToArray())}" : "";
-                        
+
                         Console.WriteLine($"{i + 1}. {voice.ShortName} ({voice.DisplayName}, {voice.Locale}, {voice.Gender}{styles}{roles})");
                     }
-                    
+
                     // Prompt user to select a voice
                     Console.Write("Enter the number of the voice to install (or 'search' to search again): ");
                     string selection = Console.ReadLine();
-                    
+
                     if (selection.Equals("search", StringComparison.OrdinalIgnoreCase))
                         continue;
-                    
+
                     if (int.TryParse(selection, out int selectedIndex) && selectedIndex >= 1 && selectedIndex <= filteredVoices.Count)
                     {
                         var selectedVoice = filteredVoices[selectedIndex - 1];
-                        
+
                         // Handle style selection if available
                         if (selectedVoice.StyleList.Count > 0)
                         {
                             Console.WriteLine($"Available styles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.StyleList.ToArray())}");
                             Console.Write("Enter a style to use (or press Enter for none): ");
                             string style = Console.ReadLine();
-                            
+
                             if (!string.IsNullOrWhiteSpace(style) && selectedVoice.StyleList.Contains(style))
                             {
                                 selectedVoice.SelectedStyle = style;
@@ -1128,14 +1231,14 @@ namespace Installer
                                 Console.WriteLine($"Style '{style}' not available. No style will be used.");
                             }
                         }
-                        
+
                         // Handle role selection if available
                         if (selectedVoice.RoleList.Count > 0)
                         {
                             Console.WriteLine($"Available roles for {selectedVoice.ShortName}: {string.Join(", ", selectedVoice.RoleList.ToArray())}");
                             Console.Write("Enter a role to use (or press Enter for none): ");
                             string role = Console.ReadLine();
-                            
+
                             if (!string.IsNullOrWhiteSpace(role) && selectedVoice.RoleList.Contains(role))
                             {
                                 selectedVoice.SelectedRole = role;
@@ -1146,11 +1249,11 @@ namespace Installer
                                 Console.WriteLine($"Role '{role}' not available. No role will be used.");
                             }
                         }
-                        
+
                         // Register the voice
                         Console.WriteLine($"Registering Azure voice: {selectedVoice.ShortName}");
                         registrar.RegisterAzureVoice(selectedVoice, dllPath);
-                        
+
                         Console.WriteLine($"Azure voice '{selectedVoice.ShortName}' installed successfully!");
                         return;
                     }

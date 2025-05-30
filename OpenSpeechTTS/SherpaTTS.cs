@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Reflection;
-using SherpaOnnx;
+// Note: SherpaOnnx namespace will be loaded dynamically to avoid strong-name issues
 
 namespace OpenSpeechTTS
 {
@@ -22,12 +22,12 @@ namespace OpenSpeechTTS
                 {
                     Directory.CreateDirectory(_logDir);
                 }
-                
+
                 LogMessage("Initializing SherpaTTS");
                 LogMessage($"Model Path: {modelPath}");
                 LogMessage($"Tokens Path: {tokensPath}");
                 LogMessage($"Data Directory: {dataDirPath}");
-                
+
                 // Check for assembly version
                 var assembly = Assembly.GetAssembly(typeof(OfflineTts));
                 LogMessage($"Using sherpa-onnx assembly version: {assembly.GetName().Version}");
@@ -80,13 +80,13 @@ namespace OpenSpeechTTS
             try
             {
                 LogMessage($"Generating speech for text: '{text}'");
-                
+
                 // Generate audio using Sherpa ONNX
                 var audio = _tts.Generate(text, 1.0f, 0);
                 var samples = audio.Samples;
-                
+
                 LogMessage($"Generated {samples.Length} audio samples at {_tts.SampleRate}Hz");
-                
+
                 // Convert float samples to bytes (16-bit PCM)
                 byte[] bytes = new byte[samples.Length * 2];
                 for (int i = 0; i < samples.Length; i++)
@@ -97,7 +97,7 @@ namespace OpenSpeechTTS
                 }
 
                 LogMessage($"Writing {bytes.Length} bytes to WAV stream");
-                
+
                 using (var writer = new BinaryWriter(stream))
                 {
                     writer.Write(0x46464952); // "RIFF"
@@ -115,7 +115,7 @@ namespace OpenSpeechTTS
                     writer.Write(bytes.Length);
                     writer.Write(bytes);
                 }
-                
+
                 LogMessage("Successfully wrote WAV data to stream");
             }
             catch (Exception ex)
@@ -134,13 +134,13 @@ namespace OpenSpeechTTS
             try
             {
                 LogMessage($"Generating audio bytes for text: '{text}'");
-                
+
                 // Generate audio using Sherpa ONNX
                 var audio = _tts.Generate(text, 1.0f, 0);
                 var samples = audio.Samples;
-                
+
                 LogMessage($"Generated {samples.Length} audio samples at {_tts.SampleRate}Hz");
-                
+
                 // Convert float samples to bytes (16-bit PCM)
                 byte[] bytes = new byte[samples.Length * 2];
                 for (int i = 0; i < samples.Length; i++)
@@ -149,7 +149,7 @@ namespace OpenSpeechTTS
                     bytes[i * 2] = (byte)(pcm & 0xFF);
                     bytes[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
                 }
-                
+
                 // Create a WAV file in memory
                 using (var ms = new MemoryStream())
                 {
@@ -170,7 +170,7 @@ namespace OpenSpeechTTS
                         writer.Write(bytes.Length);
                         writer.Write(bytes);
                     }
-                    
+
                     LogMessage($"Successfully created WAV data ({ms.Length} bytes)");
                     return ms.ToArray();
                 }
@@ -186,7 +186,7 @@ namespace OpenSpeechTTS
         {
             try
             {
-                File.AppendAllText(Path.Combine(_logDir, "sherpa_debug.log"), 
+                File.AppendAllText(Path.Combine(_logDir, "sherpa_debug.log"),
                     $"{DateTime.Now}: {message}\n");
             }
             catch { }
@@ -198,22 +198,22 @@ namespace OpenSpeechTTS
             {
                 string errorLog = Path.Combine(_logDir, "sherpa_error.log");
                 string errorMessage = $"{DateTime.Now}: {message}\n";
-                
+
                 if (ex != null)
                 {
                     errorMessage += $"Exception: {ex.GetType().Name}\n";
                     errorMessage += $"Message: {ex.Message}\n";
                     errorMessage += $"Stack Trace: {ex.StackTrace}\n";
-                    
+
                     if (ex.InnerException != null)
                     {
                         errorMessage += $"Inner Exception: {ex.InnerException.Message}\n";
                         errorMessage += $"Inner Stack Trace: {ex.InnerException.StackTrace}\n";
                     }
                 }
-                
+
                 errorMessage += "\n";
-                
+
                 File.AppendAllText(errorLog, errorMessage);
             }
             catch { }
