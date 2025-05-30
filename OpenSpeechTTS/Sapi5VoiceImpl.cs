@@ -9,7 +9,7 @@ namespace OpenSpeechTTS
 {
     [Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")]
     [ComVisible(true)]
-    public class Sapi5VoiceImpl : ISpTTSEngine
+    public class Sapi5VoiceImpl : ISpTTSEngine, ISpObjectWithToken
     {
         private SherpaTTS _sherpaTts;
         private bool _initialized;
@@ -29,64 +29,17 @@ namespace OpenSpeechTTS
         {
             try
             {
-                LogMessage("Initializing Sapi5VoiceImpl...");
+                LogMessage("Initializing Sapi5VoiceImpl constructor...");
 
                 // Set up assembly resolver for dependencies
                 SetupAssemblyResolver();
 
-                // Get the voice token from the registry
-                string voiceToken = null;
-                using (var key = Registry.ClassesRoot.OpenSubKey(@"CLSID\{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}\Token"))
-                {
-                    if (key != null)
-                    {
-                        voiceToken = (string)key.GetValue("");
-                    }
-                }
-
-                if (string.IsNullOrEmpty(voiceToken))
-                {
-                    throw new Exception("Voice token not found in registry");
-                }
-
-                LogMessage($"Found voice token: {voiceToken}");
-                string registryPath = $@"SOFTWARE\Microsoft\Speech\Voices\Tokens\{voiceToken}";
-
-                var voiceKey = Registry.LocalMachine.OpenSubKey(registryPath);
-                if (voiceKey == null)
-                    throw new Exception($"Voice registry key not found: {registryPath}");
-
-                var attributesKey = voiceKey.OpenSubKey("Attributes");
-                if (attributesKey == null)
-                    throw new Exception("Voice attributes not found in registry");
-
-                var modelPath = (string)attributesKey.GetValue("Model Path") ?? (string)attributesKey.GetValue("ModelPath");
-                var tokensPath = (string)attributesKey.GetValue("Tokens Path") ?? (string)attributesKey.GetValue("TokensPath");
-
-                if (string.IsNullOrEmpty(modelPath))
-                    throw new Exception("ModelPath not found in registry");
-                if (string.IsNullOrEmpty(tokensPath))
-                    throw new Exception("TokensPath not found in registry");
-
-                LogMessage($"Model path: {modelPath}");
-                LogMessage($"Tokens path: {tokensPath}");
-
-                // Pre-load dependencies before creating SherpaTTS
+                // Pre-load dependencies
                 PreloadDependencies();
 
-                // Get the directory containing the model as the data directory
-                string dataDirPath = Path.GetDirectoryName(modelPath);
-                if (string.IsNullOrEmpty(dataDirPath))
-                {
-                    dataDirPath = Path.GetDirectoryName(tokensPath);
-                }
-
-                // TEMPORARY: Skip SherpaTTS initialization to test SAPI bridge
-                LogMessage("TEMPORARY: Skipping SherpaTTS initialization for testing");
-                //_sherpaTts = new SherpaTTS(modelPath, tokensPath, "", dataDirPath);
-                _initialized = true;
-
-                LogMessage("Sherpa ONNX TTS engine initialized successfully");
+                // Don't initialize the voice here - wait for SetObjectToken to be called
+                // This is the correct SAPI5 pattern
+                LogMessage("Sapi5VoiceImpl constructor completed - waiting for SetObjectToken");
             }
             catch (Exception ex)
             {
@@ -95,10 +48,21 @@ namespace OpenSpeechTTS
             }
         }
 
-        // Correct SAPI5 Speak method implementation
+        // OFFICIAL SAPI5 Speak method implementation
         public int Speak(uint dwSpeakFlags, ref Guid rguidFormatId, ref WaveFormatEx pWaveFormatEx,
-                        ref SpTTSFragList pTextFragList, IntPtr pOutputSite)
+                        ref SPVTEXTFRAG pTextFragList, IntPtr pOutputSite)
         {
+            // IMMEDIATE logging to see if method is called
+            try
+            {
+                string logDir = "C:\\OpenSpeech";
+                if (!Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(Path.Combine(logDir, "sapi_debug.log"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: *** SPEAK METHOD CALLED *** flags: {dwSpeakFlags}, initialized: {_initialized}\n");
+            }
+            catch { }
+
             if (!_initialized)
             {
                 LogError("TTS engine not initialized");
@@ -181,11 +145,22 @@ namespace OpenSpeechTTS
         public int GetOutputFormat(ref Guid pTargetFormatId, ref WaveFormatEx pTargetWaveFormatEx,
                                   out Guid pOutputFormatId, out IntPtr ppCoMemOutputWaveFormatEx)
         {
+            // IMMEDIATE logging to see if method is called
             try
             {
-                LogMessage("GetOutputFormat called");
+                string logDir = "C:\\OpenSpeech";
+                if (!Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(Path.Combine(logDir, "sapi_debug.log"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: *** GET OUTPUT FORMAT CALLED *** TargetFormatId: {pTargetFormatId}\n");
+            }
+            catch { }
 
-                // Set our preferred format
+            try
+            {
+                LogMessage($"GetOutputFormat called with TargetFormatId: {pTargetFormatId}");
+
+                // Always set our preferred format
                 pOutputFormatId = SPDFID_WaveFormatEx;
 
                 // Allocate memory for WaveFormatEx
@@ -193,12 +168,12 @@ namespace OpenSpeechTTS
                 ppCoMemOutputWaveFormatEx = Marshal.AllocCoTaskMem(waveFormatSize);
 
                 // Create our format - match Sherpa ONNX output
-                uint sampleRate = _initialized && _sherpaTts != null ? 22050u : 22050u; // Default to 22050 if not initialized
+                uint sampleRate = 22050u; // Fixed sample rate
                 var format = new WaveFormatEx
                 {
                     wFormatTag = 1, // PCM
                     nChannels = 1, // Mono
-                    nSamplesPerSec = sampleRate, // Match Sherpa ONNX sample rate
+                    nSamplesPerSec = sampleRate,
                     wBitsPerSample = 16,
                     nBlockAlign = 2, // (nChannels * wBitsPerSample) / 8
                     nAvgBytesPerSec = sampleRate * 2, // nSamplesPerSec * nBlockAlign
@@ -207,7 +182,8 @@ namespace OpenSpeechTTS
 
                 Marshal.StructureToPtr(format, ppCoMemOutputWaveFormatEx, false);
 
-                LogMessage($"Output format: {format.nSamplesPerSec}Hz, {format.nChannels} channel(s), {format.wBitsPerSample}-bit");
+                LogMessage($"Returning output format: {format.nSamplesPerSec}Hz, {format.nChannels} channel(s), {format.wBitsPerSample}-bit");
+                LogMessage($"GetOutputFormat returning S_OK");
                 return S_OK;
             }
             catch (Exception ex)
@@ -220,7 +196,7 @@ namespace OpenSpeechTTS
         }
 
         // Helper method to extract text from SAPI fragment list
-        private string ExtractTextFromFragList(ref SpTTSFragList fragList)
+        private string ExtractTextFromFragList(ref SPVTEXTFRAG fragList)
         {
             try
             {
@@ -633,6 +609,81 @@ namespace OpenSpeechTTS
                 catch { }
 
                 return null;
+            }
+        }
+
+        // ISpObjectWithToken implementation - REQUIRED for SAPI5 TTS engines
+        private IntPtr _objectToken = IntPtr.Zero;
+
+        public int SetObjectToken(IntPtr pToken)
+        {
+            // IMMEDIATE logging to see if method is called
+            try
+            {
+                string logDir = "C:\\OpenSpeech";
+                if (!Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(Path.Combine(logDir, "sapi_debug.log"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: *** SET OBJECT TOKEN CALLED *** pToken: {pToken}\n");
+            }
+            catch { }
+
+            try
+            {
+                LogMessage($"SetObjectToken called with pToken: {pToken}");
+                _objectToken = pToken;
+
+                // Now initialize the voice using the token passed by SAPI
+                // This is the correct SAPI5 pattern - initialization happens here, not in constructor
+
+                if (pToken != IntPtr.Zero)
+                {
+                    LogMessage("Initializing voice from object token...");
+
+                    // For now, use hardcoded paths since we know where the Amy voice is installed
+                    // In a full implementation, we would parse the token to get voice-specific paths
+                    string modelPath = @"C:\Program Files\OpenSpeech\models\piper-en-amy-medium\model.onnx";
+                    string tokensPath = @"C:\Program Files\OpenSpeech\models\piper-en-amy-medium\tokens.txt";
+
+                    LogMessage($"Using model path: {modelPath}");
+                    LogMessage($"Using tokens path: {tokensPath}");
+
+                    // TEMPORARY: Skip SherpaTTS initialization to test SAPI bridge
+                    LogMessage("TEMPORARY: Skipping SherpaTTS initialization for testing");
+                    //_sherpaTts = new SherpaTTS(modelPath, tokensPath, "", Path.GetDirectoryName(modelPath));
+
+                    _initialized = true;
+                    LogMessage("Voice initialization completed successfully");
+                }
+                else
+                {
+                    LogMessage("Warning: pToken is null - using default initialization");
+                    _initialized = true;
+                }
+
+                LogMessage("SetObjectToken completed successfully");
+                return S_OK;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in SetObjectToken: {ex.Message}", ex);
+                return E_FAIL;
+            }
+        }
+
+        public int GetObjectToken(out IntPtr ppToken)
+        {
+            try
+            {
+                LogMessage("GetObjectToken called");
+                ppToken = _objectToken;
+                return S_OK;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in GetObjectToken: {ex.Message}", ex);
+                ppToken = IntPtr.Zero;
+                return E_FAIL;
             }
         }
     }

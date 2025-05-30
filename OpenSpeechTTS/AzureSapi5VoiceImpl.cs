@@ -7,7 +7,7 @@ namespace OpenSpeechTTS
 {
     [Guid("3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3")]
     [ComVisible(true)]
-    public class AzureSapi5VoiceImpl : ISpTTSEngine
+    public class AzureSapi5VoiceImpl : ISpTTSEngine, ISpObjectWithToken
     {
         private AzureTTS _azureTts;
         private bool _initialized;
@@ -112,7 +112,7 @@ namespace OpenSpeechTTS
 
         // Updated SAPI5 Speak method implementation for Azure
         public int Speak(uint dwSpeakFlags, ref Guid rguidFormatId, ref WaveFormatEx pWaveFormatEx,
-                        ref SpTTSFragList pTextFragList, IntPtr pOutputSite)
+                        ref SPVTEXTFRAG pTextFragList, IntPtr pOutputSite)
         {
             if (!_initialized)
                 return unchecked((int)0x80004005); // E_FAIL
@@ -200,7 +200,7 @@ namespace OpenSpeechTTS
         }
 
         // Helper method to extract text from SAPI fragment list
-        private string ExtractTextFromFragList(ref SpTTSFragList fragList)
+        private string ExtractTextFromFragList(ref SPVTEXTFRAG fragList)
         {
             try
             {
@@ -213,6 +213,21 @@ namespace OpenSpeechTTS
             {
                 return string.Empty;
             }
+        }
+
+        // ISpObjectWithToken implementation - REQUIRED for SAPI5 TTS engines
+        private IntPtr _objectToken = IntPtr.Zero;
+
+        public int SetObjectToken(IntPtr pToken)
+        {
+            _objectToken = pToken;
+            return 0; // S_OK
+        }
+
+        public int GetObjectToken(out IntPtr ppToken)
+        {
+            ppToken = _objectToken;
+            return 0; // S_OK
         }
     }
 }

@@ -9,7 +9,7 @@ namespace OpenSpeechTTS
 {
     public class SherpaTTS : IDisposable
     {
-        private readonly OfflineTts _tts;
+        private readonly object _tts; // OfflineTts _tts; // TEMPORARY: Changed to object for testing
         private bool _disposed;
         private readonly string _logDir = "C:\\OpenSpeech";
 
@@ -23,11 +23,13 @@ namespace OpenSpeechTTS
                     Directory.CreateDirectory(_logDir);
                 }
 
-                LogMessage("Initializing SherpaTTS");
+                LogMessage("TEMPORARY: Initializing SherpaTTS in mock mode");
                 LogMessage($"Model Path: {modelPath}");
                 LogMessage($"Tokens Path: {tokensPath}");
                 LogMessage($"Data Directory: {dataDirPath}");
 
+                // TEMPORARY: Comment out Sherpa ONNX initialization for testing
+                /*
                 // Check for assembly version
                 var assembly = Assembly.GetAssembly(typeof(OfflineTts));
                 LogMessage($"Using sherpa-onnx assembly version: {assembly.GetName().Version}");
@@ -63,7 +65,9 @@ namespace OpenSpeechTTS
 
                 LogMessage("Creating OfflineTts instance with config");
                 _tts = new OfflineTts(config);
-                LogMessage("SherpaTTS initialized successfully");
+                */
+                _tts = null; // TEMPORARY: Set to null for testing
+                LogMessage("SherpaTTS initialized successfully (MOCK MODE)");
             }
             catch (Exception ex)
             {
@@ -79,44 +83,13 @@ namespace OpenSpeechTTS
 
             try
             {
-                LogMessage($"Generating speech for text: '{text}'");
+                LogMessage($"TEMPORARY: Generating MOCK speech for text: '{text}'");
 
-                // Generate audio using Sherpa ONNX
-                var audio = _tts.Generate(text, 1.0f, 0);
-                var samples = audio.Samples;
+                // TEMPORARY: Generate mock audio data instead of using Sherpa ONNX
+                byte[] audioData = GenerateMockAudioData(text);
+                stream.Write(audioData, 0, audioData.Length);
 
-                LogMessage($"Generated {samples.Length} audio samples at {_tts.SampleRate}Hz");
-
-                // Convert float samples to bytes (16-bit PCM)
-                byte[] bytes = new byte[samples.Length * 2];
-                for (int i = 0; i < samples.Length; i++)
-                {
-                    short pcm = (short)(samples[i] * short.MaxValue);
-                    bytes[i * 2] = (byte)(pcm & 0xFF);
-                    bytes[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
-                }
-
-                LogMessage($"Writing {bytes.Length} bytes to WAV stream");
-
-                using (var writer = new BinaryWriter(stream))
-                {
-                    writer.Write(0x46464952); // "RIFF"
-                    writer.Write(36 + bytes.Length);
-                    writer.Write(0x45564157); // "WAVE"
-                    writer.Write(0x20746D66); // "fmt "
-                    writer.Write(16);
-                    writer.Write((short)1); // PCM
-                    writer.Write((short)1); // Mono
-                    writer.Write(_tts.SampleRate); // Sample rate
-                    writer.Write(_tts.SampleRate * 2); // Bytes per second
-                    writer.Write((short)2); // Block align
-                    writer.Write((short)16); // Bits per sample
-                    writer.Write(0x61746164); // "data"
-                    writer.Write(bytes.Length);
-                    writer.Write(bytes);
-                }
-
-                LogMessage("Successfully wrote WAV data to stream");
+                LogMessage("Successfully wrote MOCK WAV data to stream");
             }
             catch (Exception ex)
             {
@@ -133,52 +106,67 @@ namespace OpenSpeechTTS
 
             try
             {
-                LogMessage($"Generating audio bytes for text: '{text}'");
+                LogMessage($"TEMPORARY: Generating MOCK audio bytes for text: '{text}'");
 
-                // Generate audio using Sherpa ONNX
-                var audio = _tts.Generate(text, 1.0f, 0);
-                var samples = audio.Samples;
-
-                LogMessage($"Generated {samples.Length} audio samples at {_tts.SampleRate}Hz");
-
-                // Convert float samples to bytes (16-bit PCM)
-                byte[] bytes = new byte[samples.Length * 2];
-                for (int i = 0; i < samples.Length; i++)
-                {
-                    short pcm = (short)(samples[i] * short.MaxValue);
-                    bytes[i * 2] = (byte)(pcm & 0xFF);
-                    bytes[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
-                }
-
-                // Create a WAV file in memory
-                using (var ms = new MemoryStream())
-                {
-                    using (var writer = new BinaryWriter(ms))
-                    {
-                        writer.Write(0x46464952); // "RIFF"
-                        writer.Write(36 + bytes.Length);
-                        writer.Write(0x45564157); // "WAVE"
-                        writer.Write(0x20746D66); // "fmt "
-                        writer.Write(16);
-                        writer.Write((short)1); // PCM
-                        writer.Write((short)1); // Mono
-                        writer.Write(_tts.SampleRate); // Sample rate
-                        writer.Write(_tts.SampleRate * 2); // Bytes per second
-                        writer.Write((short)2); // Block align
-                        writer.Write((short)16); // Bits per sample
-                        writer.Write(0x61746164); // "data"
-                        writer.Write(bytes.Length);
-                        writer.Write(bytes);
-                    }
-
-                    LogMessage($"Successfully created WAV data ({ms.Length} bytes)");
-                    return ms.ToArray();
-                }
+                // TEMPORARY: Return mock audio data instead of using Sherpa ONNX
+                return GenerateMockAudioData(text);
             }
             catch (Exception ex)
             {
                 LogError($"Error in GenerateAudio", ex);
                 throw;
+            }
+        }
+
+        // TEMPORARY: Generate mock audio data for testing
+        private byte[] GenerateMockAudioData(string text)
+        {
+            try
+            {
+                // Create a simple WAV file with 1 second of silence per 10 characters
+                int durationMs = Math.Max(1000, text.Length * 100); // At least 1 second
+                uint sampleRate = 22050;
+                int samples = (int)(sampleRate * durationMs / 1000);
+
+                using (var ms = new MemoryStream())
+                {
+                    using (var writer = new BinaryWriter(ms))
+                    {
+                        // WAV header
+                        writer.Write(0x46464952); // "RIFF"
+                        writer.Write(36 + samples * 2);
+                        writer.Write(0x45564157); // "WAVE"
+                        writer.Write(0x20746D66); // "fmt "
+                        writer.Write(16);
+                        writer.Write((short)1); // PCM
+                        writer.Write((short)1); // Mono
+                        writer.Write(sampleRate); // Sample rate
+                        writer.Write(sampleRate * 2); // Bytes per second
+                        writer.Write((short)2); // Block align
+                        writer.Write((short)16); // Bits per sample
+                        writer.Write(0x61746164); // "data"
+                        writer.Write(samples * 2);
+
+                        // Generate simple tone instead of silence for testing
+                        for (int i = 0; i < samples; i++)
+                        {
+                            // Generate a simple 440Hz tone (A note)
+                            double time = (double)i / sampleRate;
+                            double amplitude = Math.Sin(2 * Math.PI * 440 * time) * 0.1; // Low volume
+                            short sample = (short)(amplitude * short.MaxValue);
+                            writer.Write(sample);
+                        }
+                    }
+
+                    LogMessage($"Successfully created MOCK WAV data ({ms.Length} bytes)");
+                    return ms.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error generating mock audio data: {ex.Message}", ex);
+                // Return minimal WAV file on error
+                return new byte[] { 0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45 };
             }
         }
 
@@ -225,9 +213,9 @@ namespace OpenSpeechTTS
             {
                 try
                 {
-                    LogMessage("Disposing SherpaTTS");
-                    _tts?.Dispose();
-                    LogMessage("SherpaTTS disposed successfully");
+                    LogMessage("Disposing SherpaTTS (MOCK MODE)");
+                    // TEMPORARY: _tts?.Dispose(); // Commented out for testing
+                    LogMessage("SherpaTTS disposed successfully (MOCK MODE)");
                 }
                 catch (Exception ex)
                 {

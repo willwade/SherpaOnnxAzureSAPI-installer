@@ -3,19 +3,39 @@ using System.Runtime.InteropServices;
 
 namespace OpenSpeechTTS
 {
-    // SAPI5 TTS Engine interface - this is the correct interface for TTS engines
+    // SAPI5 TTS Engine interface - OFFICIAL SAPI5 interface definition
     [ComVisible(true)]
-    [Guid("5AEF0FDD-3E3E-4E0E-96E6-DA4B71F0E0F9")]
+    [Guid("A74D7C8E-4CC5-4F2F-A6EB-804DEE18500E")]  // Official SAPI5 ISpTTSEngine GUID
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     public interface ISpTTSEngine
     {
         [PreserveSig]
-        int Speak(uint dwSpeakFlags, ref Guid rguidFormatId, ref WaveFormatEx pWaveFormatEx,
-                  ref SpTTSFragList pTextFragList, IntPtr pOutputSite);
+        int Speak(
+            [In] uint dwSpeakFlags,
+            [In] ref Guid rguidFormatId,
+            [In] ref WaveFormatEx pWaveFormatEx,
+            [In] ref SPVTEXTFRAG pTextFragList,
+            [In] IntPtr pOutputSite);
 
         [PreserveSig]
-        int GetOutputFormat(ref Guid pTargetFormatId, ref WaveFormatEx pTargetWaveFormatEx,
-                           out Guid pOutputFormatId, out IntPtr ppCoMemOutputWaveFormatEx);
+        int GetOutputFormat(
+            [In] ref Guid pTargetFormatId,
+            [In] ref WaveFormatEx pTargetWaveFormatEx,
+            [Out] out Guid pOutputFormatId,
+            [Out] out IntPtr ppCoMemOutputWaveFormatEx);
+    }
+
+    // SAPI5 Object with Token interface - REQUIRED for TTS engines
+    [ComVisible(true)]
+    [Guid("14056581-E16C-11D2-BB90-00C04F8EE6C0")]  // Official SAPI5 ISpObjectWithToken GUID
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface ISpObjectWithToken
+    {
+        [PreserveSig]
+        int SetObjectToken([In] IntPtr pToken);
+
+        [PreserveSig]
+        int GetObjectToken([Out] out IntPtr ppToken);
     }
 
     // SAPI5 Output Site interface for streaming audio
@@ -49,15 +69,72 @@ namespace OpenSpeechTTS
         int CompleteSkip(int ulNumSkipped);
     }
 
-    // Text fragment structure for SAPI5
+    // OFFICIAL SAPI5 Text fragment structure - SPVTEXTFRAG
     [StructLayout(LayoutKind.Sequential)]
-    public struct SpTTSFragList
+    public struct SPVTEXTFRAG
     {
-        public IntPtr pNext;
-        public int State;
-        public IntPtr pTextStart;
-        public uint ulTextLen;
-        public uint ulTextSrcOffset;
+        public IntPtr pNext;           // struct SPVTEXTFRAG *pNext;
+        public SPVSTATE State;         // SPVSTATE State;
+        public IntPtr pTextStart;      // LPCWSTR pTextStart;
+        public uint ulTextLen;         // ULONG ulTextLen;
+        public uint ulTextSrcOffset;   // ULONG ulTextSrcOffset;
+    }
+
+    // OFFICIAL SAPI5 Voice state structure - SPVSTATE
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SPVSTATE
+    {
+        public SPVACTIONS eAction;          // SPVACTIONS eAction;
+        public ushort LangID;               // LANGID LangID;
+        public ushort wReserved;            // WORD wReserved;
+        public int EmphAdj;                 // long EmphAdj;
+        public int RateAdj;                 // long RateAdj;
+        public uint Volume;                 // ULONG Volume;
+        public SPVPITCH PitchAdj;           // SPVPITCH PitchAdj;
+        public uint SilenceMSecs;           // ULONG SilenceMSecs;
+        public IntPtr pPhoneIds;            // SPPHONEID *pPhoneIds;
+        public SPPARTOFSPEECH ePartOfSpeech; // SPPARTOFSPEECH ePartOfSpeech;
+        public SPVCONTEXT Context;          // SPVCONTEXT Context;
+    }
+
+    // SAPI5 Voice actions enumeration
+    public enum SPVACTIONS
+    {
+        SPVA_Speak = 0,
+        SPVA_Silence,
+        SPVA_Pronounce,
+        SPVA_Bookmark,
+        SPVA_SpellOut,
+        SPVA_Section,
+        SPVA_ParseUnknownTag
+    }
+
+    // SAPI5 Pitch adjustment structure
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SPVPITCH
+    {
+        public int MiddleAdj;    // long MiddleAdj;
+        public int RangeAdj;     // long RangeAdj;
+    }
+
+    // SAPI5 Part of speech enumeration (simplified)
+    public enum SPPARTOFSPEECH
+    {
+        SPPS_Unknown = 0,
+        SPPS_Noun = 0x1000,
+        SPPS_Verb = 0x2000,
+        SPPS_Modifier = 0x3000,
+        SPPS_Function = 0x4000,
+        SPPS_Interjection = 0x5000
+    }
+
+    // SAPI5 Context structure
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SPVCONTEXT
+    {
+        public IntPtr pCategory;    // LPCWSTR pCategory;
+        public IntPtr pBefore;      // LPCWSTR pBefore;
+        public IntPtr pAfter;       // LPCWSTR pAfter;
     }
 
     // Wave format structure
