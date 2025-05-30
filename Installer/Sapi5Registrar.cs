@@ -27,7 +27,7 @@ namespace Installer
                 }
 
                 // Create culture name from language code and country
-                string cultureName = !string.IsNullOrEmpty(language.Country) 
+                string cultureName = !string.IsNullOrEmpty(language.Country)
                     ? $"{language.LangCode}-{language.Country}"
                     : language.LangCode;
 
@@ -39,7 +39,7 @@ namespace Installer
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Warning: Could not find culture for {cultureName}: {ex.Message}");
-                    
+
                     // Try just the language code if country-specific lookup failed
                     try
                     {
@@ -92,6 +92,13 @@ namespace Installer
                 var language = model.Language.FirstOrDefault();
                 string lcid = GetLcidFromLanguage(language);
 
+                // CRITICAL FIX: Remove leading zero from LCID to match Microsoft format
+                // Microsoft voices use "409" not "0409"
+                if (lcid.StartsWith("0") && lcid.Length == 4)
+                {
+                    lcid = lcid.Substring(1); // Convert "0409" to "409"
+                }
+
                 Console.WriteLine($"Registering voice with LCID: {lcid}");
 
                 using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
@@ -102,9 +109,10 @@ namespace Installer
                     voiceKey.SetValue("CLSID", "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}");
                     voiceKey.SetValue("Path", dllPath);
 
-                    // 2. Set voice attributes
+                    // 2. Set voice attributes - MATCH MICROSOFT VOICE FORMAT
                     using (var attributesKey = voiceKey.CreateSubKey("Attributes"))
                     {
+                        // Standard SAPI attributes (match Microsoft format exactly)
                         attributesKey.SetValue("Language", lcid);
                         attributesKey.SetValue("Gender", GetGenderAttribute(model.Gender));
                         attributesKey.SetValue("Age", "Adult");
@@ -112,10 +120,14 @@ namespace Installer
                         attributesKey.SetValue("Version", "1.0");
                         attributesKey.SetValue("Name", model.Name);
 
+                        // CRITICAL: Add SpLexicon attribute (required by SAPI for voice validation)
+                        // Use the standard Microsoft lexicon GUID
+                        attributesKey.SetValue("SpLexicon", "{0655E396-25D0-11D3-9C26-00C04F8EF87C}");
+
                         // 3. Set model paths with consistent naming
                         attributesKey.SetValue("Model Path", model.ModelPath);
                         attributesKey.SetValue("Tokens Path", model.TokensPath);
-                        
+
                         // Add data directory path
                         string dataDir = Path.GetDirectoryName(model.ModelPath);
                         attributesKey.SetValue("Data Directory", dataDir);
