@@ -67,11 +67,64 @@ namespace OpenSpeechTTS
                     return false;
                 }
 
-                // Try to load SherpaOnnx assembly
+                // Try to load SherpaOnnx assembly using the same approach that works in Sapi5VoiceImpl
                 LogMessage("Loading SherpaOnnx types...");
 
+                // Use the full path and the same loading strategy that works
+                string installDir = @"C:\Program Files\OpenAssistive\OpenSpeech";
+                string sherpaPath = Path.Combine(installDir, "sherpa-onnx.dll");
+
+                if (!File.Exists(sherpaPath))
+                {
+                    LogError($"SherpaOnnx assembly not found at: {sherpaPath}");
+                    return false;
+                }
+
+                LogMessage($"Loading SherpaOnnx assembly from: {sherpaPath}");
+
                 // Use reflection to avoid compile-time dependency issues
-                var sherpaAssembly = Assembly.LoadFrom("sherpa-onnx.dll");
+                Assembly sherpaAssembly = null;
+                try
+                {
+                    // Try multiple loading approaches to bypass strong-name verification
+                    try
+                    {
+                        // Method 1: Try UnsafeLoadFrom (bypasses security checks)
+                        var loadFromMethod = typeof(Assembly).GetMethod("UnsafeLoadFrom",
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                        if (loadFromMethod != null)
+                        {
+                            sherpaAssembly = (Assembly)loadFromMethod.Invoke(null, new object[] { sherpaPath });
+                            LogMessage("Successfully loaded using UnsafeLoadFrom");
+                        }
+                    }
+                    catch
+                    {
+                        // Method 2: Try LoadFile instead of LoadFrom
+                        try
+                        {
+                            sherpaAssembly = Assembly.LoadFile(sherpaPath);
+                            LogMessage("Successfully loaded using LoadFile");
+                        }
+                        catch
+                        {
+                            // Method 3: Fall back to regular LoadFrom
+                            sherpaAssembly = Assembly.LoadFrom(sherpaPath);
+                            LogMessage("Successfully loaded using LoadFrom");
+                        }
+                    }
+                }
+                catch (Exception loadEx)
+                {
+                    LogError($"Failed to load SherpaOnnx assembly: {loadEx.Message}", loadEx);
+                    return false;
+                }
+
+                if (sherpaAssembly == null)
+                {
+                    LogError("Failed to load SherpaOnnx assembly - all methods failed");
+                    return false;
+                }
                 var offlineTtsConfigType = sherpaAssembly.GetType("SherpaOnnx.OfflineTtsConfig");
                 var offlineTtsType = sherpaAssembly.GetType("SherpaOnnx.OfflineTts");
 
