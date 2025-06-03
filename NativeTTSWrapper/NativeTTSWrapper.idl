@@ -1,0 +1,34 @@
+// NativeTTSWrapper.idl : IDL source for NativeTTSWrapper
+//
+
+// This file will be processed by the MIDL tool to
+// produce the type library (NativeTTSWrapper.tlb) and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+	object,
+	uuid(A74D7C8E-4CC5-4F2F-A6EB-804DEE18500E),
+	dual,
+	nonextensible,
+	pointer_default(unique)
+]
+interface INativeTTSWrapper : IDispatch{
+};
+
+[
+	uuid(B8F4A8E2-9C3D-4A5E-8F7C-2D1B3E4F5A6B),
+	version(1.0),
+]
+library NativeTTSWrapperLib
+{
+	importlib("stdole2.tlb");
+	[
+		uuid(E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B)
+	]
+	coclass CNativeTTSWrapper
+	{
+		[default] interface INativeTTSWrapper;
+	};
+};

@@ -1,0 +1,26 @@
+HKCR
+{
+	NativeTTSWrapper.CNativeTTSWrapper.1 = s 'CNativeTTSWrapper Class'
+	{
+		CLSID = s '{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}'
+	}
+	NativeTTSWrapper.CNativeTTSWrapper = s 'CNativeTTSWrapper Class'
+	{
+		CLSID = s '{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}'
+		CurVer = s 'NativeTTSWrapper.CNativeTTSWrapper.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B} = s 'CNativeTTSWrapper Class'
+		{
+			ProgID = s 'NativeTTSWrapper.CNativeTTSWrapper.1'
+			VersionIndependentProgID = s 'NativeTTSWrapper.CNativeTTSWrapper'
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			'TypeLib' = s '{B8F4A8E2-9C3D-4A5E-8F7C-2D1B3E4F5A6B}'
+		}
+	}
+}

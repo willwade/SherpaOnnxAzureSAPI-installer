@@ -27,7 +27,8 @@ namespace Installer
 
             var installer = new ModelInstaller();
             var registrar = new Sapi5RegistrarExtended();
-            string dllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
+            string managedDllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\OpenSpeechTTS.dll";
+            string nativeDllPath = @"C:\Program Files\OpenAssistive\OpenSpeech\NativeTTSWrapper.dll";
 
             // Check for command line arguments
             if (args.Length >= 2)
@@ -38,7 +39,7 @@ namespace Installer
                 switch (command)
                 {
                     case "install":
-                        await InstallSpecificVoice(modelId, installer, registrar, dllPath);
+                        await InstallSpecificVoice(modelId, installer, registrar, nativeDllPath);
                         return;
 
                     case "install-azure":
@@ -99,7 +100,7 @@ namespace Installer
                             return;
                         }
 
-                        await InstallAzureVoice(voiceName, subscriptionKey, region, style, role, registrar, dllPath);
+                        await InstallAzureVoice(voiceName, subscriptionKey, region, style, role, registrar, managedDllPath);
                         return;
 
                     case "list-azure-voices":
@@ -192,7 +193,7 @@ namespace Installer
                     case "uninstall":
                         if (modelId == "all")
                         {
-                            await UninstallVoicesAndDll(registrar, dllPath);
+                            await UninstallVoicesAndDll(registrar, managedDllPath, nativeDllPath);
                         }
                         else
                         {
@@ -223,15 +224,15 @@ namespace Installer
             switch (choice)
             {
                 case "1":
-                    await InstallSherpaOnnxVoiceInteractive(installer, registrar, dllPath);
+                    await InstallSherpaOnnxVoiceInteractive(installer, registrar, nativeDllPath);
                     break;
 
                 case "2":
-                    await InstallAzureVoiceInteractive(registrar, dllPath);
+                    await InstallAzureVoiceInteractive(registrar, managedDllPath);
                     break;
 
                 case "3":
-                    await UninstallVoicesAndDll(registrar, dllPath);
+                    await UninstallVoicesAndDll(registrar, managedDllPath, nativeDllPath);
                     break;
 
                 case "4":
@@ -267,7 +268,7 @@ namespace Installer
             }
         }
 
-        private static async Task UninstallVoicesAndDll(Sapi5RegistrarExtended registrar, string dllPath)
+        private static async Task UninstallVoicesAndDll(Sapi5RegistrarExtended registrar, string managedDllPath, string nativeDllPath)
         {
             Console.WriteLine("Uninstalling voices...");
 
@@ -336,7 +337,8 @@ namespace Installer
             var modelDirs = Directory.Exists(modelsDir) ? Directory.GetDirectories(modelsDir) : Array.Empty<string>();
             if (modelDirs.Length == 0)
             {
-                UnregisterDll(dllPath);
+                UnregisterDll(managedDllPath);
+                UnregisterNativeDll(nativeDllPath);
 
                 // Clean up OpenSpeech directory if empty
                 try
@@ -389,6 +391,40 @@ namespace Installer
             }
         }
 
+        private static void UnregisterNativeDll(string dllPath)
+        {
+            try
+            {
+                if (!File.Exists(dllPath))
+                {
+                    Console.WriteLine($"Native DLL not found: {dllPath}");
+                    return;
+                }
+
+                // Use regsvr32 to unregister the native COM DLL
+                var process = new Process();
+                process.StartInfo.FileName = "regsvr32.exe";
+                process.StartInfo.Arguments = $"/s /u \"{dllPath}\"";
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.UseShellExecute = false;
+                process.Start();
+                process.WaitForExit();
+
+                if (process.ExitCode == 0)
+                {
+                    Console.WriteLine("Native DLL successfully unregistered.");
+                }
+                else
+                {
+                    Console.WriteLine($"Warning: Native DLL unregistration returned exit code: {process.ExitCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error unregistering native DLL: {ex.Message}");
+            }
+        }
+
         private static async Task InstallSpecificVoice(string modelId, ModelInstaller installer, Sapi5Registrar registrar, string dllPath)
         {
             Console.WriteLine($"Installing voice: {modelId}");
@@ -423,8 +459,8 @@ namespace Installer
                     Console.WriteLine($"Downloading and installing {model.Name}...");
                     await installer.DownloadAndExtractModelAsync(model);
 
-                    // Copy and register the COM DLL first
-                    CopyAndRegisterComDll(dllPath);
+                    // Copy and register the native COM DLL first (for SherpaOnnx voices)
+                    CopyAndRegisterNativeDll(dllPath);
 
                     // Then register the voice
                     registrar.RegisterVoice(model, dllPath);
@@ -584,6 +620,177 @@ namespace Installer
             catch (Exception ex)
             {
                 Console.WriteLine($"Error copying and registering COM DLL: {ex.Message}");
+                throw;
+            }
+        }
+
+        private static void CopyAndRegisterNativeDll(string targetDllPath)
+        {
+            try
+            {
+                Console.WriteLine($"Copying and registering native COM DLL to: {targetDllPath}");
+
+                // Find the source native DLL in the build output
+                string sourceDllPath = FindSourceNativeDllPath();
+                if (string.IsNullOrEmpty(sourceDllPath) || !File.Exists(sourceDllPath))
+                {
+                    throw new FileNotFoundException($"Source native DLL not found. Expected at: {sourceDllPath}");
+                }
+
+                Console.WriteLine($"Source native DLL found at: {sourceDllPath}");
+
+                // Ensure the target directory exists
+                string targetDir = Path.GetDirectoryName(targetDllPath);
+                if (!Directory.Exists(targetDir))
+                {
+                    Directory.CreateDirectory(targetDir);
+                    Console.WriteLine($"Created directory: {targetDir}");
+                }
+
+                // Copy the native DLL
+                File.Copy(sourceDllPath, targetDllPath, true);
+                Console.WriteLine($"Copied native DLL: {sourceDllPath} -> {targetDllPath}");
+
+                // Also copy the SherpaWorker.exe and dependencies
+                CopyProcessBridgeComponents(targetDir);
+
+                // Register the native DLL
+                RegisterNativeDll(targetDllPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error copying and registering native COM DLL: {ex.Message}");
+                throw;
+            }
+        }
+
+        private static string FindSourceNativeDllPath()
+        {
+            // Get the directory where the installer is running from
+            string installerDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+
+            // Look for NativeTTSWrapper.dll in the same directory
+            string dllPath = Path.Combine(installerDir, "NativeTTSWrapper.dll");
+            if (File.Exists(dllPath))
+            {
+                return dllPath;
+            }
+
+            // If not found, try relative paths from the installer location
+            string[] possiblePaths = {
+                Path.Combine(installerDir, "..", "..", "..", "NativeTTSWrapper", "x64", "Release", "NativeTTSWrapper.dll"),
+                Path.Combine(installerDir, "..", "..", "..", "NativeTTSWrapper", "x64", "Debug", "NativeTTSWrapper.dll"),
+                Path.Combine(installerDir, "NativeTTSWrapper.dll")
+            };
+
+            foreach (string path in possiblePaths)
+            {
+                string fullPath = Path.GetFullPath(path);
+                if (File.Exists(fullPath))
+                {
+                    return fullPath;
+                }
+            }
+
+            return null;
+        }
+
+        private static void CopyProcessBridgeComponents(string targetDir)
+        {
+            try
+            {
+                // Get the directory where the installer is running from
+                string installerDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+
+                // Copy SherpaWorker.exe
+                string[] workerPaths = {
+                    Path.Combine(installerDir, "SherpaWorker.exe"),
+                    Path.Combine(installerDir, "..", "..", "..", "SherpaWorker", "bin", "Release", "net6.0", "SherpaWorker.exe"),
+                    Path.Combine(installerDir, "..", "..", "..", "SherpaWorker", "bin", "Debug", "net6.0", "SherpaWorker.exe")
+                };
+
+                string sourceSherpaWorker = null;
+                foreach (string path in workerPaths)
+                {
+                    string fullPath = Path.GetFullPath(path);
+                    if (File.Exists(fullPath))
+                    {
+                        sourceSherpaWorker = fullPath;
+                        break;
+                    }
+                }
+
+                if (sourceSherpaWorker != null)
+                {
+                    string targetSherpaWorker = Path.Combine(targetDir, "SherpaWorker.exe");
+                    File.Copy(sourceSherpaWorker, targetSherpaWorker, true);
+                    Console.WriteLine($"Copied SherpaWorker.exe");
+
+                    // Copy SherpaWorker dependencies
+                    string sourceWorkerDir = Path.GetDirectoryName(sourceSherpaWorker);
+                    string[] workerDependencies = {
+                        "sherpa-onnx.dll",
+                        "SherpaNative.dll",
+                        "onnxruntime.dll",
+                        "onnxruntime_providers_shared.dll",
+                        "SherpaWorker.deps.json",
+                        "SherpaWorker.runtimeconfig.json"
+                    };
+
+                    foreach (string dep in workerDependencies)
+                    {
+                        string sourceDep = Path.Combine(sourceWorkerDir, dep);
+                        string targetDep = Path.Combine(targetDir, dep);
+
+                        if (File.Exists(sourceDep))
+                        {
+                            File.Copy(sourceDep, targetDep, true);
+                            Console.WriteLine($"Copied SherpaWorker dependency: {dep}");
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Warning: SherpaWorker.exe not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error copying ProcessBridge components: {ex.Message}");
+            }
+        }
+
+        private static void RegisterNativeDll(string dllPath)
+        {
+            try
+            {
+                Console.WriteLine($"Registering native COM DLL: {dllPath}");
+
+                // Check if the DLL exists
+                if (!File.Exists(dllPath))
+                {
+                    throw new FileNotFoundException($"Native DLL not found: {dllPath}");
+                }
+
+                // Register the DLL with regsvr32
+                var process = new Process();
+                process.StartInfo.FileName = "regsvr32.exe";
+                process.StartInfo.Arguments = $"/s \"{dllPath}\"";
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.UseShellExecute = false;
+                process.Start();
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
+                {
+                    throw new Exception($"Failed to register native COM DLL. Exit code: {process.ExitCode}");
+                }
+
+                Console.WriteLine("Native COM DLL registered successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error registering native COM DLL: {ex.Message}");
                 throw;
             }
         }

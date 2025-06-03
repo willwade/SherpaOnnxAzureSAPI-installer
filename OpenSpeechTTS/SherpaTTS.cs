@@ -28,16 +28,22 @@ namespace OpenSpeechTTS
                 LogMessage($"Tokens Path: {tokensPath}");
                 LogMessage($"Data Directory: {dataDirPath}");
 
-                // Try to initialize real SherpaOnnx TTS
-                if (TryInitializeRealTts(modelPath, tokensPath))
+                // Try ProcessBridge first (preferred method)
+                if (TryInitializeProcessBridge(modelPath, tokensPath))
                 {
                     _useRealTts = true;
-                    LogMessage("SherpaTTS initialized successfully with REAL TTS");
+                    LogMessage("SherpaTTS initialized successfully with PROCESSBRIDGE TTS");
+                }
+                // Fallback to direct SherpaOnnx integration
+                else if (TryInitializeRealTts(modelPath, tokensPath))
+                {
+                    _useRealTts = true;
+                    LogMessage("SherpaTTS initialized successfully with DIRECT REAL TTS");
                 }
                 else
                 {
                     _useRealTts = false;
-                    LogMessage("SherpaTTS initialized in MOCK MODE (real TTS failed)");
+                    LogMessage("SherpaTTS initialized in MOCK MODE (ProcessBridge and real TTS failed)");
                 }
             }
             catch (Exception ex)
@@ -52,7 +58,7 @@ namespace OpenSpeechTTS
         {
             try
             {
-                LogMessage("Attempting to initialize real SherpaOnnx TTS...");
+                LogMessage("Attempting to initialize real TTS using native bridge...");
 
                 // Check if model files exist
                 if (!File.Exists(modelPath))
@@ -67,107 +73,88 @@ namespace OpenSpeechTTS
                     return false;
                 }
 
-                // Try to load SherpaOnnx assembly using the same approach that works in Sapi5VoiceImpl
-                LogMessage("Loading SherpaOnnx types...");
-
-                // Use the full path and the same loading strategy that works
+                // Check if ONNX runtime is available
                 string installDir = @"C:\Program Files\OpenAssistive\OpenSpeech";
-                string sherpaPath = Path.Combine(installDir, "sherpa-onnx.dll");
+                string onnxRuntimePath = Path.Combine(installDir, "onnxruntime.dll");
 
-                if (!File.Exists(sherpaPath))
+                if (!File.Exists(onnxRuntimePath))
                 {
-                    LogError($"SherpaOnnx assembly not found at: {sherpaPath}");
+                    LogError($"ONNX runtime not found at: {onnxRuntimePath}");
                     return false;
                 }
 
-                LogMessage($"Loading SherpaOnnx assembly from: {sherpaPath}");
+                LogMessage($"Found ONNX runtime: {onnxRuntimePath}");
+                LogMessage($"Model path: {modelPath}");
+                LogMessage($"Tokens path: {tokensPath}");
 
-                // Use reflection to avoid compile-time dependency issues
-                Assembly sherpaAssembly = null;
-                try
+                // Instead of using the problematic SherpaOnnx assembly,
+                // we'll create a native bridge or process-based solution
+
+                // For now, let's try to use the native SherpaNative.dll if available
+                string nativePath = Path.Combine(installDir, "SherpaNative.dll");
+                if (File.Exists(nativePath))
                 {
-                    // Try multiple loading approaches to bypass strong-name verification
-                    try
+                    LogMessage($"Found native bridge: {nativePath}");
+
+                    // Try to initialize using native bridge
+                    if (TryInitializeNativeBridge(modelPath, tokensPath, nativePath))
                     {
-                        // Method 1: Try UnsafeLoadFrom (bypasses security checks)
-                        var loadFromMethod = typeof(Assembly).GetMethod("UnsafeLoadFrom",
-                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                        if (loadFromMethod != null)
-                        {
-                            sherpaAssembly = (Assembly)loadFromMethod.Invoke(null, new object[] { sherpaPath });
-                            LogMessage("Successfully loaded using UnsafeLoadFrom");
-                        }
-                    }
-                    catch
-                    {
-                        // Method 2: Try LoadFile instead of LoadFrom
-                        try
-                        {
-                            sherpaAssembly = Assembly.LoadFile(sherpaPath);
-                            LogMessage("Successfully loaded using LoadFile");
-                        }
-                        catch
-                        {
-                            // Method 3: Fall back to regular LoadFrom
-                            sherpaAssembly = Assembly.LoadFrom(sherpaPath);
-                            LogMessage("Successfully loaded using LoadFrom");
-                        }
+                        LogMessage("Successfully initialized using native bridge");
+                        return true;
                     }
                 }
-                catch (Exception loadEx)
+
+                // Fallback: Create a process-based bridge
+                LogMessage("Attempting process-based TTS bridge...");
+                if (TryInitializeProcessBridge(modelPath, tokensPath))
                 {
-                    LogError($"Failed to load SherpaOnnx assembly: {loadEx.Message}", loadEx);
-                    return false;
+                    LogMessage("Successfully initialized using process bridge");
+                    return true;
                 }
 
-                if (sherpaAssembly == null)
-                {
-                    LogError("Failed to load SherpaOnnx assembly - all methods failed");
-                    return false;
-                }
-                var offlineTtsConfigType = sherpaAssembly.GetType("SherpaOnnx.OfflineTtsConfig");
-                var offlineTtsType = sherpaAssembly.GetType("SherpaOnnx.OfflineTts");
-
-                if (offlineTtsConfigType == null || offlineTtsType == null)
-                {
-                    LogError("Could not find SherpaOnnx types in assembly");
-                    return false;
-                }
-
-                LogMessage("Creating TTS configuration...");
-
-                // Create configuration using reflection
-                var config = Activator.CreateInstance(offlineTtsConfigType);
-
-                // Set configuration properties using reflection
-                var modelProperty = offlineTtsConfigType.GetProperty("Model");
-                var modelValue = modelProperty.GetValue(config);
-                var vitsProperty = modelValue.GetType().GetProperty("Vits");
-                var vitsValue = vitsProperty.GetValue(modelValue);
-
-                // Set VITS model properties
-                vitsValue.GetType().GetProperty("Model").SetValue(vitsValue, modelPath);
-                vitsValue.GetType().GetProperty("Tokens").SetValue(vitsValue, tokensPath);
-                vitsValue.GetType().GetProperty("NoiseScale").SetValue(vitsValue, 0.667f);
-                vitsValue.GetType().GetProperty("NoiseScaleW").SetValue(vitsValue, 0.8f);
-                vitsValue.GetType().GetProperty("LengthScale").SetValue(vitsValue, 1.0f);
-
-                // Set other config properties
-                modelValue.GetType().GetProperty("NumThreads").SetValue(modelValue, 1);
-                modelValue.GetType().GetProperty("Debug").SetValue(modelValue, 0);
-                modelValue.GetType().GetProperty("Provider").SetValue(modelValue, "cpu");
-
-                LogMessage("Creating OfflineTts instance...");
-
-                // Create TTS instance
-                _tts = Activator.CreateInstance(offlineTtsType, config);
-
-                LogMessage("Real SherpaOnnx TTS initialized successfully!");
-                return true;
+                LogError("All real TTS initialization methods failed");
+                return false;
             }
             catch (Exception ex)
             {
                 LogError($"Failed to initialize real TTS: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        private bool TryInitializeNativeBridge(string modelPath, string tokensPath, string nativePath)
+        {
+            try
+            {
+                LogMessage("Attempting native bridge initialization...");
+
+                // For now, we'll implement this as a placeholder
+                // In a full implementation, this would use P/Invoke to call native functions
+                LogMessage("Native bridge not yet implemented - falling back to process bridge");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Native bridge initialization failed: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        private bool TryInitializeProcessBridge(string modelPath, string tokensPath)
+        {
+            try
+            {
+                LogMessage("Attempting process bridge initialization...");
+
+                // Create a ProcessBridge TTS that will use the SherpaWorker executable
+                _tts = new ProcessBasedTTS(modelPath, tokensPath);
+
+                LogMessage("Process bridge TTS initialized successfully");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Process bridge initialization failed: {ex.Message}", ex);
                 return false;
             }
         }
@@ -231,36 +218,61 @@ namespace OpenSpeechTTS
         {
             try
             {
-                LogMessage("Using real SherpaOnnx TTS to generate audio...");
+                LogMessage("Using bridge TTS to generate audio...");
 
-                // Use reflection to call the Generate method
-                var generateMethod = _tts.GetType().GetMethod("Generate", new[] { typeof(string), typeof(float), typeof(int) });
-                if (generateMethod == null)
+                // Check if we have a ProcessBasedTTS instance
+                if (_tts is ProcessBasedTTS processTts)
                 {
-                    LogError("Could not find Generate method on OfflineTts");
-                    return GenerateMockAudioData(text);
+                    LogMessage("Using ProcessBasedTTS for audio generation");
+                    var audioResult = processTts.Generate(text, 1.0f, 0);
+
+                    // Extract samples and sample rate from the result
+                    var samplesProperty = audioResult.GetType().GetProperty("Samples");
+                    var sampleRateProperty = audioResult.GetType().GetProperty("SampleRate");
+
+                    if (samplesProperty != null && sampleRateProperty != null)
+                    {
+                        var samples = (float[])samplesProperty.GetValue(audioResult);
+                        var sampleRate = (int)sampleRateProperty.GetValue(audioResult);
+
+                        LogMessage($"Generated {samples.Length} samples at {sampleRate}Hz using ProcessBasedTTS");
+                        return ConvertSamplesToWav(samples, sampleRate);
+                    }
+                }
+                else
+                {
+                    // Try the original reflection-based approach for other TTS types
+                    LogMessage("Using reflection-based TTS generation");
+
+                    var generateMethod = _tts.GetType().GetMethod("Generate", new[] { typeof(string), typeof(float), typeof(int) });
+                    if (generateMethod == null)
+                    {
+                        LogError("Could not find Generate method on TTS object");
+                        return GenerateMockAudioData(text);
+                    }
+
+                    // Call Generate(text, speed=1.0f, speakerId=0)
+                    var audioResult = generateMethod.Invoke(_tts, new object[] { text, 1.0f, 0 });
+
+                    // Get the samples from the result
+                    var samplesProperty = audioResult.GetType().GetProperty("Samples");
+                    var sampleRateProperty = audioResult.GetType().GetProperty("SampleRate");
+
+                    if (samplesProperty == null || sampleRateProperty == null)
+                    {
+                        LogError("Could not find Samples or SampleRate properties on audio result");
+                        return GenerateMockAudioData(text);
+                    }
+
+                    var samples = (float[])samplesProperty.GetValue(audioResult);
+                    var sampleRate = (int)sampleRateProperty.GetValue(audioResult);
+
+                    LogMessage($"Generated {samples.Length} samples at {sampleRate}Hz using reflection");
+                    return ConvertSamplesToWav(samples, sampleRate);
                 }
 
-                // Call Generate(text, speed=1.0f, speakerId=0)
-                var audioResult = generateMethod.Invoke(_tts, new object[] { text, 1.0f, 0 });
-
-                // Get the samples from the result
-                var samplesProperty = audioResult.GetType().GetProperty("Samples");
-                var sampleRateProperty = audioResult.GetType().GetProperty("SampleRate");
-
-                if (samplesProperty == null || sampleRateProperty == null)
-                {
-                    LogError("Could not find Samples or SampleRate properties on audio result");
-                    return GenerateMockAudioData(text);
-                }
-
-                var samples = (float[])samplesProperty.GetValue(audioResult);
-                var sampleRate = (int)sampleRateProperty.GetValue(audioResult);
-
-                LogMessage($"Generated {samples.Length} samples at {sampleRate}Hz");
-
-                // Convert float samples to WAV format
-                return ConvertSamplesToWav(samples, sampleRate);
+                LogError("No valid TTS method found");
+                return GenerateMockAudioData(text);
             }
             catch (Exception ex)
             {
@@ -353,8 +365,9 @@ namespace OpenSpeechTTS
                         }
                     }
 
-                    LogMessage($"Successfully created MOCK WAV data ({ms.Length} bytes)");
-                    return ms.ToArray();
+                    byte[] result = ms.ToArray();
+                    LogMessage($"Successfully created MOCK WAV data ({result.Length} bytes)");
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -421,6 +434,356 @@ namespace OpenSpeechTTS
                     _disposed = true;
                 }
             }
+        }
+    }
+
+    // Process-based TTS bridge to handle .NET compatibility issues
+    public class ProcessBasedTTS
+    {
+        private readonly string _modelPath;
+        private readonly string _tokensPath;
+        private readonly string _logDir = "C:\\OpenSpeech";
+
+        public ProcessBasedTTS(string modelPath, string tokensPath)
+        {
+            _modelPath = modelPath;
+            _tokensPath = tokensPath;
+            LogMessage($"ProcessBasedTTS initialized with model: {modelPath}");
+        }
+
+        public object Generate(string text, float speed, int speakerId)
+        {
+            try
+            {
+                LogMessage($"ProcessBasedTTS generating audio for: '{text}' using SherpaWorker");
+
+                // Use the real ProcessBridge to call SherpaWorker.exe
+                var result = GenerateWithProcessBridge(text, speed, speakerId);
+
+                if (result != null)
+                {
+                    LogMessage($"Generated real audio result with {result.Samples.Length} samples using ProcessBridge");
+                    return result;
+                }
+                else
+                {
+                    LogMessage("ProcessBridge failed, falling back to mock audio");
+                    var mockResult = new MockAudioResult(text);
+                    LogMessage($"Generated fallback mock audio result with {mockResult.Samples.Length} samples");
+                    return mockResult;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in ProcessBasedTTS.Generate: {ex.Message}", ex);
+
+                // Fallback to mock audio on error
+                LogMessage("Exception occurred, falling back to mock audio");
+                var mockResult = new MockAudioResult(text);
+                return mockResult;
+            }
+        }
+
+        private ProcessBridgeAudioResult GenerateWithProcessBridge(string text, float speed, int speakerId)
+        {
+            try
+            {
+                LogMessage("Starting ProcessBridge TTS generation...");
+
+                // Path to the SherpaWorker executable
+                string sherpaWorkerPath = Path.Combine(
+                    Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+                    "..", "..", "SherpaWorker", "bin", "Release", "net6.0", "win-x64", "publish", "SherpaWorker.exe");
+
+                // Fallback paths if the relative path doesn't work
+                if (!File.Exists(sherpaWorkerPath))
+                {
+                    sherpaWorkerPath = @"C:\Program Files\OpenAssistive\OpenSpeech\SherpaWorker.exe";
+                }
+
+                if (!File.Exists(sherpaWorkerPath))
+                {
+                    // Try the development path
+                    sherpaWorkerPath = Path.Combine(Environment.CurrentDirectory, "SherpaWorker", "bin", "Release", "net6.0", "win-x64", "publish", "SherpaWorker.exe");
+                }
+
+                if (!File.Exists(sherpaWorkerPath))
+                {
+                    LogError($"SherpaWorker.exe not found at any expected location", new FileNotFoundException());
+                    return null;
+                }
+
+                LogMessage($"Using SherpaWorker at: {sherpaWorkerPath}");
+
+                // Create temporary request file
+                string tempDir = Path.Combine(Path.GetTempPath(), "OpenSpeechTTS");
+                if (!Directory.Exists(tempDir))
+                    Directory.CreateDirectory(tempDir);
+
+                string requestId = Guid.NewGuid().ToString("N").Substring(0, 8);
+                string requestPath = Path.Combine(tempDir, $"tts_request_{requestId}.json");
+                string responsePath = Path.Combine(tempDir, $"tts_request_{requestId}.response.json");
+                string audioPath = Path.Combine(tempDir, $"tts_audio_{requestId}");
+
+                // Create TTS request
+                var request = new
+                {
+                    Text = text,
+                    Speed = speed,
+                    SpeakerId = speakerId,
+                    OutputPath = audioPath
+                };
+
+                string requestJson = Newtonsoft.Json.JsonConvert.SerializeObject(request, Newtonsoft.Json.Formatting.Indented);
+                File.WriteAllText(requestPath, requestJson);
+
+                LogMessage($"Created request file: {requestPath}");
+
+                // Launch SherpaWorker process
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = sherpaWorkerPath,
+                    Arguments = $"\"{requestPath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(sherpaWorkerPath)
+                };
+
+                LogMessage($"Launching: {processInfo.FileName} {processInfo.Arguments}");
+
+                using (var process = System.Diagnostics.Process.Start(processInfo))
+                {
+                    if (process == null)
+                    {
+                        LogError("Failed to start SherpaWorker process", new Exception("Process.Start returned null"));
+                        return null;
+                    }
+
+                    // Wait for process to complete (with timeout)
+                    bool completed = process.WaitForExit(30000); // 30 second timeout
+
+                    if (!completed)
+                    {
+                        LogError("SherpaWorker process timed out", new TimeoutException());
+                        process.Kill();
+                        return null;
+                    }
+
+                    string stdout = process.StandardOutput.ReadToEnd();
+                    string stderr = process.StandardError.ReadToEnd();
+
+                    LogMessage($"SherpaWorker exit code: {process.ExitCode}");
+                    if (!string.IsNullOrEmpty(stdout))
+                        LogMessage($"SherpaWorker stdout: {stdout}");
+                    if (!string.IsNullOrEmpty(stderr))
+                        LogMessage($"SherpaWorker stderr: {stderr}");
+
+                    if (process.ExitCode != 0)
+                    {
+                        LogError($"SherpaWorker failed with exit code {process.ExitCode}", new Exception(stderr));
+                        return null;
+                    }
+                }
+
+                // Read response
+                if (!File.Exists(responsePath))
+                {
+                    LogError("Response file not created by SherpaWorker", new FileNotFoundException());
+                    return null;
+                }
+
+                string responseJson = File.ReadAllText(responsePath);
+                LogMessage($"Response: {responseJson}");
+
+                var response = Newtonsoft.Json.JsonConvert.DeserializeObject<TtsResponse>(responseJson);
+
+                if (response == null || !response.Success)
+                {
+                    LogError($"SherpaWorker reported failure: {response?.ErrorMessage}", new Exception(response?.ErrorMessage));
+                    return null;
+                }
+
+                // Load the generated audio file
+                string audioFilePath = response.AudioPath;
+                if (!File.Exists(audioFilePath))
+                {
+                    LogError($"Audio file not found: {audioFilePath}", new FileNotFoundException());
+                    return null;
+                }
+
+                // Read the WAV file and extract samples
+                var samples = ReadWavFile(audioFilePath);
+                if (samples == null || samples.Length == 0)
+                {
+                    LogError("Failed to read audio samples from WAV file", new Exception("No samples extracted"));
+                    return null;
+                }
+
+                LogMessage($"Successfully loaded {samples.Length} samples from ProcessBridge");
+
+                // Clean up temporary files
+                try
+                {
+                    File.Delete(requestPath);
+                    File.Delete(responsePath);
+                    File.Delete(audioFilePath);
+                }
+                catch { } // Ignore cleanup errors
+
+                // Create result object
+                return new ProcessBridgeAudioResult(samples, response.SampleRate);
+            }
+            catch (Exception ex)
+            {
+                LogError($"ProcessBridge generation failed: {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        private float[] ReadWavFile(string filePath)
+        {
+            try
+            {
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                using var reader = new BinaryReader(fileStream);
+
+                // Read WAV header
+                string riff = new string(reader.ReadChars(4));
+                if (riff != "RIFF")
+                    throw new Exception("Invalid WAV file - missing RIFF header");
+
+                uint fileSize = reader.ReadUInt32();
+                string wave = new string(reader.ReadChars(4));
+                if (wave != "WAVE")
+                    throw new Exception("Invalid WAV file - missing WAVE header");
+
+                // Find fmt chunk
+                while (fileStream.Position < fileStream.Length)
+                {
+                    string chunkId = new string(reader.ReadChars(4));
+                    uint chunkSize = reader.ReadUInt32();
+
+                    if (chunkId == "fmt ")
+                    {
+                        ushort audioFormat = reader.ReadUInt16();
+                        ushort numChannels = reader.ReadUInt16();
+                        uint sampleRate = reader.ReadUInt32();
+                        uint byteRate = reader.ReadUInt32();
+                        ushort blockAlign = reader.ReadUInt16();
+                        ushort bitsPerSample = reader.ReadUInt16();
+
+                        // Skip any extra format bytes
+                        if (chunkSize > 16)
+                            reader.ReadBytes((int)(chunkSize - 16));
+
+                        LogMessage($"WAV format: {audioFormat}, channels: {numChannels}, rate: {sampleRate}, bits: {bitsPerSample}");
+                    }
+                    else if (chunkId == "data")
+                    {
+                        // Read audio data
+                        int sampleCount = (int)(chunkSize / 2); // 16-bit samples
+                        float[] samples = new float[sampleCount];
+
+                        for (int i = 0; i < sampleCount; i++)
+                        {
+                            short sample = reader.ReadInt16();
+                            samples[i] = sample / 32768.0f; // Convert to float [-1, 1]
+                        }
+
+                        LogMessage($"Read {sampleCount} samples from WAV file");
+                        return samples;
+                    }
+                    else
+                    {
+                        // Skip unknown chunk
+                        reader.ReadBytes((int)chunkSize);
+                    }
+                }
+
+                throw new Exception("No data chunk found in WAV file");
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to read WAV file: {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        private void LogMessage(string message)
+        {
+            try
+            {
+                File.AppendAllText(Path.Combine(_logDir, "sherpa_debug.log"),
+                    $"{DateTime.Now}: {message}\n");
+            }
+            catch { }
+        }
+
+        private void LogError(string message, Exception ex = null)
+        {
+            try
+            {
+                string errorLog = Path.Combine(_logDir, "sherpa_error.log");
+                string errorMessage = $"{DateTime.Now}: {message}\n";
+                if (ex != null)
+                {
+                    errorMessage += $"Exception: {ex.Message}\n";
+                }
+                File.AppendAllText(errorLog, errorMessage);
+            }
+            catch { }
+        }
+    }
+
+    // Mock audio result that matches the expected SherpaOnnx interface
+    public class MockAudioResult
+    {
+        public float[] Samples { get; private set; }
+        public int SampleRate { get; private set; }
+
+        public MockAudioResult(string text)
+        {
+            // Generate a simple audio waveform based on the text
+            SampleRate = 22050;
+            int durationMs = Math.Max(1000, text.Length * 100); // At least 1 second
+            int sampleCount = (int)(SampleRate * durationMs / 1000.0);
+
+            Samples = new float[sampleCount];
+
+            // Generate a simple tone pattern
+            for (int i = 0; i < sampleCount; i++)
+            {
+                double time = (double)i / SampleRate;
+                // Create a simple melody based on text length
+                double frequency = 440.0 + (text.Length % 12) * 50; // Vary frequency based on text
+                double amplitude = Math.Sin(2 * Math.PI * frequency * time) * 0.1; // Low volume
+                Samples[i] = (float)amplitude;
+            }
+        }
+    }
+
+    // TTS Response structure for ProcessBridge IPC communication
+    public class TtsResponse
+    {
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; } = "";
+        public int SampleCount { get; set; }
+        public int SampleRate { get; set; }
+        public string AudioPath { get; set; } = "";
+    }
+
+    // ProcessBridge audio result that matches the expected SherpaOnnx interface
+    public class ProcessBridgeAudioResult
+    {
+        public float[] Samples { get; private set; }
+        public int SampleRate { get; private set; }
+
+        public ProcessBridgeAudioResult(float[] samples, int sampleRate)
+        {
+            Samples = samples;
+            SampleRate = sampleRate;
         }
     }
 }

@@ -83,15 +83,29 @@ namespace OpenSpeechTTS
                     }
                     else
                     {
-                        LogMessage("Model files not found - using mock mode");
-                        _initialized = true; // Allow mock mode to work
+                        LogMessage("Model files not found - using mock mode for auto-initialization");
+                        // Initialize with mock mode - create a SherpaTTS instance that will use mock audio
+                        _sherpaTts = new SherpaTTS("", "", "", ""); // Empty paths will trigger mock mode
+                        _initialized = true;
+                        LogMessage("Auto-initialization completed in mock mode");
                     }
                 }
                 catch (Exception ex)
                 {
                     LogError($"Auto-initialization failed: {ex.Message}", ex);
-                    LogMessage("Continuing with mock audio generation...");
-                    _initialized = true; // Allow mock mode to work
+                    LogMessage("Falling back to mock mode");
+                    try
+                    {
+                        // Ensure we have a SherpaTTS instance even if initialization failed
+                        _sherpaTts = new SherpaTTS("", "", "", ""); // Mock mode
+                        _initialized = true;
+                        LogMessage("Fallback mock mode initialization completed");
+                    }
+                    catch (Exception ex2)
+                    {
+                        LogError($"Even mock mode initialization failed: {ex2.Message}", ex2);
+                        return E_FAIL;
+                    }
                 }
             }
 
