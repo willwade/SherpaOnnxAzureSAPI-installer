@@ -5,8 +5,11 @@
 #include <cmath>
 #include <algorithm>
 
-// For now, we'll implement a mock Azure TTS engine
-// Later we'll integrate the real Azure Speech SDK
+// Real Azure Speech SDK integration
+#include <speechapi_cxx.h>
+
+using namespace Microsoft::CognitiveServices::Speech;
+using namespace Microsoft::CognitiveServices::Speech::Audio;
 
 using json = nlohmann::json;
 
@@ -90,36 +93,49 @@ namespace NativeTTS {
         try {
             LogMessage(L"Generating Azure TTS audio for text: " + text);
 
+            if (!m_synthesizer) {
+                LogError(L"Azure synthesizer not created");
+                return E_FAIL;
+            }
+
             // Build SSML
             std::wstring ssml = BuildSSML(text);
             LogMessage(L"Generated SSML: " + ssml);
 
-            // For now, generate a mock audio signal
-            // Later we'll use the real Azure Speech SDK
-            
-            // Generate 2 seconds of audio at 24kHz
-            int numSamples = m_sampleRate * 2; // 2 seconds
-            samples.resize(numSamples);
-            
-            // Generate a more complex waveform to distinguish from SherpaOnnx
-            for (int i = 0; i < numSamples; i++) {
-                float t = static_cast<float>(i) / m_sampleRate;
-                // Mix of frequencies to simulate speech-like audio
-                float sample = 0.1f * (
-                    sin(2.0f * 3.14159f * 200.0f * t) +  // 200Hz
-                    0.5f * sin(2.0f * 3.14159f * 400.0f * t) +  // 400Hz
-                    0.3f * sin(2.0f * 3.14159f * 800.0f * t)    // 800Hz
-                );
-                
-                // Apply envelope to make it more speech-like
-                float envelope = exp(-t * 0.5f); // Decay envelope
-                samples[i] = sample * envelope;
+            // Convert SSML to UTF-8 for Azure SDK
+            std::string ssmlUtf8 = WStringToUTF8(ssml);
+
+            // Perform synthesis
+            auto result = m_synthesizer->SpeakSsmlAsync(ssmlUtf8).get();
+            if (!result) {
+                LogError(L"Azure synthesis failed - no result");
+                return E_FAIL;
             }
 
-            sampleRate = m_sampleRate;
+            // Check result reason
+            if (result->Reason == ResultReason::SynthesizingAudioCompleted) {
+                LogMessage(L"Azure synthesis completed successfully");
 
-            LogMessage(L"Generated " + std::to_wstring(samples.size()) + L" samples at " + std::to_wstring(sampleRate) + L"Hz");
-            return S_OK;
+                // Process the synthesis result
+                HRESULT hr = ProcessSynthesisResult(result, samples, sampleRate);
+                if (FAILED(hr)) {
+                    LogError(L"Failed to process Azure synthesis result", hr);
+                    return hr;
+                }
+
+                LogMessage(L"Generated " + std::to_wstring(samples.size()) + L" samples at " + std::to_wstring(sampleRate) + L"Hz");
+                return S_OK;
+            }
+            else if (result->Reason == ResultReason::Canceled) {
+                auto cancellation = SpeechSynthesisCancellationDetails::FromResult(result);
+                std::string errorDetails = "Azure synthesis canceled: " + cancellation->ErrorDetails;
+                LogError(std::wstring(errorDetails.begin(), errorDetails.end()));
+                return E_FAIL;
+            }
+            else {
+                LogError(L"Azure synthesis failed with unknown reason");
+                return E_FAIL;
+            }
         }
         catch (const std::exception& ex) {
             std::string error = "Exception in AzureTTSEngine::Generate: ";
@@ -264,15 +280,70 @@ namespace NativeTTS {
     }
 
     HRESULT AzureTTSEngine::CreateSpeechConfig() {
-        LogMessage(L"Creating Azure speech configuration (mock)");
-        // Mock implementation - later we'll create real Azure SpeechConfig
-        return S_OK;
+        LogMessage(L"Creating Azure speech configuration");
+
+        try {
+            // Convert subscription key and region to UTF-8
+            std::string subscriptionKey = WStringToUTF8(m_subscriptionKey);
+            std::string region = WStringToUTF8(m_region);
+
+            // Create speech configuration
+            m_speechConfig = SpeechConfig::FromSubscription(subscriptionKey, region);
+            if (!m_speechConfig) {
+                LogError(L"Failed to create Azure SpeechConfig");
+                return E_FAIL;
+            }
+
+            // Set voice name
+            std::string voiceName = WStringToUTF8(m_voiceName);
+            m_speechConfig->SetSpeechSynthesisVoiceName(voiceName);
+
+            // Set output format to PCM 24kHz 16-bit mono
+            m_speechConfig->SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat::Riff24Khz16BitMonoPcm);
+
+            LogMessage(L"Azure speech configuration created successfully");
+            return S_OK;
+        }
+        catch (const std::exception& ex) {
+            std::string error = "Exception creating Azure speech config: ";
+            error += ex.what();
+            LogError(std::wstring(error.begin(), error.end()));
+            return E_FAIL;
+        }
     }
 
     HRESULT AzureTTSEngine::CreateSynthesizer() {
-        LogMessage(L"Creating Azure synthesizer (mock)");
-        // Mock implementation - later we'll create real Azure SpeechSynthesizer
-        return S_OK;
+        LogMessage(L"Creating Azure synthesizer");
+
+        try {
+            if (!m_speechConfig) {
+                LogError(L"Speech config not created");
+                return E_FAIL;
+            }
+
+            // Create audio configuration for in-memory synthesis
+            m_audioConfig = AudioConfig::FromDefaultSpeakerOutput();
+            if (!m_audioConfig) {
+                LogError(L"Failed to create Azure AudioConfig");
+                return E_FAIL;
+            }
+
+            // Create speech synthesizer
+            m_synthesizer = SpeechSynthesizer::FromConfig(m_speechConfig, m_audioConfig);
+            if (!m_synthesizer) {
+                LogError(L"Failed to create Azure SpeechSynthesizer");
+                return E_FAIL;
+            }
+
+            LogMessage(L"Azure synthesizer created successfully");
+            return S_OK;
+        }
+        catch (const std::exception& ex) {
+            std::string error = "Exception creating Azure synthesizer: ";
+            error += ex.what();
+            LogError(std::wstring(error.begin(), error.end()));
+            return E_FAIL;
+        }
     }
 
     std::wstring AzureTTSEngine::BuildSSML(const std::wstring& text) const {
@@ -315,17 +386,81 @@ namespace NativeTTS {
         std::shared_ptr<Microsoft::CognitiveServices::Speech::SpeechSynthesisResult> result,
         std::vector<float>& samples,
         int& sampleRate) const {
-        
-        // Mock implementation - later we'll process real Azure results
-        LogMessage(L"Processing Azure synthesis result (mock)");
-        return S_OK;
+
+        try {
+            LogMessage(L"Processing Azure synthesis result");
+
+            // Get audio data from result
+            auto audioData = result->GetAudioData();
+            if (audioData.empty()) {
+                LogError(L"Azure synthesis result contains no audio data");
+                return E_FAIL;
+            }
+
+            LogMessage(L"Received " + std::to_wstring(audioData.size()) + L" bytes of audio data from Azure");
+
+            // Azure returns WAV format with header, we need to extract PCM data
+            const uint8_t* data = audioData.data();
+            size_t dataSize = audioData.size();
+
+            // Skip WAV header (44 bytes) and convert PCM to float
+            if (dataSize < 44) {
+                LogError(L"Audio data too small to contain WAV header");
+                return E_FAIL;
+            }
+
+            // Extract sample rate from WAV header (bytes 24-27)
+            sampleRate = *reinterpret_cast<const uint32_t*>(data + 24);
+            LogMessage(L"Audio sample rate: " + std::to_wstring(sampleRate) + L"Hz");
+
+            // Convert PCM data to float samples
+            HRESULT hr = ConvertAudioToFloat(data + 44, dataSize - 44, samples);
+            if (FAILED(hr)) {
+                LogError(L"Failed to convert Azure audio to float", hr);
+                return hr;
+            }
+
+            LogMessage(L"Converted to " + std::to_wstring(samples.size()) + L" float samples");
+            return S_OK;
+        }
+        catch (const std::exception& ex) {
+            std::string error = "Exception processing Azure synthesis result: ";
+            error += ex.what();
+            LogError(std::wstring(error.begin(), error.end()));
+            return E_FAIL;
+        }
     }
 
-    HRESULT AzureTTSEngine::ConvertAudioToFloat(const uint8_t* audioData, size_t dataSize, 
+    HRESULT AzureTTSEngine::ConvertAudioToFloat(const uint8_t* audioData, size_t dataSize,
                                                std::vector<float>& samples) const {
-        // Mock implementation - later we'll convert real Azure audio data
-        LogMessage(L"Converting Azure audio to float (mock)");
-        return S_OK;
+        try {
+            LogMessage(L"Converting Azure audio to float");
+
+            // Azure typically returns 16-bit PCM data
+            if (dataSize % 2 != 0) {
+                LogError(L"Audio data size is not aligned for 16-bit samples");
+                return E_INVALIDARG;
+            }
+
+            size_t numSamples = dataSize / 2; // 16-bit = 2 bytes per sample
+            samples.resize(numSamples);
+
+            const int16_t* pcmData = reinterpret_cast<const int16_t*>(audioData);
+
+            // Convert 16-bit PCM to normalized float (-1.0 to 1.0)
+            for (size_t i = 0; i < numSamples; ++i) {
+                samples[i] = static_cast<float>(pcmData[i]) / 32768.0f;
+            }
+
+            LogMessage(L"Converted " + std::to_wstring(numSamples) + L" PCM samples to float");
+            return S_OK;
+        }
+        catch (const std::exception& ex) {
+            std::string error = "Exception converting Azure audio to float: ";
+            error += ex.what();
+            LogError(std::wstring(error.begin(), error.end()));
+            return E_FAIL;
+        }
     }
 
 } // namespace NativeTTS

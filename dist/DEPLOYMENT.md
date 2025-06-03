@@ -37,4 +37,4 @@ To build the complete installer with .NET components:
 1. Install .NET 6.0 SDK
 2. Run: .\BuildCompleteInstaller.ps1
 
-Built on: 2025-06-03 14:50:11
+Built on: 2025-06-03 16:13:02

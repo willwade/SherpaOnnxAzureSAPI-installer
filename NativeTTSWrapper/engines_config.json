@@ -17,7 +17,7 @@
     "azure-jenny": {
       "type": "azure",
       "config": {
-        "subscriptionKey": "${AZURE_API_KEY}",
+        "subscriptionKey": "b14f8945b0f1459f9964bdd72c42c2cc",
         "region": "uksouth",
         "voiceName": "en-US-JennyNeural",
         "language": "en-US",
@@ -29,7 +29,7 @@
     "azure-libby": {
       "type": "azure",
       "config": {
-        "subscriptionKey": "${AZURE_API_KEY}",
+        "subscriptionKey": "b14f8945b0f1459f9964bdd72c42c2cc",
         "region": "uksouth",
         "voiceName": "en-GB-LibbyNeural",
         "language": "en-GB",
