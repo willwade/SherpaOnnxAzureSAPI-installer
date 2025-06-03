@@ -1,0 +1,11 @@
+﻿{
+    "Configuration":  "Release",
+    "Platform":  "x64",
+    "Components":  {
+                       "NativeCOM":  true,
+                       "Installer":  true,
+                       "ManagedCOM":  true,
+                       "SherpaWorker":  true
+                   },
+    "BuildDate":  "2025-06-03 05:37:04"
+}

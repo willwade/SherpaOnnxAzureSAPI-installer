@@ -7,20 +7,48 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TTSInstaller", "TTSInstalle
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSpeechTTS", "OpenSpeechTTS\OpenSpeechTTS.csproj", "{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SherpaWorker", "SherpaWorker\SherpaWorker.csproj", "{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeTTSWrapper", "NativeTTSWrapper\NativeTTSWrapper.vcxproj", "{B2C3D4E5-6F78-9012-BCDE-F23456789012}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Debug|x64.Build.0 = Debug|Any CPU
 		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Release|x64.ActiveCfg = Release|Any CPU
+		{92CA8525-7666-4574-BEEC-3C13A9BDDA80}.Release|x64.Build.0 = Release|Any CPU
 		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Debug|x64.Build.0 = Debug|Any CPU
 		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Release|Any CPU.Build.0 = Release|Any CPU
+		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Release|x64.ActiveCfg = Release|Any CPU
+		{634AF6C5-5E5D-4D48-B3D5-6A24201B3916}.Release|x64.Build.0 = Release|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-5E6F-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|Any CPU
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Debug|x64.ActiveCfg = Debug|x64
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Debug|x64.Build.0 = Debug|x64
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Release|Any CPU.ActiveCfg = Release|x64
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Release|x64.ActiveCfg = Release|x64
+		{B2C3D4E5-6F78-9012-BCDE-F23456789012}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
