@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using SherpaNative;
 
 namespace SherpaWorker
 {
@@ -184,10 +185,20 @@ namespace SherpaWorker
                 float[] samples;
                 int sampleRate;
 
-                // Method 1: Try using existing SherpaOnnx infrastructure
-                if (TryGenerateWithSherpaOnnx(request.Text, out samples, out sampleRate))
+                // Method 1: Try Windows built-in TTS (working solution)
+                if (TryGenerateWithWindowsTTS(request.Text, out samples, out sampleRate))
                 {
-                    Console.WriteLine($"✅ Generated using SherpaOnnx: {samples.Length} samples at {sampleRate}Hz");
+                    Console.WriteLine($"✅ Generated using Windows TTS: {samples.Length} samples at {sampleRate}Hz");
+                }
+                // Method 2: Try direct SherpaOnnx integration (preferred but currently failing)
+                else if (TryDirectSherpaOnnxIntegration(request.Text, out samples, out sampleRate))
+                {
+                    Console.WriteLine($"✅ Generated using direct SherpaOnnx: {samples.Length} samples at {sampleRate}Hz");
+                }
+                // Method 3: Try using existing SherpaOnnx infrastructure with reflection (fallback)
+                else if (TryGenerateWithSherpaOnnx(request.Text, out samples, out sampleRate))
+                {
+                    Console.WriteLine($"✅ Generated using SherpaOnnx reflection: {samples.Length} samples at {sampleRate}Hz");
                 }
                 // Method 2: Try using external TTS process
                 else if (TryGenerateWithExternalProcess(request.Text, out samples, out sampleRate))
@@ -268,6 +279,42 @@ namespace SherpaWorker
             catch (Exception ex)
             {
                 throw new Exception($"Failed to save WAV file: {ex.Message}", ex);
+            }
+        }
+
+        private static bool TryDirectSherpaOnnxIntegration(string text, out float[] samples, out int sampleRate)
+        {
+            samples = null;
+            sampleRate = 22050;
+
+            try
+            {
+                Console.WriteLine("Attempting SherpaNative integration...");
+
+                // Use the SherpaNative wrapper which has working SherpaOnnx integration
+                var wrapper = new SherpaWrapper(_modelPath, _tokensPath);
+                Console.WriteLine("SherpaNative wrapper created successfully");
+                Console.WriteLine($"Generating audio for: '{text}'");
+
+                // Generate waveform using SherpaNative
+                byte[] waveformBytes = wrapper.GenerateWaveform(text);
+
+                // Convert bytes back to float samples
+                samples = new float[waveformBytes.Length / 2];
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    short pcmSample = BitConverter.ToInt16(waveformBytes, i * 2);
+                    samples[i] = pcmSample / 32767.0f;
+                }
+
+                Console.WriteLine($"✅ Generated {samples.Length} samples at {sampleRate}Hz using SherpaNative");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"SherpaNative integration failed: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return false;
             }
         }
 

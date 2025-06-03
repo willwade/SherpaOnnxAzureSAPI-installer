@@ -36,6 +36,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
+  <!-- vcpkg integration -->
+  <Import Project="C:\vcpkg\scripts\buildsystems\msbuild\vcpkg.props" Condition="Exists('C:\vcpkg\scripts\buildsystems\msbuild\vcpkg.props')" />
   <ImportGroup Label="Shared">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -65,13 +67,16 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>NativeTTSWrapper.def</ModuleDefinitionFile>
-      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -96,7 +101,9 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -104,7 +111,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>NativeTTSWrapper.def</ModuleDefinitionFile>
-      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -125,6 +133,11 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="ITTSEngine.h" />
+    <ClInclude Include="TTSEngineManager.h" />
+    <ClInclude Include="SherpaOnnxEngine.h" />
+    <ClInclude Include="AzureTTSEngine.h" />
+    <ClInclude Include="sherpa-onnx-c-api.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -137,6 +150,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ITTSEngine.cpp" />
+    <ClCompile Include="TTSEngineManager.cpp" />
+    <ClCompile Include="SherpaOnnxEngine.cpp" />
+    <ClCompile Include="AzureTTSEngine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="NativeTTSWrapper.rc" />
@@ -144,6 +161,7 @@
   <ItemGroup>
     <None Include="NativeTTSWrapper.def" />
     <None Include="NativeTTSWrapper.rgs" />
+    <None Include="engines_config.json" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="NativeTTSWrapper.idl" />
@@ -151,4 +169,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <!-- vcpkg integration -->
+  <Import Project="C:\vcpkg\scripts\buildsystems\msbuild\vcpkg.targets" Condition="Exists('C:\vcpkg\scripts\buildsystems\msbuild\vcpkg.targets')" />
 </Project>

@@ -15,8 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="sherpa-onnx">
-      <HintPath>C:\Program Files\OpenAssistive\OpenSpeech\sherpa-onnx.dll</HintPath>
+    <Reference Include="SherpaNative">
+      <HintPath>C:\Program Files\OpenAssistive\OpenSpeech\SherpaNative.dll</HintPath>
     </Reference>
   </ItemGroup>
 

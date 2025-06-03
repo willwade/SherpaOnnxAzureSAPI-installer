@@ -216,15 +216,15 @@ namespace OpenSpeechTTS
         }
 
         // ISpObjectWithToken implementation - REQUIRED for SAPI5 TTS engines
-        private IntPtr _objectToken = IntPtr.Zero;
+        private object _objectToken = null;
 
-        public int SetObjectToken(IntPtr pToken)
+        public int SetObjectToken(object pToken)
         {
             _objectToken = pToken;
             return 0; // S_OK
         }
 
-        public int GetObjectToken(out IntPtr ppToken)
+        public int GetObjectToken(out object ppToken)
         {
             ppToken = _objectToken;
             return 0; // S_OK

@@ -11,7 +11,9 @@ namespace Installer
     public class Sapi5RegistrarExtended : Sapi5Registrar
     {
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
-        private const string SherpaOnnxClsid = "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}";
+        // UPDATED: Use native COM wrapper as primary CLSID for maximum SAPI compatibility
+        private const string SherpaOnnxClsid = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"; // Native COM wrapper
+        private const string SherpaOnnxManagedClsid = "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"; // Managed COM (fallback)
         private const string AzureTtsClsid = "{3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3}";
 
         private string GetLcidFromLanguage(LanguageInfo language)

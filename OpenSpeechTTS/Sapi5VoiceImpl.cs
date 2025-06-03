@@ -9,6 +9,8 @@ namespace OpenSpeechTTS
 {
     [Guid("3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2")]
     [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    [ProgId("OpenSpeechTTS.Sapi5VoiceImpl")]
     public class Sapi5VoiceImpl : ISpTTSEngine, ISpObjectWithToken
     {
         private SherpaTTS _sherpaTts;
@@ -29,6 +31,13 @@ namespace OpenSpeechTTS
         {
             try
             {
+                // PHASE 1 FIX: Enhanced activation logging
+                LogMessage("=== COM OBJECT ACTIVATION ===");
+                LogMessage($"COM object activated by process: {System.Diagnostics.Process.GetCurrentProcess().ProcessName}");
+                LogMessage($"Process ID: {System.Diagnostics.Process.GetCurrentProcess().Id}");
+                LogMessage($"Current thread apartment: {System.Threading.Thread.CurrentThread.GetApartmentState()}");
+                LogMessage($"Assembly location: {System.Reflection.Assembly.GetExecutingAssembly().Location}");
+                LogMessage($"AppDomain: {System.AppDomain.CurrentDomain.FriendlyName}");
                 LogMessage("Initializing Sapi5VoiceImpl constructor...");
 
                 // Set up assembly resolver for dependencies
@@ -40,6 +49,7 @@ namespace OpenSpeechTTS
                 // Don't initialize the voice here - wait for SetObjectToken to be called
                 // This is the correct SAPI5 pattern
                 LogMessage("Sapi5VoiceImpl constructor completed - waiting for SetObjectToken");
+                LogMessage("=== COM OBJECT ACTIVATION COMPLETE ===");
             }
             catch (Exception ex)
             {
@@ -185,7 +195,7 @@ namespace OpenSpeechTTS
         public int GetOutputFormat(ref Guid pTargetFormatId, ref WaveFormatEx pTargetWaveFormatEx,
                                   out Guid pOutputFormatId, out IntPtr ppCoMemOutputWaveFormatEx)
         {
-            // IMMEDIATE logging to see if method is called
+            // IMMEDIATE logging to see if method is called - use direct file writing to avoid any dependencies
             try
             {
                 string logDir = "C:\\OpenSpeech";
@@ -196,9 +206,19 @@ namespace OpenSpeechTTS
             }
             catch { }
 
+            // Initialize output parameters first to avoid any issues
+            pOutputFormatId = Guid.Empty;
+            ppCoMemOutputWaveFormatEx = IntPtr.Zero;
+
             try
             {
-                LogMessage($"GetOutputFormat called with TargetFormatId: {pTargetFormatId}");
+                // Direct logging without calling LogMessage to avoid any potential issues
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_debug.log",
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: GetOutputFormat processing... TargetFormatId: {pTargetFormatId}\n");
+                }
+                catch { }
 
                 // Always set our preferred format
                 pOutputFormatId = SPDFID_WaveFormatEx;
@@ -206,6 +226,17 @@ namespace OpenSpeechTTS
                 // Allocate memory for WaveFormatEx
                 int waveFormatSize = Marshal.SizeOf<WaveFormatEx>();
                 ppCoMemOutputWaveFormatEx = Marshal.AllocCoTaskMem(waveFormatSize);
+
+                if (ppCoMemOutputWaveFormatEx == IntPtr.Zero)
+                {
+                    try
+                    {
+                        File.AppendAllText("C:\\OpenSpeech\\sapi_error.log",
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: Failed to allocate memory for WaveFormatEx\n");
+                    }
+                    catch { }
+                    return E_OUTOFMEMORY;
+                }
 
                 // Create our format - match Sherpa ONNX output
                 uint sampleRate = 22050u; // Fixed sample rate
@@ -222,13 +253,36 @@ namespace OpenSpeechTTS
 
                 Marshal.StructureToPtr(format, ppCoMemOutputWaveFormatEx, false);
 
-                LogMessage($"Returning output format: {format.nSamplesPerSec}Hz, {format.nChannels} channel(s), {format.wBitsPerSample}-bit");
-                LogMessage($"GetOutputFormat returning S_OK");
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_debug.log",
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: Returning output format: {format.nSamplesPerSec}Hz, {format.nChannels} channel(s), {format.wBitsPerSample}-bit\n");
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_debug.log",
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: GetOutputFormat returning S_OK\n");
+                }
+                catch { }
+
                 return S_OK;
             }
             catch (Exception ex)
             {
-                LogError($"Error in GetOutputFormat: {ex.Message}", ex);
+                try
+                {
+                    File.AppendAllText("C:\\OpenSpeech\\sapi_error.log",
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: ERROR: Error in GetOutputFormat: {ex.Message}\nException: {ex.Message}\nStack Trace: {ex.StackTrace}\n\n");
+                }
+                catch { }
+
+                // Clean up on error
+                if (ppCoMemOutputWaveFormatEx != IntPtr.Zero)
+                {
+                    try
+                    {
+                        Marshal.FreeCoTaskMem(ppCoMemOutputWaveFormatEx);
+                    }
+                    catch { }
+                }
+
                 pOutputFormatId = Guid.Empty;
                 ppCoMemOutputWaveFormatEx = IntPtr.Zero;
                 return E_FAIL;
@@ -653,9 +707,9 @@ namespace OpenSpeechTTS
         }
 
         // ISpObjectWithToken implementation - REQUIRED for SAPI5 TTS engines
-        private IntPtr _objectToken = IntPtr.Zero;
+        private object _objectToken = null;
 
-        public int SetObjectToken(IntPtr pToken)
+        public int SetObjectToken(object pToken)
         {
             // IMMEDIATE logging to see if method is called
             try
@@ -676,7 +730,7 @@ namespace OpenSpeechTTS
                 // Now initialize the voice using the token passed by SAPI
                 // This is the correct SAPI5 pattern - initialization happens here, not in constructor
 
-                if (pToken != IntPtr.Zero)
+                if (pToken != null)
                 {
                     LogMessage("Initializing voice from object token...");
 
@@ -711,7 +765,7 @@ namespace OpenSpeechTTS
             }
         }
 
-        public int GetObjectToken(out IntPtr ppToken)
+        public int GetObjectToken(out object ppToken)
         {
             try
             {
@@ -722,7 +776,7 @@ namespace OpenSpeechTTS
             catch (Exception ex)
             {
                 LogError($"Error in GetObjectToken: {ex.Message}", ex);
-                ppToken = IntPtr.Zero;
+                ppToken = null;
                 return E_FAIL;
             }
         }

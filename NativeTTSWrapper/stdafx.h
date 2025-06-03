@@ -18,5 +18,13 @@
 #include <memory>
 #include <fstream>
 #include <sstream>
+#include <map>
+#include <mutex>
+#include <codecvt>
+#include <locale>
+
+// Third-party libraries
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 using namespace ATL;

@@ -1,4 +1,4 @@
-﻿# SherpaOnnx SAPI Installer
+# SherpaOnnx SAPI Installer
 
 This package contains the complete SherpaOnnx SAPI installer with Azure TTS support.
 
@@ -37,4 +37,4 @@ sudo .\SherpaOnnxSAPIInstaller.exe uninstall all
 - .NET Framework 4.7.2+ (for Azure TTS)
 - .NET 6.0 Runtime (included in installer)
 
-Built on: 2025-06-03 05:37:04
+Built on: 2025-06-03 06:51:22

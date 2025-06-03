@@ -27,15 +27,15 @@ namespace OpenSpeechTTS
 
     // SAPI5 Object with Token interface - REQUIRED for TTS engines
     [ComVisible(true)]
-    [Guid("14056581-E16C-11D2-BB90-00C04F8EE6C0")]  // Official SAPI5 ISpObjectWithToken GUID
+    [Guid("5B559F40-E952-11D2-BB91-00C04F8EE6C0")]  // Official SAPI5 ISpObjectWithToken GUID
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     public interface ISpObjectWithToken
     {
         [PreserveSig]
-        int SetObjectToken([In] IntPtr pToken);
+        int SetObjectToken([In, MarshalAs(UnmanagedType.Interface)] object pToken);
 
         [PreserveSig]
-        int GetObjectToken([Out] out IntPtr ppToken);
+        int GetObjectToken([Out, MarshalAs(UnmanagedType.Interface)] out object ppToken);
     }
 
     // SAPI5 Output Site interface for streaming audio

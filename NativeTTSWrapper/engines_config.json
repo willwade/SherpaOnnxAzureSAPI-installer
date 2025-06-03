@@ -1,0 +1,77 @@
+{
+  "engines": {
+    "sherpa-amy": {
+      "type": "sherpaonnx",
+      "config": {
+        "modelPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/model.onnx",
+        "tokensPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/tokens.txt",
+        "lexiconPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/lexicon.txt",
+        "noiseScale": 0.667,
+        "noiseScaleW": 0.8,
+        "lengthScale": 1.0,
+        "numThreads": 1,
+        "provider": "cpu",
+        "debug": false
+      }
+    },
+    "azure-jenny": {
+      "type": "azure",
+      "config": {
+        "subscriptionKey": "${AZURE_API_KEY}",
+        "region": "uksouth",
+        "voiceName": "en-US-JennyNeural",
+        "language": "en-US",
+        "sampleRate": 24000,
+        "channels": 1,
+        "bitsPerSample": 16
+      }
+    },
+    "azure-libby": {
+      "type": "azure",
+      "config": {
+        "subscriptionKey": "${AZURE_API_KEY}",
+        "region": "uksouth",
+        "voiceName": "en-GB-LibbyNeural",
+        "language": "en-GB",
+        "sampleRate": 24000,
+        "channels": 1,
+        "bitsPerSample": 16
+      }
+    },
+    "sherpa-jenny-high": {
+      "type": "sherpaonnx",
+      "config": {
+        "modelPath": "C:/Program Files/OpenSpeech/models/piper-en-jenny-high/model.onnx",
+        "tokensPath": "C:/Program Files/OpenSpeech/models/piper-en-jenny-high/tokens.txt",
+        "noiseScale": 0.667,
+        "noiseScaleW": 0.8,
+        "lengthScale": 1.0,
+        "numThreads": 2,
+        "provider": "cpu",
+        "debug": false
+      }
+    }
+  },
+  "voices": {
+    "amy": "sherpa-amy",
+    "jenny": "azure-jenny",
+    "libby": "azure-libby",
+    "jenny-high": "sherpa-jenny-high"
+  },
+  "settings": {
+    "defaultEngine": "sherpa-amy",
+    "fallbackEngine": "sherpa-amy",
+    "enableHealthCheck": true,
+    "healthCheckIntervalMs": 30000,
+    "enablePerformanceLogging": true,
+    "logLevel": "info"
+  },
+  "performance": {
+    "preloadEngines": true,
+    "keepEnginesWarm": true,
+    "maxConcurrentSynthesis": 4,
+    "audioBufferSizeMs": 100,
+    "enableAudioCache": false,
+    "audioCacheMaxSizeMB": 50
+  }
+}

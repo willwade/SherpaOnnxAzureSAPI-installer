@@ -1,7 +1,7 @@
-﻿# Native COM Wrapper Deployment
+# Native COM Wrapper Deployment
 
 ## Built Component:
-- NativeTTSWrapper.dll (108.5 KB)
+- NativeTTSWrapper.dll (109 KB)
 
 ## Manual Deployment Steps:
 
@@ -37,4 +37,4 @@ To build the complete installer with .NET components:
 1. Install .NET 6.0 SDK
 2. Run: .\BuildCompleteInstaller.ps1
 
-Built on: 2025-06-03 05:26:11
+Built on: 2025-06-03 14:50:11

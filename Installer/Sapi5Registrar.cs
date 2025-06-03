@@ -106,7 +106,8 @@ namespace Installer
                     // 1. Register the SAPI voice
                     voiceKey.SetValue("", model.Name);
                     voiceKey.SetValue(lcid, model.Name); // Register for the specific language
-                    voiceKey.SetValue("CLSID", "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}");
+                    // UPDATED: Use native COM wrapper for maximum SAPI compatibility
+                    voiceKey.SetValue("CLSID", "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"); // Native COM wrapper
                     voiceKey.SetValue("Path", dllPath);
 
                     // 2. Set voice attributes - MATCH MICROSOFT VOICE FORMAT
@@ -134,8 +135,8 @@ namespace Installer
                     }
                 }
 
-                // 4. Register the CLSID token for the voice
-                using (var clsidKey = Registry.ClassesRoot.CreateSubKey(@"CLSID\{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}"))
+                // 4. Register the CLSID token for the voice (using native COM wrapper)
+                using (var clsidKey = Registry.ClassesRoot.CreateSubKey(@"CLSID\{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"))
                 {
                     using (var tokenKey = clsidKey.CreateSubKey("Token"))
                     {
