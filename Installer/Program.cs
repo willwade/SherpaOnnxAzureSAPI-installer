@@ -483,6 +483,9 @@ namespace Installer
                     // Then register the voice
                     registrar.RegisterVoice(model, dllPath);
 
+                    // THE BUG FIX: Update engines_config.json for SherpaOnnx voices
+                    EngineConfigManager.AddSherpaVoice(model);
+
                     Console.WriteLine($"Successfully installed voice: {model.Name}");
                 }
                 catch (Exception ex)
@@ -940,6 +943,10 @@ namespace Installer
                 if (models.TryGetValue(modelId, out var model))
                 {
                     registrar.UnregisterVoice(modelId);
+
+                    // Also remove from engines_config.json
+                    EngineConfigManager.RemoveSherpaVoice(modelId);
+
                     Console.WriteLine($"Successfully uninstalled voice: {modelId}");
                 }
                 else
@@ -1223,16 +1230,16 @@ namespace Installer
             var models = await LoadModelsAsync();
 
             Console.WriteLine($"Found {models.Count} voices.");
-            Console.WriteLine("You can search for voices by:");
-            Console.WriteLine(" - Language (e.g., 'english', 'spanish')");
-            Console.WriteLine(" - Model name (e.g., 'xiaomaiiwn')");
-            Console.WriteLine(" - Model ID (e.g., 'cantonese-fs-xiaomaiiwn')");
-            Console.WriteLine(" - Model type (e.g., 'vits', 'mms', 'piper', 'coqui')");
+            Console.WriteLine("🎵 EASY VOICE SELECTION:");
+            Console.WriteLine(" - Enter a NUMBER to select from the list");
+            Console.WriteLine(" - Enter a NAME (e.g., 'amy', 'danny', 'english')");
+            Console.WriteLine(" - Enter a full MODEL ID if you know it");
+            Console.WriteLine(" - Popular searches: 'amy', 'english', 'piper', 'low quality'");
             Console.WriteLine();
 
             while (true)
             {
-                Console.Write("Enter a search term (or 'exit' to quit): ");
+                Console.Write("🔍 Enter search term or 'popular' for common voices (or 'exit' to quit): ");
                 string searchTerm = Console.ReadLine();
 
                 if (string.IsNullOrWhiteSpace(searchTerm))
@@ -1241,56 +1248,150 @@ namespace Installer
                 if (searchTerm.Equals("exit", StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // Filter models
-                var filteredModels = models.Values.Where(model =>
-                    (model.Id?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (model.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (model.Developer?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (model.Language != null && model.Language.Any(lang =>
-                        (lang.LangCode?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                        (lang.LanguageName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)))
-                ).ToList(); // Convert to list before checking Count
+                List<TtsModel> filteredModels;
+
+                // Show popular English voices if requested
+                if (searchTerm.Equals("popular", StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredModels = models.Values.Where(model =>
+                        model.Id?.StartsWith("piper-en-", StringComparison.OrdinalIgnoreCase) == true &&
+                        (model.Quality == "low" || model.Quality == "medium") &&
+                        model.FilesizeMb < 200 // Reasonable size
+                    ).OrderBy(m => m.Quality).ThenBy(m => m.Name).ToList();
+
+                    Console.WriteLine("🌟 Popular English Voices (fast download, good quality):");
+                }
+                else
+                {
+                    // Enhanced search - much more flexible
+                    filteredModels = models.Values.Where(model =>
+                        // Direct ID match
+                        (model.Id?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        // Name match (most common)
+                        (model.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        // Quality match (low, medium, high)
+                        (model.Quality?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        // Developer/type match
+                        (model.Developer?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (model.ModelType?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        // Language matching
+                        (model.Language != null && model.Language.Any(lang =>
+                            (lang.LangCode?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (lang.LanguageName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))) ||
+                        // Smart partial matching for common terms
+                        (searchTerm.Equals("english", StringComparison.OrdinalIgnoreCase) &&
+                         model.Id?.Contains("en-", StringComparison.OrdinalIgnoreCase) == true) ||
+                        (searchTerm.Equals("amy", StringComparison.OrdinalIgnoreCase) &&
+                         model.Id?.Contains("amy", StringComparison.OrdinalIgnoreCase) == true)
+                    ).ToList();
+                }
 
                 if (filteredModels.Count == 0)
                 {
-                    Console.WriteLine("No voices matched your search. Try again.");
+                    Console.WriteLine("❌ No voices matched your search. Try:");
+                    Console.WriteLine("   • 'amy' - for Amy voices");
+                    Console.WriteLine("   • 'english' - for English voices");
+                    Console.WriteLine("   • 'popular' - for recommended voices");
+                    Console.WriteLine("   • 'piper' - for Piper voices");
                     continue;
                 }
 
-                // Display filtered results
-                Console.WriteLine("Matching voices:");
-                foreach (var model in filteredModels)
+                // Display filtered results with NUMBERS for easy selection
+                Console.WriteLine($"\n✅ Found {filteredModels.Count} matching voices:");
+                Console.WriteLine("".PadRight(80, '='));
+
+                for (int i = 0; i < Math.Min(filteredModels.Count, 20); i++) // Limit to 20 for readability
                 {
-                    var languages = model.Language.Select(l => l.LanguageName).ToList();
-                    string languageStr = string.Join(", ", languages);
-                    Console.WriteLine($" - {model.Id} ({model.Name}, Type: {model.ModelType}, Language: {languageStr})");
+                    var model = filteredModels[i];
+                    var languages = model.Language?.Select(l => l.LanguageName).ToList() ?? new List<string>();
+                    string languageStr = languages.Count > 0 ? string.Join(", ", languages) : "Unknown";
+                    string sizeStr = model.FilesizeMb > 0 ? $"{model.FilesizeMb:F1}MB" : "Unknown size";
+
+                    Console.WriteLine($"{i + 1,2}. {model.Name} ({model.Quality}) - {languageStr} [{sizeStr}]");
+                    Console.WriteLine($"    ID: {model.Id}");
+                    if (i < filteredModels.Count - 1) Console.WriteLine();
                 }
 
-                // Prompt user to install
-                Console.Write("Enter the model ID to install (or 'search' to search again): ");
-                string chosenModelId = Console.ReadLine();
+                if (filteredModels.Count > 20)
+                {
+                    Console.WriteLine($"... and {filteredModels.Count - 20} more. Refine your search to see all results.");
+                }
 
-                if (chosenModelId.Equals("search", StringComparison.OrdinalIgnoreCase))
+                Console.WriteLine("".PadRight(80, '='));
+                Console.WriteLine();
+
+                // Enhanced selection prompt
+                Console.Write("👉 Select voice by NUMBER (1-" + Math.Min(filteredModels.Count, 20) + "), NAME, or full ID (or 'search' for new search): ");
+                string selection = Console.ReadLine();
+
+                if (selection.Equals("search", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (models.TryGetValue(chosenModelId, out var chosenModel))
+                TtsModel chosenModel = null;
+
+                // Try to parse as number first (most user-friendly)
+                if (int.TryParse(selection, out int selectedIndex) &&
+                    selectedIndex >= 1 && selectedIndex <= Math.Min(filteredModels.Count, 20))
+                {
+                    chosenModel = filteredModels[selectedIndex - 1];
+                    Console.WriteLine($"✅ Selected: {chosenModel.Name} ({chosenModel.Quality}) - {chosenModel.Id}");
+                }
+                // Try exact ID match
+                else if (models.TryGetValue(selection, out chosenModel))
+                {
+                    Console.WriteLine($"✅ Found by ID: {chosenModel.Name} - {chosenModel.Id}");
+                }
+                // Try partial name matching from current filtered results
+                else
+                {
+                    var nameMatches = filteredModels.Where(m =>
+                        m.Name?.Contains(selection, StringComparison.OrdinalIgnoreCase) == true ||
+                        m.Id?.Contains(selection, StringComparison.OrdinalIgnoreCase) == true
+                    ).ToList();
+
+                    if (nameMatches.Count == 1)
+                    {
+                        chosenModel = nameMatches[0];
+                        Console.WriteLine($"✅ Found by name: {chosenModel.Name} - {chosenModel.Id}");
+                    }
+                    else if (nameMatches.Count > 1)
+                    {
+                        Console.WriteLine($"❌ Multiple matches for '{selection}'. Please be more specific or use a number.");
+                        continue;
+                    }
+                }
+
+                if (chosenModel != null)
                 {
                     try
                     {
-                        Console.WriteLine($"Downloading and installing {chosenModel.Name}...");
+                        Console.WriteLine($"\n🚀 Installing {chosenModel.Name} ({chosenModel.Quality})...");
+                        Console.WriteLine($"   Size: {chosenModel.FilesizeMb:F1}MB");
+                        Console.WriteLine($"   ID: {chosenModel.Id}");
+                        Console.WriteLine();
+
                         await installer.DownloadAndExtractModelAsync(chosenModel);
                         registrar.RegisterSherpaVoice(chosenModel, dllPath);
-                        Console.WriteLine($"Voice {chosenModel.Name} installed successfully!");
+
+                        // THE BUG FIX: Update engines_config.json for SherpaOnnx voices
+                        EngineConfigManager.AddSherpaVoice(chosenModel);
+
+                        Console.WriteLine($"🎉 Voice '{chosenModel.Name}' installed successfully!");
+                        Console.WriteLine($"💡 You can now use this voice in any Windows application that supports SAPI!");
                         return;
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error installing voice: {ex.Message}");
+                        Console.WriteLine($"❌ Error installing voice: {ex.Message}");
+                        Console.WriteLine("Please try a different voice or check your internet connection.");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Invalid model ID. Please try again.");
+                    Console.WriteLine($"❌ Could not find voice '{selection}'. Please try:");
+                    Console.WriteLine("   • A number from the list above");
+                    Console.WriteLine("   • A voice name like 'amy' or 'danny'");
+                    Console.WriteLine("   • The full voice ID");
                 }
             }
         }
@@ -1634,6 +1735,160 @@ namespace Installer
             }
         }
 
+        /// <summary>
+        /// Adds a SherpaOnnx voice configuration to engines_config.json
+        /// THIS IS THE BUG FIX - SherpaOnnx voices were not being added to engine config!
+        /// </summary>
+        /// <param name="model">The TTS model to add</param>
+        public static void AddSherpaVoice(TtsModel model)
+        {
+            try
+            {
+                Console.WriteLine($"🔧 Updating engines configuration for SherpaOnnx voice: {model.Name}");
+
+                // Load existing configuration or create new one
+                JsonNode config;
+                try
+                {
+                    config = LoadConfiguration();
+                }
+                catch (FileNotFoundException)
+                {
+                    // Create new configuration if file doesn't exist
+                    Console.WriteLine("Creating new engines_config.json file...");
+                    config = new JsonObject
+                    {
+                        ["engines"] = new JsonObject(),
+                        ["voices"] = new JsonObject()
+                    };
+
+                    // Ensure directory exists
+                    string configDir = Path.GetDirectoryName(ConfigPath);
+                    if (!Directory.Exists(configDir))
+                    {
+                        Directory.CreateDirectory(configDir);
+                    }
+                }
+
+                // Create engine ID (e.g., "sherpa-amy-low")
+                string engineId = GenerateSherpaEngineId(model.Id);
+
+                // Create engine configuration
+                var engineConfig = new JsonObject
+                {
+                    ["type"] = "sherpa",
+                    ["config"] = new JsonObject
+                    {
+                        ["modelPath"] = $"models/{model.Id}",
+                        ["sampleRate"] = model.SampleRate > 0 ? model.SampleRate : 22050,
+                        ["channels"] = 1,
+                        ["bitsPerSample"] = 16,
+                        ["voiceId"] = model.Id,
+                        ["modelType"] = model.ModelType ?? "vits"
+                    }
+                };
+
+                // Add to engines section
+                var engines = config["engines"]?.AsObject();
+                if (engines != null)
+                {
+                    engines[engineId] = engineConfig;
+                    Console.WriteLine($"✅ Added engine configuration: {engineId}");
+                }
+
+                // Add to voices section with multiple mappings for easy access
+                var voices = config["voices"]?.AsObject();
+                if (voices != null)
+                {
+                    // Add short name mapping (e.g., "amy" -> "sherpa-amy-low")
+                    string shortName = GenerateSherpaShortName(model.Id, model.Name);
+                    voices[shortName] = engineId;
+                    Console.WriteLine($"✅ Added voice mapping: {shortName} -> {engineId}");
+
+                    // Add full ID mapping
+                    voices[model.Id] = engineId;
+                    Console.WriteLine($"✅ Added full ID mapping: {model.Id} -> {engineId}");
+
+                    // Add model name mapping if different from short name
+                    if (!string.IsNullOrEmpty(model.Name) && model.Name.ToLower() != shortName)
+                    {
+                        voices[model.Name.ToLower()] = engineId;
+                        Console.WriteLine($"✅ Added name mapping: {model.Name.ToLower()} -> {engineId}");
+                    }
+                }
+
+                // Save configuration
+                SaveConfiguration(config);
+                Console.WriteLine($"🎉 Engine configuration updated successfully for SherpaOnnx voice '{model.Name}'!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Could not update engine configuration: {ex.Message}");
+                Console.WriteLine("   Voice will still be registered in SAPI, but may not work for synthesis");
+                // Don't fail the installation if config update fails
+            }
+        }
+
+        /// <summary>
+        /// Removes a SherpaOnnx voice configuration from engines_config.json
+        /// </summary>
+        /// <param name="voiceId">SherpaOnnx voice ID to remove</param>
+        public static void RemoveSherpaVoice(string voiceId)
+        {
+            try
+            {
+                Console.WriteLine($"Removing SherpaOnnx engine configuration for: {voiceId}");
+
+                JsonNode config;
+                try
+                {
+                    config = LoadConfiguration();
+                }
+                catch (FileNotFoundException)
+                {
+                    Console.WriteLine("No engine configuration file found - nothing to remove.");
+                    return;
+                }
+
+                string engineId = GenerateSherpaEngineId(voiceId);
+
+                // Remove from engines
+                var engines = config["engines"]?.AsObject();
+                if (engines != null && engines.ContainsKey(engineId))
+                {
+                    engines.Remove(engineId);
+                    Console.WriteLine($"Removed engine: {engineId}");
+                }
+
+                // Remove from voices (find all mappings to this engine)
+                var voices = config["voices"]?.AsObject();
+                if (voices != null)
+                {
+                    var toRemove = new List<string>();
+                    foreach (var kvp in voices)
+                    {
+                        if (kvp.Value?.ToString() == engineId)
+                        {
+                            toRemove.Add(kvp.Key);
+                        }
+                    }
+
+                    foreach (var key in toRemove)
+                    {
+                        voices.Remove(key);
+                        Console.WriteLine($"Removed voice mapping: {key}");
+                    }
+                }
+
+                SaveConfiguration(config);
+                Console.WriteLine($"Engine configuration removed for '{voiceId}'.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not remove SherpaOnnx engine configuration: {ex.Message}");
+            }
+        }
+
         private static JsonNode LoadConfiguration()
         {
             if (!File.Exists(ConfigPath))
@@ -1689,6 +1944,51 @@ namespace Installer
 
             // Fallback
             return voiceName.ToLower().Replace("-", "").Replace("neural", "");
+        }
+
+        private static string GenerateSherpaEngineId(string voiceId)
+        {
+            // Convert "piper-en-amy-low" to "sherpa-amy-low"
+            if (voiceId.StartsWith("piper-en-"))
+            {
+                return voiceId.Replace("piper-en-", "sherpa-");
+            }
+            else if (voiceId.StartsWith("piper-"))
+            {
+                return voiceId.Replace("piper-", "sherpa-");
+            }
+            else if (!voiceId.StartsWith("sherpa-"))
+            {
+                return $"sherpa-{voiceId}";
+            }
+
+            return voiceId; // Already has sherpa prefix
+        }
+
+        private static string GenerateSherpaShortName(string voiceId, string voiceName)
+        {
+            // Try to extract a user-friendly short name
+            // "piper-en-amy-low" -> "amy"
+            // "piper-en-danny-low" -> "danny"
+
+            if (voiceId.StartsWith("piper-en-"))
+            {
+                string remainder = voiceId.Substring("piper-en-".Length);
+                string[] parts = remainder.Split('-');
+                if (parts.Length > 0)
+                {
+                    return parts[0].ToLower(); // Return the name part (amy, danny, etc.)
+                }
+            }
+
+            // Fallback to voice name if available
+            if (!string.IsNullOrEmpty(voiceName))
+            {
+                return voiceName.ToLower().Replace(" ", "");
+            }
+
+            // Final fallback
+            return voiceId.ToLower().Replace("-", "").Replace("piper", "").Replace("en", "");
         }
     }
 }
