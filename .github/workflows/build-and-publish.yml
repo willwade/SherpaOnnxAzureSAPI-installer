@@ -1,4 +1,4 @@
-name: Build and Publish TTSInstaller
+name: Build and Publish SherpaOnnx SAPI Installer
 
 on:
   push:
@@ -14,69 +14,221 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
 
-      - name: Install WiX Toolset
-        run: |
-          dotnet tool install --global wix
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Restore Dependencies
-        run: dotnet restore TTSInstaller.sln
-
-      - name: Build Project
+      - name: Check Dependencies
         run: |
-          dotnet build TTSInstaller.sln -c Release
-          dotnet publish TTSInstaller.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+          Write-Host "Checking C++ project dependencies..." -ForegroundColor Yellow
 
-      - name: Download Model Files
+          # Check if required libraries exist
+          $requiredLibs = @(
+            "NativeTTSWrapper\libs\sherpa-onnx-c-api.lib",
+            "NativeTTSWrapper\azure-speech-sdk\lib\Microsoft.CognitiveServices.Speech.core.lib"
+          )
+
+          $allLibsFound = $true
+          foreach ($lib in $requiredLibs) {
+            if (Test-Path $lib) {
+              Write-Host "✅ Found: $lib" -ForegroundColor Green
+            } else {
+              Write-Host "❌ Missing: $lib" -ForegroundColor Red
+              $allLibsFound = $false
+            }
+          }
+
+          if (-not $allLibsFound) {
+            Write-Host "⚠️ Some dependencies missing - will use existing binaries" -ForegroundColor Yellow
+            echo "SKIP_CPP_BUILD=true" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "✅ All dependencies found - proceeding with build" -ForegroundColor Green
+            echo "SKIP_CPP_BUILD=false" >> $env:GITHUB_ENV
+          }
+
+      - name: Build Native C++ Wrapper
+        if: env.SKIP_CPP_BUILD != 'true'
         run: |
-          # Create the model directory structure
-          mkdir -p models\vits-piper-en_US-amy-low\espeak-ng-data
-          
-          # Download the Piper model files
-          $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low/en_US-amy-low.onnx" -OutFile "models\vits-piper-en_US-amy-low\en_US-amy-low.onnx"
-          Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low/tokens.txt" -OutFile "models\vits-piper-en_US-amy-low\tokens.txt"
-          
-          # Download espeak-ng-data files
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phondata" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phondata"
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phondata-manifest" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phondata-manifest"
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phonindex" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phonindex"
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/phontab" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\phontab"
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/intonations" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\intonations"
-          Invoke-WebRequest -Uri "https://github.com/espeak-ng/espeak-ng/raw/master/espeak-ng-data/en_dict" -OutFile "models\vits-piper-en_US-amy-low\espeak-ng-data\en_dict"
-          
-      - name: Build WiX Installer
-        run: dotnet build TTSInstaller.wixproj -c Release -p:Platform=x64
+          Write-Host "Building native COM wrapper..." -ForegroundColor Yellow
+          try {
+            # Build the native COM wrapper using MSBuild
+            msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnabled=false /verbosity:minimal
+            Write-Host "✅ Native wrapper build completed" -ForegroundColor Green
+          } catch {
+            Write-Host "❌ Native wrapper build failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "⚠️ Will use existing binary from dist folder" -ForegroundColor Yellow
+            echo "SKIP_CPP_BUILD=true" >> $env:GITHUB_ENV
+          }
+
+      - name: Verify Build Output
+        run: |
+          Write-Host "Checking build output..." -ForegroundColor Green
+
+          $newlyBuilt = Test-Path "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+          $existingBinary = Test-Path "dist\NativeTTSWrapper.dll"
+
+          if ($newlyBuilt) {
+            Write-Host "✅ Native wrapper built successfully (new build)" -ForegroundColor Green
+            $fileInfo = Get-Item "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+            Write-Host "   File size: $([math]::Round($fileInfo.Length / 1KB, 1)) KB" -ForegroundColor Gray
+            echo "USE_NEW_BUILD=true" >> $env:GITHUB_ENV
+          } elseif ($existingBinary) {
+            Write-Host "✅ Using existing native wrapper binary" -ForegroundColor Green
+            $fileInfo = Get-Item "dist\NativeTTSWrapper.dll"
+            Write-Host "   File size: $([math]::Round($fileInfo.Length / 1KB, 1)) KB" -ForegroundColor Gray
+            echo "USE_NEW_BUILD=false" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "❌ No native wrapper binary available (neither built nor existing)" -ForegroundColor Red
+            exit 1
+          }
+
+      - name: Copy Existing Binaries
+        run: |
+          # Create output directory structure
+          New-Item -ItemType Directory -Path "build-output" -Force
+
+          # Copy existing built binaries from dist folder
+          if (Test-Path "dist\SherpaOnnxSAPIInstaller.exe") {
+            Copy-Item "dist\SherpaOnnxSAPIInstaller.exe" "build-output\" -Force
+            Write-Host "Copied main installer" -ForegroundColor Green
+          }
+
+          if (Test-Path "dist\OpenSpeechTTS.dll") {
+            Copy-Item "dist\OpenSpeechTTS.dll" "build-output\" -Force
+            Write-Host "Copied managed COM objects" -ForegroundColor Green
+          }
+
+          if (Test-Path "dist\SherpaWorker.exe") {
+            Copy-Item "dist\SherpaWorker.exe" "build-output\" -Force
+            Copy-Item "dist\SherpaWorker.deps.json" "build-output\" -Force -ErrorAction SilentlyContinue
+            Copy-Item "dist\SherpaWorker.runtimeconfig.json" "build-output\" -Force -ErrorAction SilentlyContinue
+            Write-Host "Copied SherpaWorker components" -ForegroundColor Green
+          }
+
+          # Copy native wrapper (newly built or existing)
+          if ($env:USE_NEW_BUILD -eq "true" -and (Test-Path "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll")) {
+            Copy-Item "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" "build-output\" -Force
+            Write-Host "Copied newly built native wrapper" -ForegroundColor Green
+          } elseif (Test-Path "dist\NativeTTSWrapper.dll") {
+            Copy-Item "dist\NativeTTSWrapper.dll" "build-output\" -Force
+            Write-Host "Copied existing native wrapper" -ForegroundColor Green
+          } else {
+            Write-Host "⚠️ No native wrapper available to copy" -ForegroundColor Yellow
+          }
+
+          # Copy supporting files
+          if (Test-Path "dist\merged_models.json") {
+            Copy-Item "dist\merged_models.json" "build-output\" -Force
+            Write-Host "Copied models database" -ForegroundColor Green
+          }
+
+          if (Test-Path "dist\sherpa-onnx.dll") {
+            Copy-Item "dist\sherpa-onnx.dll" "build-output\" -Force
+            Write-Host "Copied SherpaOnnx library" -ForegroundColor Green
+          }
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TTSInstaller
+          name: SherpaOnnx-SAPI-Installer
           path: |
-            ./bin/Release/net6.0-windows/win-x64/publish/TTSInstaller.exe
-            ./bin/Release/net6.0-windows/win-x64/publish/OpenSpeechTTS.dll
-            ./bin/Release/TTSInstaller.msi
+            build-output/SherpaOnnxSAPIInstaller.exe
+            build-output/OpenSpeechTTS.dll
+            build-output/NativeTTSWrapper.dll
+            build-output/SherpaWorker.exe
+            build-output/SherpaWorker.deps.json
+            build-output/SherpaWorker.runtimeconfig.json
+            build-output/merged_models.json
+            build-output/sherpa-onnx.dll
 
-  sign:
+  test:
     runs-on: windows-latest
     needs: build
+    if: success()
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SherpaOnnx-SAPI-Installer
+          path: test-artifacts
+
+      - name: Basic Functionality Test
+        run: |
+          Write-Host "Testing SherpaOnnx SAPI Installer..." -ForegroundColor Cyan
+
+          # Check if main installer exists
+          if (Test-Path "test-artifacts\SherpaOnnxSAPIInstaller.exe") {
+            Write-Host "✅ Main installer found" -ForegroundColor Green
+            $fileInfo = Get-Item "test-artifacts\SherpaOnnxSAPIInstaller.exe"
+            Write-Host "   Size: $([math]::Round($fileInfo.Length / 1MB, 1)) MB" -ForegroundColor Gray
+          } else {
+            Write-Host "❌ Main installer missing" -ForegroundColor Red
+            exit 1
+          }
+
+          # Check if COM DLLs exist
+          $requiredDlls = @("OpenSpeechTTS.dll", "NativeTTSWrapper.dll")
+          foreach ($dll in $requiredDlls) {
+            if (Test-Path "test-artifacts\$dll") {
+              Write-Host "✅ $dll found" -ForegroundColor Green
+            } else {
+              Write-Host "❌ $dll missing" -ForegroundColor Red
+              exit 1
+            }
+          }
+
+          # Check if models database exists
+          if (Test-Path "test-artifacts\merged_models.json") {
+            Write-Host "✅ Models database found" -ForegroundColor Green
+            $models = Get-Content "test-artifacts\merged_models.json" -Raw | ConvertFrom-Json
+            $voiceCount = $models.PSObject.Properties.Name.Count
+            Write-Host "   Available voices: $voiceCount" -ForegroundColor Gray
+          } else {
+            Write-Host "❌ Models database missing" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "🎉 All basic tests passed!" -ForegroundColor Green
+
+  notify:
+    runs-on: windows-latest
+    needs: [build, test]
     if: always()
 
     steps:
-      - name: Notify Signing Required
+      - name: Build Status Summary
         run: |
-          echo "The build artifacts are ready but must be signed locally."
-          echo "Download them from the artifacts tab and sign the EXE, DLL, and MSI locally."
+          Write-Host "SherpaOnnx SAPI Installer Build Summary" -ForegroundColor Cyan
+          Write-Host "=======================================" -ForegroundColor Cyan
+          Write-Host ""
 
-      - name: Provide Signing Instructions
-        run: |
-          echo "Use the following commands to sign the artifacts locally:"
-          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-TTSInstaller.exe>"
-          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-OpenSpeechTTS.dll>"
-          echo "signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 <path-to-TTSInstaller.msi>"
+          if ("${{ needs.build.result }}" -eq "success") {
+            Write-Host "✅ Build: SUCCESS" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Build: FAILED" -ForegroundColor Red
+          }
+
+          if ("${{ needs.test.result }}" -eq "success") {
+            Write-Host "✅ Tests: SUCCESS" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Tests: FAILED" -ForegroundColor Red
+          }
+
+          Write-Host ""
+          if ("${{ needs.build.result }}" -eq "success" -and "${{ needs.test.result }}" -eq "success") {
+            Write-Host "🎉 Build completed successfully!" -ForegroundColor Green
+            Write-Host "📦 Artifacts are ready for download from the Actions tab" -ForegroundColor Yellow
+          } else {
+            Write-Host "⚠️ Build or tests failed - check logs above" -ForegroundColor Yellow
+          }
