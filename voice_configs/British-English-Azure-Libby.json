@@ -1,0 +1,33 @@
+{
+  "name": "British-English-Azure-Libby",
+  "displayName": "British English (Azure Libby)",
+  "description": "British English voice using Azure TTS Libby Neural voice",
+  "language": "English",
+  "locale": "en-GB",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "Microsoft Azure",
+  "ttsConfig": {
+    "engine": "azure",
+    "voice_id": "en-GB-LibbyNeural",
+    "azureTTS": {
+      "key": "b14f8945b0f1459f9964bdd72c42c2cc",
+      "location": "uksouth",
+      "voice": "en-GB-LibbyNeural",
+      "style": "",
+      "role": ""
+    },
+    "TTS": {
+      "engine": "azure",
+      "voice_id": "en-GB-LibbyNeural",
+      "bypass_tts": false
+    },
+    "translate": {
+      "no_translate": true,
+      "provider": "",
+      "start_lang": "auto",
+      "end_lang": "en",
+      "replace_pb": false
+    }
+  }
+}

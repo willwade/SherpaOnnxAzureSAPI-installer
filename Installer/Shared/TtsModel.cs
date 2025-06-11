@@ -20,3 +20,10 @@ public class TtsModel
     public string TokensPath { get; set; }
     public string LexiconPath { get; set; }
 }
+
+public class LanguageInfo
+{
+    public string LangCode { get; set; }
+    public string Name { get; set; }
+    public string Country { get; set; }
+}

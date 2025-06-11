@@ -203,8 +203,28 @@ namespace Installer
                         }
                         return;
 
+                    case "create-pipe-voice":
+                        await CreatePipeVoiceFromConfig(modelId);
+                        return;
+
+                    case "install-pipe-voice":
+                        await InstallPipeVoice(modelId);
+                        return;
+
+                    case "list-pipe-voices":
+                        ListPipeVoices();
+                        return;
+
+                    case "remove-pipe-voice":
+                        RemovePipeVoice(modelId);
+                        return;
+
+                    case "test-pipe-service":
+                        await TestPipeService();
+                        return;
+
                     default:
-                        Console.WriteLine("Invalid command. Use 'install <model-id>', 'verify <model-id>', or 'uninstall <model-id|all>'");
+                        Console.WriteLine("Invalid command. Use 'install <model-id>', 'verify <model-id>', 'uninstall <model-id|all>', 'install-pipe-voice <config-name>', 'list-pipe-voices', 'remove-pipe-voice <voice-name>', or 'test-pipe-service'");
                         return;
                 }
             }
@@ -216,10 +236,13 @@ namespace Installer
             Console.WriteLine("Select an option:");
             Console.WriteLine("1. Install Sherpa ONNX voice");
             Console.WriteLine("2. Install Azure TTS voice");
-            Console.WriteLine("3. Uninstall all voices");
-            Console.WriteLine("4. Exit");
+            Console.WriteLine("3. Install Pipe-based voice");
+            Console.WriteLine("4. List pipe-based voices");
+            Console.WriteLine("5. Test pipe service connection");
+            Console.WriteLine("6. Uninstall all voices");
+            Console.WriteLine("7. Exit");
             Console.WriteLine();
-            Console.Write("Enter your choice (1-4): ");
+            Console.Write("Enter your choice (1-7): ");
 
             string choice = Console.ReadLine();
 
@@ -234,15 +257,193 @@ namespace Installer
                     break;
 
                 case "3":
-                    await UninstallVoicesAndDll(registrar, managedDllPath, nativeDllPath);
+                    await InstallPipeVoiceInteractive();
                     break;
 
                 case "4":
+                    ListPipeVoices();
+                    break;
+
+                case "5":
+                    await TestPipeService();
+                    break;
+
+                case "6":
+                    await UninstallVoicesAndDll(registrar, managedDllPath, nativeDllPath);
+                    break;
+
+                case "7":
                     return;
 
                 default:
                     Console.WriteLine("Invalid choice. Please try again.");
                     break;
+            }
+        }
+
+        static async Task CreatePipeVoiceFromConfig(string configName)
+        {
+            try
+            {
+                string configPath = Path.Combine("voice_configs", $"{configName}.json");
+                if (!File.Exists(configPath))
+                {
+                    Console.WriteLine($"Configuration file not found: {configPath}");
+                    Console.WriteLine("Available configurations:");
+                    if (Directory.Exists("voice_configs"))
+                    {
+                        foreach (string file in Directory.GetFiles("voice_configs", "*.json"))
+                        {
+                            Console.WriteLine($"  - {Path.GetFileNameWithoutExtension(file)}");
+                        }
+                    }
+                    return;
+                }
+
+                string jsonContent = File.ReadAllText(configPath);
+                var config = JsonSerializer.Deserialize<ConfigBasedVoiceManager.PipeVoiceConfig>(jsonContent);
+
+                var voiceManager = new ConfigBasedVoiceManager();
+                voiceManager.CreateVoice(config);
+
+                Console.WriteLine($"Successfully created pipe voice: {config.DisplayName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating pipe voice: {ex.Message}");
+            }
+        }
+
+        static async Task InstallPipeVoice(string configName)
+        {
+            await CreatePipeVoiceFromConfig(configName);
+        }
+
+        static void ListPipeVoices()
+        {
+            try
+            {
+                var voiceManager = new ConfigBasedVoiceManager();
+                var voices = voiceManager.ListVoices();
+
+                if (voices.Count == 0)
+                {
+                    Console.WriteLine("No pipe-based voices installed.");
+                    return;
+                }
+
+                Console.WriteLine("Installed pipe-based voices:");
+                Console.WriteLine("============================");
+                foreach (var voice in voices)
+                {
+                    Console.WriteLine($"Name: {voice.DisplayName}");
+                    Console.WriteLine($"  ID: {voice.Name}");
+                    Console.WriteLine($"  Language: {voice.Language} ({voice.Locale})");
+                    Console.WriteLine($"  Gender: {voice.Gender}");
+                    Console.WriteLine($"  Engine: {voice.TtsConfig?.TTS?.Engine ?? "Unknown"}");
+                    Console.WriteLine($"  Voice ID: {voice.TtsConfig?.TTS?.VoiceId ?? "Unknown"}");
+                    Console.WriteLine($"  Description: {voice.Description}");
+                    Console.WriteLine();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing pipe voices: {ex.Message}");
+            }
+        }
+
+        static void RemovePipeVoice(string voiceName)
+        {
+            try
+            {
+                var voiceManager = new ConfigBasedVoiceManager();
+                voiceManager.RemoveVoice(voiceName);
+                Console.WriteLine($"Successfully removed pipe voice: {voiceName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error removing pipe voice: {ex.Message}");
+            }
+        }
+
+        static async Task TestPipeService()
+        {
+            try
+            {
+                var bridge = new PipeServiceBridge();
+
+                Console.WriteLine("Testing connection to AACSpeakHelper pipe service...");
+
+                if (!bridge.IsServiceRunning())
+                {
+                    Console.WriteLine("❌ AACSpeakHelper pipe service is not running.");
+                    Console.WriteLine("Please start the AACSpeakHelper server before testing.");
+                    return;
+                }
+
+                Console.WriteLine("✅ AACSpeakHelper pipe service is running.");
+
+                bool connectionTest = await bridge.TestConnectionAsync();
+                if (connectionTest)
+                {
+                    Console.WriteLine("✅ Successfully connected to pipe service.");
+                }
+                else
+                {
+                    Console.WriteLine("❌ Failed to connect to pipe service.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error testing pipe service: {ex.Message}");
+            }
+        }
+
+        static async Task InstallPipeVoiceInteractive()
+        {
+            try
+            {
+                Console.WriteLine();
+                Console.WriteLine("Available pipe voice configurations:");
+                Console.WriteLine("===================================");
+
+                if (!Directory.Exists("voice_configs"))
+                {
+                    Console.WriteLine("No voice configurations found. Please create voice_configs directory with JSON configuration files.");
+                    return;
+                }
+
+                var configFiles = Directory.GetFiles("voice_configs", "*.json");
+                if (configFiles.Length == 0)
+                {
+                    Console.WriteLine("No voice configuration files found in voice_configs directory.");
+                    return;
+                }
+
+                for (int i = 0; i < configFiles.Length; i++)
+                {
+                    string configName = Path.GetFileNameWithoutExtension(configFiles[i]);
+                    Console.WriteLine($"{i + 1}. {configName}");
+                }
+
+                Console.WriteLine();
+                Console.Write($"Select a configuration (1-{configFiles.Length}): ");
+                string choice = Console.ReadLine();
+
+                if (int.TryParse(choice, out int selectedIndex) && selectedIndex >= 1 && selectedIndex <= configFiles.Length)
+                {
+                    string selectedConfig = Path.GetFileNameWithoutExtension(configFiles[selectedIndex - 1]);
+                    Console.WriteLine($"Installing pipe voice: {selectedConfig}");
+                    await InstallPipeVoice(selectedConfig);
+                }
+                else
+                {
+                    Console.WriteLine("Invalid selection.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in interactive pipe voice installation: {ex.Message}");
             }
         }
 

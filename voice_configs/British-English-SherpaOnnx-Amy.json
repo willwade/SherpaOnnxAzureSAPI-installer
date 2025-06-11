@@ -1,0 +1,26 @@
+{
+  "name": "British-English-SherpaOnnx-Amy",
+  "displayName": "British English (SherpaOnnx Amy)",
+  "description": "British English voice using SherpaOnnx Amy model",
+  "language": "English",
+  "locale": "en-GB",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "SherpaOnnx",
+  "ttsConfig": {
+    "engine": "sherpaonnx",
+    "voice_id": "sherpa-piper-amy-normal",
+    "TTS": {
+      "engine": "sherpaonnx",
+      "voice_id": "sherpa-piper-amy-normal",
+      "bypass_tts": false
+    },
+    "translate": {
+      "no_translate": true,
+      "provider": "",
+      "start_lang": "auto",
+      "end_lang": "en",
+      "replace_pb": false
+    }
+  }
+}

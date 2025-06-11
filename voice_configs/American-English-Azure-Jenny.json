@@ -1,0 +1,33 @@
+{
+  "name": "American-English-Azure-Jenny",
+  "displayName": "American English (Azure Jenny)",
+  "description": "American English voice using Azure TTS Jenny Neural voice",
+  "language": "English",
+  "locale": "en-US",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "Microsoft Azure",
+  "ttsConfig": {
+    "engine": "azure",
+    "voice_id": "en-US-JennyNeural",
+    "azureTTS": {
+      "key": "b14f8945b0f1459f9964bdd72c42c2cc",
+      "location": "uksouth",
+      "voice": "en-US-JennyNeural",
+      "style": "",
+      "role": ""
+    },
+    "TTS": {
+      "engine": "azure",
+      "voice_id": "en-US-JennyNeural",
+      "bypass_tts": false
+    },
+    "translate": {
+      "no_translate": true,
+      "provider": "",
+      "start_lang": "auto",
+      "end_lang": "en",
+      "replace_pb": false
+    }
+  }
+}
