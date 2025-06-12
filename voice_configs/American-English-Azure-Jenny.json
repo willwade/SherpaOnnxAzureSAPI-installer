@@ -8,26 +8,12 @@
   "age": "Adult",
   "vendor": "Microsoft Azure",
   "ttsConfig": {
-    "engine": "azure",
-    "voice_id": "en-US-JennyNeural",
-    "azureTTS": {
-      "key": "b14f8945b0f1459f9964bdd72c42c2cc",
-      "location": "uksouth",
+    "text": "",
+    "args": {
+      "engine": "microsoft",
       "voice": "en-US-JennyNeural",
-      "style": "",
-      "role": ""
-    },
-    "TTS": {
-      "engine": "azure",
-      "voice_id": "en-US-JennyNeural",
-      "bypass_tts": false
-    },
-    "translate": {
-      "no_translate": true,
-      "provider": "",
-      "start_lang": "auto",
-      "end_lang": "en",
-      "replace_pb": false
+      "rate": 0,
+      "volume": 100
     }
   }
 }

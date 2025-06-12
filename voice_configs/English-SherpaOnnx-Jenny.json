@@ -1,7 +1,7 @@
 {
-  "name": "British-English-SherpaOnnx-Amy",
-  "displayName": "British English (SherpaOnnx Amy)",
-  "description": "British English voice using SherpaOnnx Amy model",
+  "name": "English-SherpaOnnx-Jenny",
+  "displayName": "English (SherpaOnnx Jenny)",
+  "description": "English voice using SherpaOnnx Jenny model",
   "language": "English",
   "locale": "en-GB",
   "gender": "Female",

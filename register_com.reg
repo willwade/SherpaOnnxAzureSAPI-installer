@@ -1,5 +1,0 @@
-Windows Registry Editor Version 5.00
-
-; Fix Azure Libby voice to use correct C++ COM wrapper CLSID
-[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\British-English-Azure-Libby]
-"CLSID"="{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"

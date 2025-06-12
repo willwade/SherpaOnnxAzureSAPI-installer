@@ -77,6 +77,14 @@ private:
     // DIRECT: SherpaOnnx C API fallback (when engine manager fails)
     HRESULT GenerateAudioViaDirectSherpaOnnx(const std::wstring& text, std::vector<BYTE>& audioData);
 
+    // NEW: AACSpeakHelper pipe service communication
+    HRESULT GenerateAudioViaPipeService(const std::wstring& text, std::vector<BYTE>& audioData);
+    bool ConnectToAACSpeakHelper(HANDLE& hPipe);
+    bool SendPipeMessage(HANDLE hPipe, const std::string& jsonMessage);
+    bool ReceivePipeResponse(HANDLE hPipe, std::vector<BYTE>& audioData);
+    std::string CreateAACSpeakHelperMessage(const std::wstring& text);
+    std::wstring LoadVoiceConfiguration();
+
     // LEGACY: ProcessBridge fallback methods (for backward compatibility)
     bool GenerateAudioViaProcessBridge(const std::wstring& text, std::vector<BYTE>& audioData);
     bool CallSherpaWorker(const std::wstring& requestPath, std::wstring& responsePath);

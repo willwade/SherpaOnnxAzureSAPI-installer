@@ -405,6 +405,142 @@ class SapiVoiceManager:
         except Exception as e:
             print(f"❌ Error running installer: {e}")
 
+    def install_voice_by_name(self, voice_name: str) -> bool:
+        """Install a specific voice by name (non-interactive)"""
+        print(f"Installing voice: {voice_name}")
+
+        # Find the configuration file
+        config_file = self.voice_configs_dir / f"{voice_name}.json"
+        if not config_file.exists():
+            print(f"❌ Voice configuration not found: {config_file}")
+            print("Available configurations:")
+            self.list_voice_configs()
+            return False
+
+        # Check if installer exists
+        if not self.installer_path:
+            print("❌ Installer not found. Please build the project first.")
+            print("   Run: dotnet build Installer/Installer.csproj -c Release")
+            return False
+
+        # Install using the installer
+        try:
+            result = subprocess.run([
+                str(self.installer_path),
+                "install-pipe-voice",
+                voice_name
+            ], capture_output=True, text=True, check=True)
+
+            print(f"✅ Successfully installed voice: {voice_name}")
+            print("   The voice should now appear in Windows SAPI applications.")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Installation failed: {e}")
+            if e.stdout:
+                print(f"Output: {e.stdout}")
+            if e.stderr:
+                print(f"Error: {e.stderr}")
+            return False
+        except Exception as e:
+            print(f"❌ Error running installer: {e}")
+            return False
+
+    def remove_voice_by_name(self, voice_name: str) -> bool:
+        """Remove a specific voice by name (non-interactive)"""
+        print(f"Removing voice: {voice_name}")
+
+        # Check if voice is installed
+        if not self._is_voice_installed(voice_name):
+            print(f"❌ Voice not found in SAPI registry: {voice_name}")
+            print("Installed voices:")
+            installed = self._get_installed_voices()
+            if installed:
+                for voice in installed:
+                    print(f"  - {voice}")
+            else:
+                print("  No pipe-based voices installed.")
+            return False
+
+        # Check if installer exists
+        if not self.installer_path:
+            print("❌ Installer not found. Please build the project first.")
+            return False
+
+        # Remove using the installer
+        try:
+            result = subprocess.run([
+                str(self.installer_path),
+                "remove-pipe-voice",
+                voice_name
+            ], capture_output=True, text=True, check=True)
+
+            print(f"✅ Successfully removed voice: {voice_name}")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Removal failed: {e}")
+            if e.stdout:
+                print(f"Output: {e.stdout}")
+            if e.stderr:
+                print(f"Error: {e.stderr}")
+            return False
+        except Exception as e:
+            print(f"❌ Error running installer: {e}")
+            return False
+
+    def list_installed_voices(self):
+        """List installed SAPI voices (non-interactive)"""
+        print("Installed pipe-based voices:")
+        installed_voices = self._get_installed_voices()
+        if not installed_voices:
+            print("  No pipe-based voices are currently installed.")
+        else:
+            for voice in installed_voices:
+                print(f"  - {voice}")
+
+    def remove_all_voices(self) -> bool:
+        """Remove all installed pipe-based voices (non-interactive)"""
+        print("Removing all installed pipe-based voices...")
+
+        installed_voices = self._get_installed_voices()
+        if not installed_voices:
+            print("No pipe-based voices are currently installed.")
+            return True
+
+        success_count = 0
+        for voice_name in installed_voices:
+            print(f"Removing: {voice_name}")
+            if self.remove_voice_by_name(voice_name):
+                success_count += 1
+
+        print(f"Removed {success_count}/{len(installed_voices)} voices.")
+        return success_count == len(installed_voices)
+
+    def view_voice_config_by_name(self, voice_name: str):
+        """View a specific voice configuration by name (non-interactive)"""
+        config_file = self.voice_configs_dir / f"{voice_name}.json"
+        if not config_file.exists():
+            print(f"❌ Voice configuration not found: {voice_name}")
+            print("Available configurations:")
+            config_files = list(self.voice_configs_dir.glob("*.json"))
+            if config_files:
+                for config_file in config_files:
+                    print(f"  - {config_file.stem}")
+            else:
+                print("  No configurations found.")
+            return
+
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            print(f"=== {config.get('displayName', 'Unknown')} ===")
+            print(json.dumps(config, indent=2, ensure_ascii=False))
+
+        except Exception as e:
+            print(f"❌ Error reading configuration: {e}")
+
     def test_pipe_service(self):
         """Test connection to AACSpeakHelper pipe service"""
         print("\n=== Test Pipe Service Connection ===")
@@ -651,14 +787,20 @@ Examples:
 
     parser.add_argument("--list", action="store_true",
                        help="List all voice configurations")
+    parser.add_argument("--list-installed", action="store_true",
+                       help="List installed SAPI voices")
     parser.add_argument("--test-pipe", action="store_true",
                        help="Test AACSpeakHelper pipe service connection")
     parser.add_argument("--install", metavar="VOICE_NAME",
                        help="Install specific voice to SAPI")
     parser.add_argument("--remove", metavar="VOICE_NAME",
                        help="Remove specific voice from SAPI")
+    parser.add_argument("--remove-all", action="store_true",
+                       help="Remove all installed pipe-based voices")
     parser.add_argument("--create", action="store_true",
                        help="Create new voice configuration")
+    parser.add_argument("--view", metavar="VOICE_NAME",
+                       help="View specific voice configuration")
 
     args = parser.parse_args()
 
@@ -667,16 +809,21 @@ Examples:
     # Handle command line arguments
     if args.list:
         manager.list_voice_configs()
+    elif args.list_installed:
+        manager.list_installed_voices()
     elif args.test_pipe:
         manager.test_pipe_service()
     elif args.install:
-        # TODO: Implement non-interactive install
-        print(f"Installing voice: {args.install}")
-        manager.install_voice_to_sapi()
+        success = manager.install_voice_by_name(args.install)
+        sys.exit(0 if success else 1)
     elif args.remove:
-        # TODO: Implement non-interactive remove
-        print(f"Removing voice: {args.remove}")
-        manager.remove_voice_from_sapi()
+        success = manager.remove_voice_by_name(args.remove)
+        sys.exit(0 if success else 1)
+    elif args.remove_all:
+        success = manager.remove_all_voices()
+        sys.exit(0 if success else 1)
+    elif args.view:
+        manager.view_voice_config_by_name(args.view)
     elif args.create:
         manager.create_voice_config()
     else:
