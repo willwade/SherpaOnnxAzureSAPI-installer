@@ -14,7 +14,7 @@ namespace Installer
     public class ConfigBasedVoiceManager
     {
         private const string VoiceConfigsDirectory = @"C:\Program Files\OpenAssistive\OpenSpeech\voice_configs";
-        private const string PipeServiceClsid = "{4A8B9C2D-1E3F-4567-8901-234567890ABC}"; // New CLSID for pipe service voices
+        private const string PipeServiceClsid = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"; // C++ NativeTTSWrapper CLSID
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
 
         /// <summary>
@@ -52,9 +52,18 @@ namespace Installer
 
         /// <summary>
         /// TTS engine configuration that will be sent to AACSpeakHelper
+        /// Supports both old format and new AACSpeakHelper format
         /// </summary>
         public class TtsEngineConfig
         {
+            // New AACSpeakHelper format
+            [JsonPropertyName("text")]
+            public string Text { get; set; } = "";
+
+            [JsonPropertyName("args")]
+            public AACSpeakHelperArgs Args { get; set; }
+
+            // Legacy format for backward compatibility
             [JsonPropertyName("engine")]
             public string Engine { get; set; }
 
@@ -72,6 +81,24 @@ namespace Installer
 
             [JsonPropertyName("translate")]
             public TranslateConfig Translate { get; set; }
+        }
+
+        /// <summary>
+        /// AACSpeakHelper arguments format
+        /// </summary>
+        public class AACSpeakHelperArgs
+        {
+            [JsonPropertyName("engine")]
+            public string Engine { get; set; }
+
+            [JsonPropertyName("voice")]
+            public string Voice { get; set; }
+
+            [JsonPropertyName("rate")]
+            public int Rate { get; set; } = 0;
+
+            [JsonPropertyName("volume")]
+            public int Volume { get; set; } = 100;
         }
 
         public class AzureTtsConfig
