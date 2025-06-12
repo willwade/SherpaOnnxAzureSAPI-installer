@@ -181,7 +181,34 @@ try {
 
 Write-Host ""
 
-# Step 8: Test SAPI Integration
+# Step 8: Check Voice Registration
+Write-Host "📋 Step 8: Checking Voice Registration" -ForegroundColor Yellow
+Write-Host "======================================" -ForegroundColor Yellow
+
+Write-Host "Verifying voice registry entries..." -ForegroundColor Cyan
+
+$voiceName = "English-SherpaOnnx-Jenny"
+$voiceRegistryPath = "HKLM:\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\$voiceName"
+
+try {
+    $voiceKey = Get-ItemProperty -Path $voiceRegistryPath -ErrorAction Stop
+    Write-Host "✅ Voice registered in SAPI registry" -ForegroundColor Green
+    Write-Host "   CLSID: $($voiceKey.CLSID)" -ForegroundColor Gray
+
+    # Verify correct CLSID
+    if ($voiceKey.CLSID -eq "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}") {
+        Write-Host "✅ Correct CLSID registered (C++ COM wrapper)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ Unexpected CLSID: $($voiceKey.CLSID)" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "❌ Voice not found in SAPI registry" -ForegroundColor Red
+    Write-Host "   Voice installation may have failed" -ForegroundColor Yellow
+}
+
+Write-Host ""
+
+# Step 9: Test SAPI Integration
 Write-Host "📋 Step 8: Testing SAPI Integration" -ForegroundColor Yellow
 Write-Host "===================================" -ForegroundColor Yellow
 
@@ -224,8 +251,8 @@ try {
 
 Write-Host ""
 
-# Step 9: Summary and Next Steps
-Write-Host "📋 Step 9: Summary and Next Steps" -ForegroundColor Yellow
+# Step 10: Summary and Next Steps
+Write-Host "📋 Step 10: Summary and Next Steps" -ForegroundColor Yellow
 Write-Host "=================================" -ForegroundColor Yellow
 
 Write-Host "🎯 Test Summary:" -ForegroundColor Cyan
