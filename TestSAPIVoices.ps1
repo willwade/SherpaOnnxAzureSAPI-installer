@@ -31,9 +31,9 @@ try {
     
     for ($i = 0; $i -lt $voices.Count; $i++) {
         $voiceToken = $voices.Item($i)
-        $voiceName = $voiceToken.GetDescription()
+        $currentVoiceName = $voiceToken.GetDescription()
         $voiceId = $voiceToken.Id
-        
+
         # Get voice attributes
         try {
             $attributes = $voiceToken.GetAttribute("Name")
@@ -48,29 +48,35 @@ try {
             $vendor = "N/A"
             $language = "N/A"
         }
-        
-        Write-Host "Voice $($i + 1): $voiceName" -ForegroundColor White
+
+        Write-Host "Voice $($i + 1): $currentVoiceName" -ForegroundColor White
         Write-Host "  ID: $voiceId" -ForegroundColor Gray
         if ($gender -ne "N/A") { Write-Host "  Gender: $gender" -ForegroundColor Gray }
         if ($vendor -ne "N/A") { Write-Host "  Vendor: $vendor" -ForegroundColor Gray }
         if ($language -ne "N/A") { Write-Host "  Language: $language" -ForegroundColor Gray }
-        
+
         # Categorize voices
-        if ($voiceName -like "*Azure*" -or $voiceName -like "*Libby*" -or $voiceName -like "*Jenny*") {
+        if ($currentVoiceName -like "*Azure*" -or $currentVoiceName -like "*Libby*" -or $currentVoiceName -like "*Jenny*") {
             Write-Host "  Type: 🌐 Azure TTS Voice" -ForegroundColor Green
-            $customVoices += @{Name=$voiceName; Index=$i; Type="Azure"}
-        } elseif ($voiceName -like "*amy*" -or $voiceName -like "*northern*" -or $voiceName -like "*sherpa*") {
+            Write-Host "DEBUG: Adding Azure voice '$currentVoiceName' at index $i" -ForegroundColor Magenta
+            $customVoices += @{Name=$currentVoiceName; Index=$i; Type="Azure"}
+        } elseif ($currentVoiceName -like "*amy*" -or $currentVoiceName -like "*northern*" -or $currentVoiceName -like "*sherpa*") {
             Write-Host "  Type: 🤖 SherpaOnnx Voice" -ForegroundColor Blue
-            $customVoices += @{Name=$voiceName; Index=$i; Type="SherpaOnnx"}
+            Write-Host "DEBUG: Adding SherpaOnnx voice '$currentVoiceName' at index $i" -ForegroundColor Magenta
+            $customVoices += @{Name=$currentVoiceName; Index=$i; Type="SherpaOnnx"}
         } else {
             Write-Host "  Type: 🖥️ System Voice" -ForegroundColor Gray
-            $systemVoices += @{Name=$voiceName; Index=$i; Type="System"}
+            $systemVoices += @{Name=$currentVoiceName; Index=$i; Type="System"}
         }
         Write-Host ""
     }
     
     # Summary
     Write-Host "Summary:" -ForegroundColor Cyan
+    Write-Host "DEBUG: customVoices array count: $($customVoices.Count)" -ForegroundColor Magenta
+    Write-Host "DEBUG: customVoices type: $($customVoices.GetType().Name)" -ForegroundColor Magenta
+    Write-Host "DEBUG: customVoices content: $($customVoices | ConvertTo-Json -Depth 2)" -ForegroundColor Magenta
+    Write-Host "DEBUG: systemVoices array count: $($systemVoices.Count)" -ForegroundColor Magenta
     Write-Host "  🌐 Azure TTS voices: $(($customVoices | Where-Object {$_.Type -eq 'Azure'}).Count)" -ForegroundColor Green
     Write-Host "  🤖 SherpaOnnx voices: $(($customVoices | Where-Object {$_.Type -eq 'SherpaOnnx'}).Count)" -ForegroundColor Blue
     Write-Host "  🖥️ System voices: $($systemVoices.Count)" -ForegroundColor Gray
@@ -83,15 +89,17 @@ try {
     
     # Test specific voice or all custom voices
     $voicesToTest = @()
-    
+
+    Write-Host "DEBUG: VoiceName parameter: '$VoiceName'" -ForegroundColor Magenta
     if ($VoiceName) {
+        Write-Host "DEBUG: Taking specific voice branch" -ForegroundColor Magenta
         # Test specific voice
         $found = $false
         for ($i = 0; $i -lt $voices.Count; $i++) {
             $voiceToken = $voices.Item($i)
-            $voiceName = $voiceToken.GetDescription()
-            if ($voiceName -like "*$VoiceName*") {
-                $voicesToTest += @{Name=$voiceName; Index=$i; Token=$voiceToken}
+            $currentVoiceName = $voiceToken.GetDescription()
+            if ($currentVoiceName -like "*$VoiceName*") {
+                $voicesToTest += @{Name=$currentVoiceName; Index=$i; Token=$voiceToken}
                 $found = $true
                 break
             }
@@ -102,15 +110,27 @@ try {
             return
         }
     } else {
+        Write-Host "DEBUG: Taking all custom voices branch" -ForegroundColor Magenta
         # Test all custom voices
-        foreach ($customVoice in $customVoices) {
+        Write-Host "DEBUG: Found $($customVoices.Count) custom voices to test" -ForegroundColor Magenta
+        Write-Host "DEBUG: customVoices is array: $($customVoices -is [array])" -ForegroundColor Magenta
+
+        # Force array iteration
+        @($customVoices) | ForEach-Object {
+            $customVoice = $_
+            Write-Host "DEBUG: Processing custom voice: Name='$($customVoice.Name)', Index=$($customVoice.Index), Type=$($customVoice.Type)" -ForegroundColor Magenta
             $voiceToken = $voices.Item($customVoice.Index)
+            $actualVoiceName = $voiceToken.GetDescription()
+            Write-Host "DEBUG: Voice token at index $($customVoice.Index) is actually: '$actualVoiceName'" -ForegroundColor Magenta
             $voicesToTest += @{Name=$customVoice.Name; Index=$customVoice.Index; Token=$voiceToken; Type=$customVoice.Type}
         }
+        Write-Host "DEBUG: Total voices to test: $($voicesToTest.Count)" -ForegroundColor Magenta
     }
     
+    Write-Host "DEBUG: voicesToTest count: $($voicesToTest.Count)" -ForegroundColor Magenta
     if ($voicesToTest.Count -eq 0) {
         Write-Host "⚠️ No custom voices to test. Only system voices found." -ForegroundColor Yellow
+        Write-Host "DEBUG: customVoices count was: $($customVoices.Count)" -ForegroundColor Magenta
         return
     }
     
@@ -120,6 +140,7 @@ try {
     Write-Host ""
     
     foreach ($testVoice in $voicesToTest) {
+        Write-Host "DEBUG: Testing voice at index $($testVoice.Index): $($testVoice.Name)" -ForegroundColor Magenta
         Write-Host "Testing: $($testVoice.Name)" -ForegroundColor Yellow
         Write-Host "Text: '$TestText'" -ForegroundColor Gray
         

@@ -301,7 +301,7 @@ namespace Installer
                 }
 
                 string jsonContent = File.ReadAllText(configPath);
-                var config = JsonSerializer.Deserialize<ConfigBasedVoiceManager.PipeVoiceConfig>(jsonContent);
+                var config = System.Text.Json.JsonSerializer.Deserialize<ConfigBasedVoiceManager.PipeVoiceConfig>(jsonContent);
 
                 var voiceManager = new ConfigBasedVoiceManager();
                 voiceManager.CreateVoice(config);
@@ -670,7 +670,7 @@ namespace Installer
                 var language = model.Language?.FirstOrDefault();
                 if (language != null)
                 {
-                    Console.WriteLine($"Language: {language.LanguageName} ({language.LangCode})");
+                    Console.WriteLine($"Language: {language.Name} ({language.LangCode})");
                 }
 
                 try
@@ -1478,7 +1478,7 @@ namespace Installer
                         // Language matching
                         (model.Language != null && model.Language.Any(lang =>
                             (lang.LangCode?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                            (lang.LanguageName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))) ||
+                            (lang.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))) ||
                         // Smart partial matching for common terms
                         (searchTerm.Equals("english", StringComparison.OrdinalIgnoreCase) &&
                          model.Id?.Contains("en-", StringComparison.OrdinalIgnoreCase) == true) ||
@@ -1504,7 +1504,7 @@ namespace Installer
                 for (int i = 0; i < Math.Min(filteredModels.Count, 20); i++) // Limit to 20 for readability
                 {
                     var model = filteredModels[i];
-                    var languages = model.Language?.Select(l => l.LanguageName).ToList() ?? new List<string>();
+                    var languages = model.Language?.Select(l => l.Name).ToList() ?? new List<string>();
                     string languageStr = languages.Count > 0 ? string.Join(", ", languages) : "Unknown";
                     string sizeStr = model.FilesizeMb > 0 ? $"{model.FilesizeMb:F1}MB" : "Unknown size";
 
@@ -1713,8 +1713,8 @@ namespace Installer
                         voice.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         voice.Locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         voice.Gender.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        // Use the language code converter for intelligent language matching
-                        LanguageCodeConverter.LocaleMatchesLanguage(voice.Locale, searchTerm)
+                        // Use simple language matching
+                        LocaleMatchesLanguage(voice.Locale, searchTerm)
                     ).ToList(); // Convert to list before checking Count
 
                     if (filteredVoices.Count == 0)
@@ -1802,6 +1802,43 @@ namespace Installer
             {
                 Console.WriteLine($"Error installing Azure voice: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Simple language matching for voice search
+        /// </summary>
+        private static bool LocaleMatchesLanguage(string locale, string searchTerm)
+        {
+            if (string.IsNullOrEmpty(locale) || string.IsNullOrEmpty(searchTerm))
+                return false;
+
+            // Direct match
+            if (locale.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Common language mappings
+            var languageMappings = new Dictionary<string, string[]>
+            {
+                { "english", new[] { "en-", "en_" } },
+                { "spanish", new[] { "es-", "es_" } },
+                { "french", new[] { "fr-", "fr_" } },
+                { "german", new[] { "de-", "de_" } },
+                { "italian", new[] { "it-", "it_" } },
+                { "portuguese", new[] { "pt-", "pt_" } },
+                { "chinese", new[] { "zh-", "zh_" } },
+                { "japanese", new[] { "ja-", "ja_" } },
+                { "korean", new[] { "ko-", "ko_" } },
+                { "russian", new[] { "ru-", "ru_" } },
+                { "arabic", new[] { "ar-", "ar_" } },
+                { "hindi", new[] { "hi-", "hi_" } }
+            };
+
+            if (languageMappings.TryGetValue(searchTerm.ToLower(), out string[] codes))
+            {
+                return codes.Any(code => locale.StartsWith(code, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return false;
         }
     }
 
