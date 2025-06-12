@@ -1,0 +1,19 @@
+{
+  "name": "English-eSpeak-Basic",
+  "displayName": "English (eSpeak Basic)",
+  "description": "English voice using eSpeak (no credentials required)",
+  "language": "English",
+  "locale": "en-US",
+  "gender": "Neutral",
+  "age": "Adult",
+  "vendor": "eSpeak",
+  "ttsConfig": {
+    "text": "",
+    "args": {
+      "engine": "espeak",
+      "voice": "en",
+      "rate": 0,
+      "volume": 100
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "English-Google-Basic",
+  "displayName": "English (Google Basic)",
+  "description": "English voice using Google TTS (no credentials required)",
+  "language": "English",
+  "locale": "en-US",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "Google",
+  "ttsConfig": {
+    "text": "",
+    "args": {
+      "engine": "google",
+      "voice": "en",
+      "rate": 0,
+      "volume": 100
+    }
+  }
+}
