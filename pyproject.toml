@@ -32,6 +32,10 @@ dev = [
     "isort>=5.12.0",
     "mypy>=1.0.0",
 ]
+build = [
+    "pyinstaller>=6.0.0",
+    "setuptools>=68.0.0",
+]
 
 [project.scripts]
 sapi-voice-manager = "SapiVoiceManager:main"
