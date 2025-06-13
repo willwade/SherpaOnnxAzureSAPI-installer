@@ -1,0 +1,19 @@
+{
+  "name": "British-English-Azure-Libby",
+  "displayName": "British English (Azure Libby)",
+  "description": "British English voice using Azure TTS Libby Neural voice",
+  "language": "English",
+  "locale": "en-GB",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "Microsoft Azure",
+  "ttsConfig": {
+    "text": "",
+    "args": {
+      "engine": "microsoft",
+      "voice": "en-GB-LibbyNeural",
+      "rate": 0,
+      "volume": 100
+    }
+  }
+}

@@ -1,138 +1,193 @@
-# SherpaOnnx SAPI Installer
+# C++ SAPI Bridge to AACSpeakHelper
 
-A complete, production-ready installer for multi-engine Text-to-Speech (TTS) voices with full Windows SAPI compatibility. Supports both **SherpaOnnx** (offline, high-quality) and **Azure TTS** (cloud-based) engines with 100% SAPI integration.
+A **complete C++ SAPI COM wrapper** that bridges Windows SAPI applications to the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, etc.) through a unified interface.
+
+## 🎉 **Implementation Status: 100% COMPLETE**
+
+**Ready for production testing!** All components are implemented and integrated:
+- ✅ C++ SAPI COM wrapper with AACSpeakHelper pipe communication
+- ✅ Voice registration system with correct CLSID alignment
+- ✅ Non-interactive CLI tool for voice management
+- ✅ Comprehensive testing framework
+- ✅ Complete CI/CD pipeline with automated builds
+- ✅ Professional installer package creation
 
 ## 🎯 Key Features
 
 - **🎵 100% SAPI Compatibility**: Works with any Windows application that uses SAPI
-- **🚀 Dual Engine Support**: SherpaOnnx (offline) + Azure TTS (cloud)
-- **⚡ Native Performance**: C++ COM wrapper for maximum compatibility
-- **📦 Complete Installer**: Single executable with all dependencies
-- **🎛️ Multiple Interfaces**: Command line, interactive mode, and programmatic API
-- **🔧 Voice Management**: Install, uninstall, verify, and test voices
-- **🌐 Dynamic Models**: Automatic download from online voice repositories
+- **🚀 Multi-Engine Support**: Azure TTS, SherpaOnnx, Google TTS, ElevenLabs, and more
+- **⚡ Native C++ Performance**: C++ COM wrapper for maximum compatibility and speed
+- **🔧 Unified Interface**: All TTS engines accessible through AACSpeakHelper pipe service
+- **📦 Easy Installation**: Automated installer with one-click setup
+- **🎛️ Configuration-Based**: JSON voice configurations for easy management
+- **🌐 Extensible**: Easy to add new TTS engines via AACSpeakHelper
+- **🧪 Comprehensive Testing**: Complete integration testing framework
+- **🏗️ CI/CD Ready**: Automated builds with GitHub Actions
 
 ## 🏗️ Architecture
 
-### SherpaOnnx Engine (Offline TTS)
 ```
-SAPI Application
+SAPI Application (Notepad, Screen Readers, etc.)
        ↓
-Native COM Wrapper (C++)     ← 100% SAPI Compatible
+C++ COM Wrapper (NativeTTSWrapper.dll)
        ↓
-ProcessBridge (JSON IPC)
+Named Pipe Communication (\\.\pipe\AACSpeakHelper)
        ↓
-SherpaWorker (.NET 6.0)
+AACSpeakHelper Python Service
        ↓
-SherpaOnnx (Native C++)
-       ↓
-High-Quality Audio Output
+Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 ```
 
-### Azure TTS Engine (Cloud TTS)
-```
-SAPI Application
-       ↓
-Managed COM Objects (.NET)   ← Full SAPI Integration
-       ↓
-Azure TTS API
-       ↓
-Cloud-Generated Audio
-```
+### Key Components
+
+- **C++ COM Wrapper**: Native SAPI interface with full compatibility
+- **AACSpeakHelper Service**: Python-based TTS engine manager with pipe interface
+- **Voice Configurations**: JSON files defining TTS engine settings
+- **CLI Installer**: Python tool for voice management (matches AACSpeakHelper pattern)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Windows 10/11
-- Administrator privileges
-- .NET 6.0 Runtime (included in installer)
-- .NET Framework 4.7.2+ (for Azure TTS)
+- Administrator privileges (for COM registration)
+- Python 3.11+ with uv package manager
+- .NET 6.0 Runtime (included in installer package)
 
-### Installation
+### Option 1: Use Pre-built Package (Recommended)
 
-#### Option 1: Download Release (Recommended)
-1. Download the latest release from [GitHub Releases](../../releases)
-2. Extract the package
-3. Run as Administrator:
-   ```powershell
-   sudo .\SherpaOnnxSAPIInstaller.exe
-   ```
+Download the latest release package from GitHub Actions artifacts or releases:
 
-#### Option 2: Build from Source
 ```powershell
-# Install prerequisites (see Build Instructions below)
+# Extract the package and run installer as Administrator
+install.bat
+
+# The installer will:
+# - Register the C++ COM wrapper
+# - Set up voice configurations
+# - Prepare the system for AACSpeakHelper integration
+```
+
+### Option 2: Build from Source
+
+#### Step 1: Set up AACSpeakHelper Service
+```bash
+# Clone and set up AACSpeakHelper
+git clone https://github.com/AceCentre/AACSpeakHelper
+cd AACSpeakHelper
+uv venv && uv sync --all-extras
+
+# Start the service
+uv run python AACSpeakHelperServer.py
+```
+
+#### Step 2: Build and Install SAPI Bridge
+```powershell
+# Clone this repository
 git clone https://github.com/willwade/SherpaOnnxAzureSAPI-installer.git
 cd SherpaOnnxAzureSAPI-installer
 
-# Build complete installer
-sudo .\BuildCompleteInstaller.ps1
+# Run the complete test workflow (builds everything)
+.\test_windows_integration.ps1
 
-# Or build native wrapper only
-sudo .\BuildNativeOnly.ps1
+# Or create installer package
+.\create_installer.ps1
+```
+
+### Quick Test
+```powershell
+# Install a voice (no credentials needed)
+uv run python SapiVoiceManager.py --install English-SherpaOnnx-Jenny
+
+# Test SAPI synthesis
+$voice = New-Object -ComObject SAPI.SpVoice
+$voice.Speak("Hello from SherpaOnnx via AACSpeakHelper!")
 ```
 
 ## 📖 Usage
 
-### Interactive Mode
-```powershell
-sudo .\SherpaOnnxSAPIInstaller.exe
+### Voice Management
+
+#### Available Voice Configurations
+- **`English-SherpaOnnx-Jenny`** - High-quality neural TTS (no credentials needed)
+- **`English-Google-Basic`** - Google TTS (no credentials needed)
+- **`British-English-Azure-Libby`** - Azure TTS British voice (requires API key)
+- **`American-English-Azure-Jenny`** - Azure TTS American voice (requires API key)
+
+#### CLI Voice Manager (Interactive Mode)
+```bash
+# Start the interactive voice manager
+uv run python SapiVoiceManager.py
 ```
-Provides a user-friendly menu for:
-- Installing SherpaOnnx voices
-- Installing Azure TTS voices  
-- Managing voice configurations
+
+This provides a user-friendly menu for:
+- Installing voices from AACSpeakHelper configurations
+- Managing voice registrations in Windows SAPI
+- Testing voice synthesis
 - Uninstalling voices
 
-### Command Line Interface
+#### Non-Interactive Commands
 
-#### Install SherpaOnnx Voice
-```powershell
-sudo .\SherpaOnnxSAPIInstaller.exe install amy
-sudo .\SherpaOnnxSAPIInstaller.exe install jenny
+**Install Voice**:
+```bash
+# Install SherpaOnnx voice (no credentials needed)
+uv run python SapiVoiceManager.py --install English-SherpaOnnx-Jenny
+
+# Install Google TTS voice (no credentials needed)
+uv run python SapiVoiceManager.py --install English-Google-Basic
+
+# Install Azure TTS voice (requires API key in AACSpeakHelper)
+uv run python SapiVoiceManager.py --install British-English-Azure-Libby
 ```
 
-#### Install Azure TTS Voice
-```powershell
-# Configure Azure credentials
-sudo .\SherpaOnnxSAPIInstaller.exe save-azure-config --key YOUR_KEY --region eastus
+**List and View Voices**:
+```bash
+# List all available voice configurations
+uv run python SapiVoiceManager.py --list
 
-# Install Azure voice
-sudo .\SherpaOnnxSAPIInstaller.exe install-azure en-US-JennyNeural
+# View specific voice configuration
+uv run python SapiVoiceManager.py --view English-SherpaOnnx-Jenny
 
-# With style and role
-sudo .\SherpaOnnxSAPIInstaller.exe install-azure en-US-AriaNeural --style cheerful --role YoungAdultFemale
+# List installed SAPI voices
+uv run python SapiVoiceManager.py --list-installed
 ```
 
-#### List Available Voices
-```powershell
-# List Azure voices
-sudo .\SherpaOnnxSAPIInstaller.exe list-azure-voices
+**Remove Voices**:
+```bash
+# Remove a specific voice
+uv run python SapiVoiceManager.py --remove English-SherpaOnnx-Jenny
 
-# Verify installation
-sudo .\SherpaOnnxSAPIInstaller.exe verify amy
-```
-
-#### Uninstall Voices
-```powershell
-# Uninstall specific voice
-sudo .\SherpaOnnxSAPIInstaller.exe uninstall amy
-
-# Uninstall all voices
-sudo .\SherpaOnnxSAPIInstaller.exe uninstall all
+# Remove all installed voices
+uv run python SapiVoiceManager.py --remove-all
 ```
 
 ### Testing Installation
+
+#### Automated Integration Testing
 ```powershell
-# Test with PowerShell
+# Run the complete integration test
+.\test_windows_integration.ps1
+
+# Test with Google TTS as well
+.\test_windows_integration.ps1 -TestGoogle
+```
+
+#### Manual SAPI Testing
+```powershell
+# Test with PowerShell SAPI
 $voice = New-Object -ComObject SAPI.SpVoice
-$voice.Speak("Hello from SherpaOnnx!")
+$voice.Speak("Hello from AACSpeakHelper!")
 
 # Test with specific voice
 $voices = $voice.GetVoices()
-$amyVoice = $voices | Where-Object { $_.GetDescription() -like "*amy*" }
-$voice.Voice = $amyVoice
-$voice.Speak("This is Amy speaking!")
+$sherpaVoice = $voices | Where-Object { $_.GetDescription() -like "*SherpaOnnx*" }
+$voice.Voice = $sherpaVoice
+$voice.Speak("This is Jenny from SherpaOnnx neural TTS!")
 ```
+
+#### Real Application Testing
+- **Notepad**: Select text → Right-click → "Speak selected text"
+- **Windows Narrator**: Use installed voices in narrator settings
+- **Screen Readers**: NVDA, JAWS, and other screen readers can use the voices
 
 ## 🔧 Build Instructions
 
@@ -146,142 +201,199 @@ $voice.Speak("This is Amy speaking!")
    - Download: https://dotnet.microsoft.com/download/dotnet/6.0
    - Choose "SDK x64" for Windows
 
-3. **.NET Framework 4.7.2 Developer Pack**
-   - Download: https://dotnet.microsoft.com/download/dotnet-framework/net472
+3. **Python 3.11+ with uv**
+   - Download Python: https://www.python.org/downloads/
+   - Install uv: `pip install uv`
 
-### Build Process
+### Automated Build Process
 
-#### Complete Build (All Components)
+#### Complete Build and Test
 ```powershell
-# Clean build with all components
-sudo .\BuildCompleteInstaller.ps1 -Clean
+# Run the complete build and test workflow
+.\test_complete_workflow.ps1
 
-# Build specific configuration
-sudo .\BuildCompleteInstaller.ps1 -Configuration Release
+# Or run Windows integration test (includes build)
+.\test_windows_integration.ps1
 ```
 
-#### Native Wrapper Only
+#### Create Installer Package
 ```powershell
-# Build just the native COM wrapper (when .NET 6.0 not available)
-sudo .\BuildNativeOnly.ps1
+# Create complete installer package
+.\create_installer.ps1
+
+# Create with custom version
+.\create_installer.ps1 -Version "1.1.0"
+
+# Skip build if already built
+.\create_installer.ps1 -SkipBuild
 ```
 
-#### Manual Build Steps
+### Manual Build Process
+
+#### Build C++ COM Wrapper
 ```powershell
-# Restore packages
-dotnet restore TTSInstaller.sln
+# Build the native SAPI COM wrapper
+msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64
 
-# Build managed components
-dotnet build "OpenSpeechTTS\OpenSpeechTTS.csproj" --configuration Release
-dotnet build "SherpaWorker\SherpaWorker.csproj" --configuration Release
-dotnet build "TTSInstaller.csproj" --configuration Release
+# Register the COM wrapper (as Administrator)
+regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+```
 
-# Build native wrapper
-$msbuild = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
-& $msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64
+#### Build .NET Installer
+```powershell
+# Build the .NET installer
+cd Installer
+dotnet build -c Release
+dotnet publish -c Release -o "..\build\installer" --self-contained true -r win-x64
+cd ..
+```
 
-# Publish single executable
-dotnet publish "TTSInstaller.csproj" --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true
+#### Build Python CLI with PyInstaller
+```bash
+# Set up Python environment
+uv venv
+uv sync --extra build
+
+# Build standalone executable
+uv run pyinstaller --onefile --name "SapiVoiceManager" SapiVoiceManager.py
 ```
 
 ## 📁 Project Structure
 
 ```
 SherpaOnnxAzureSAPI-installer/
-├── Installer/                    # Main installer logic
-│   ├── Program.cs                # Entry point and CLI interface
-│   ├── ModelInstaller.cs         # SherpaOnnx model management
-│   ├── AzureVoiceInstaller.cs    # Azure TTS integration
-│   └── Sapi5RegistrarExtended.cs # Voice registration system
-├── NativeTTSWrapper/             # Native C++ COM wrapper
-│   ├── NativeTTSWrapper.cpp      # Main implementation
+├── NativeTTSWrapper/             # C++ SAPI COM wrapper
+│   ├── NativeTTSWrapper.cpp      # Main SAPI implementation with AACSpeakHelper pipe
 │   ├── NativeTTSWrapper.h        # Interface definitions
+│   ├── NativeTTSWrapper.idl      # COM interface definition
 │   └── NativeTTSWrapper.vcxproj  # Visual Studio project
-├── OpenSpeechTTS/                # Managed COM objects
-│   ├── Sapi5VoiceImpl.cs         # SherpaOnnx SAPI implementation
-│   └── AzureSapi5VoiceImpl.cs    # Azure TTS SAPI implementation
-├── SherpaWorker/                 # ProcessBridge worker
-│   └── Program.cs                # .NET 6.0 worker process
-├── BuildCompleteInstaller.ps1    # Complete build script
-├── BuildNativeOnly.ps1           # Native-only build script
-└── TTSInstaller.sln              # Visual Studio solution
+├── Installer/                    # .NET installer components
+│   ├── Program.cs                # Entry point and CLI interface
+│   ├── ConfigBasedVoiceManager.cs # Voice configuration management
+│   └── Installer.csproj          # .NET project file
+├── voice_configs/                # Voice configuration files (AACSpeakHelper format)
+│   ├── English-SherpaOnnx-Jenny.json      # SherpaOnnx neural voice
+│   ├── English-Google-Basic.json          # Google TTS voice
+│   ├── British-English-Azure-Libby.json   # Azure TTS British voice
+│   └── American-English-Azure-Jenny.json  # Azure TTS American voice
+├── .github/workflows/            # CI/CD pipeline
+│   └── build-simple.yml          # GitHub Actions workflow
+├── SapiVoiceManager.py           # Python CLI tool (non-interactive)
+├── test_complete_workflow.ps1    # Complete build and test automation
+├── test_windows_integration.ps1  # Windows integration testing
+├── create_installer.ps1          # Installer package creation
+├── INTEGRATION_TESTING.md        # Complete testing guide
+├── TODO.md                       # Project status and roadmap
+├── pyproject.toml                # Python dependencies
+└── README.md                     # This file
 ```
 
 ## 🎵 How It Works
 
-### SherpaOnnx Voice Pipeline
+### Voice Synthesis Pipeline
 1. **SAPI Application** calls standard `voice.Speak()` method
-2. **Native COM Wrapper** receives the call with 100% SAPI compatibility
-3. **ProcessBridge** communicates via JSON IPC for isolation
-4. **SherpaWorker** processes the request using .NET 6.0
-5. **SherpaOnnx** generates high-quality audio using neural models
-6. **Audio Output** is returned through the SAPI pipeline
+2. **C++ COM Wrapper** receives the call with 100% SAPI compatibility
+3. **Named Pipe Communication** sends JSON request to AACSpeakHelper
+4. **AACSpeakHelper Service** processes the request using configured TTS engine
+5. **TTS Engine** (Azure, SherpaOnnx, Google, etc.) generates audio
+6. **Audio Output** is returned through the pipe back to SAPI
 
-### Azure TTS Voice Pipeline
-1. **SAPI Application** calls standard `voice.Speak()` method
-2. **Managed COM Objects** handle the SAPI interface
-3. **Azure TTS API** processes the request in the cloud
-4. **Audio Output** is streamed back through SAPI
+### Voice Configuration System
+1. **Voice Configs** define TTS engine settings in JSON format
+2. **CLI Installer** registers voices with Windows SAPI registry
+3. **COM Wrapper** loads voice config and communicates with AACSpeakHelper
+4. **AACSpeakHelper** handles the actual TTS engine communication
 
 ### Key Advantages
 - **100% SAPI Compatibility**: Works with any Windows application
 - **No Application Changes**: Existing software works immediately
-- **High Performance**: Native C++ wrapper for optimal speed
-- **Robust Architecture**: Process isolation prevents crashes
-- **Dual Engine Support**: Best of both offline and cloud TTS
+- **Multi-Engine Support**: Easy to add new TTS engines via AACSpeakHelper
+- **Configuration-Based**: JSON configs make voice management simple
+- **Unified Interface**: All TTS engines accessible through one pipe service
 
 ## 🔧 Technical Details
 
 ### Components
-- **Native COM Wrapper**: 108.5 KB C++ DLL with full SAPI interfaces
-- **ProcessBridge System**: .NET 6.0 SherpaWorker (58.7 MB)
-- **Managed COM Objects**: .NET Framework 4.7.2 for Azure integration
-- **Voice Models**: Downloaded automatically from online repositories
-- **Registry Integration**: Complete SAPI voice registration
+- **C++ COM Wrapper**: Native SAPI interface with full compatibility
+- **AACSpeakHelper Service**: Python-based TTS engine manager
+- **Named Pipe Communication**: `\\.\pipe\AACSpeakHelper` for IPC
+- **Voice Configurations**: JSON files defining TTS engine settings
+- **CLI Installer**: Python tool for voice management
 
-### Supported Voice Formats
-- **SherpaOnnx**: ONNX neural models (Piper, MMS, VITS, Coqui)
-- **Azure TTS**: All Azure Neural voices with styles and roles
-- **Languages**: 100+ languages supported across both engines
+### Supported TTS Engines (via AACSpeakHelper)
+- **SherpaOnnx**: High-quality neural models (offline, no credentials needed)
+- **Google TTS**: Basic text-to-speech (online, no credentials needed)
+- **Azure TTS**: All Azure Neural voices with styles and roles (requires API key)
+- **ElevenLabs**: High-quality AI voices (requires API key)
+- **OpenAI TTS**: OpenAI's text-to-speech models (requires API key)
+- **And more**: Extensible via AACSpeakHelper plugin system
 
 ### System Requirements
 - **OS**: Windows 10/11 (x64)
-- **Memory**: 4GB RAM minimum, 8GB recommended
-- **Storage**: 500MB for installer, additional space for voice models
-- **Network**: Internet connection for model downloads and Azure TTS
+- **Memory**: 4GB RAM minimum, 8GB recommended for neural TTS
+- **Python**: 3.11+ for AACSpeakHelper service
+- **Network**: Internet connection for cloud TTS services (SherpaOnnx works offline)
+- **Privileges**: Administrator access for COM registration
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-#### Voice Not Appearing
+#### Voice Not Appearing in SAPI
 ```powershell
 # Check voice registration
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\*" | Select-Object PSChildName
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\*" | Select-Object PSChildName
 
-# Re-register COM objects
-sudo regsvr32 "C:\Program Files\OpenAssistive\OpenSpeech\NativeTTSWrapper.dll"
+# Re-register COM wrapper (as Administrator)
+regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+
+# Check CLSID registration
+Get-ItemProperty "HKCR:\CLSID\{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"
 ```
 
-#### Build Failures
+#### AACSpeakHelper Service Not Running
+```bash
+# Start AACSpeakHelper service
+cd AACSpeakHelper
+uv run python AACSpeakHelperServer.py
+
+# Check if service is listening on pipe
+# (Service should show "Waiting for client connection..." message)
+
+# Test pipe connectivity
+# The service creates: \\.\pipe\AACSpeakHelper
+```
+
+#### Voice Synthesis Fails
+- Ensure AACSpeakHelper service is running and listening on pipe
+- Check voice configuration file exists in `voice_configs/`
+- Verify TTS engine credentials are configured in AACSpeakHelper (for cloud services)
+- Check Windows Event Viewer for COM errors
+- Run integration test: `.\test_windows_integration.ps1`
+
+#### Build Issues
 ```powershell
 # Check prerequisites
 dotnet --version          # Should show 6.0.x+
 where msbuild            # Should find MSBuild.exe
+python --version         # Should show 3.11+
+uv --version             # Should show uv version
 
-# Clean and rebuild
-sudo .\BuildCompleteInstaller.ps1 -Clean
+# Run automated build test
+.\test_complete_workflow.ps1
 ```
 
-#### Audio Issues
-- Check Windows audio settings
-- Verify voice model files in `C:\Program Files\OpenSpeech\models\`
-- Review logs in `C:\OpenSpeech\*.log`
+#### Integration Testing
+```powershell
+# Run complete integration test
+.\test_windows_integration.ps1
 
-### Debug Logs
-- **Native Wrapper**: `C:\OpenSpeech\native_tts_debug.log`
-- **ProcessBridge**: `C:\OpenSpeech\sherpa_debug.log`
-- **Azure TTS**: `C:\OpenSpeech\azure_debug.log`
+# Test specific voice
+.\test_windows_integration.ps1 -TestVoice "English-SherpaOnnx-Jenny"
+
+# Test with Google TTS as well
+.\test_windows_integration.ps1 -TestGoogle
+```
 
 ## 🤝 Contributing
 
@@ -297,11 +409,12 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 ## 🙏 Acknowledgments
 
+- [AACSpeakHelper](https://github.com/AceCentre/AACSpeakHelper) - Multi-engine TTS service
+- [Ace Centre](https://acecentre.org.uk/) - Funding and supporting AACSpeakHelper
 - [SherpaOnnx](https://github.com/k2-fsa/sherpa-onnx) - High-quality neural TTS
 - [Microsoft Azure TTS](https://azure.microsoft.com/services/cognitive-services/text-to-speech/) - Cloud TTS service
-- [Piper](https://github.com/rhasspy/piper) - Neural voice models
 - Windows SAPI - Speech API framework
 
 ---
 
-**🎉 Ready to give your applications a voice? Install SherpaOnnx SAPI today!**
+**🎉 Ready to bridge SAPI applications to multiple TTS engines? Install the C++ SAPI Bridge today!**

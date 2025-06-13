@@ -1,0 +1,19 @@
+{
+  "name": "English-SherpaOnnx-Jenny",
+  "displayName": "English (SherpaOnnx Jenny)",
+  "description": "English voice using SherpaOnnx Jenny model",
+  "language": "English",
+  "locale": "en-GB",
+  "gender": "Female",
+  "age": "Adult",
+  "vendor": "SherpaOnnx",
+  "ttsConfig": {
+    "text": "",
+    "args": {
+      "engine": "sherpaonnx",
+      "voice": "en_GB-jenny_dioco-medium",
+      "rate": 0,
+      "volume": 100
+    }
+  }
+}

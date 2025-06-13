@@ -83,14 +83,26 @@ STDMETHODIMP CNativeTTSWrapper::Speak(
 
                 if (FAILED(hr))
                 {
-                    LogMessage(L"Direct SherpaOnnx failed, trying ProcessBridge fallback...");
-                    LogMessage(L"Step 3: Attempting ProcessBridge...");
-                    if (!GenerateAudioViaProcessBridge(text, audioData))
+                    LogMessage(L"Direct SherpaOnnx failed, trying AACSpeakHelper pipe service...");
+                    LogMessage(L"Step 3: Attempting AACSpeakHelper pipe service...");
+                    hr = GenerateAudioViaPipeService(text, audioData);
+                    LogMessage((L"AACSpeakHelper pipe service result: " + std::to_wstring(hr)).c_str());
+
+                    if (FAILED(hr))
                     {
-                        LogMessage(L"All methods failed: native engine, direct SherpaOnnx, and ProcessBridge");
-                        return E_FAIL;
+                        LogMessage(L"AACSpeakHelper pipe service failed, trying ProcessBridge fallback...");
+                        LogMessage(L"Step 4: Attempting ProcessBridge fallback...");
+                        if (!GenerateAudioViaProcessBridge(text, audioData))
+                        {
+                            LogMessage(L"All methods failed: native engine, direct SherpaOnnx, AACSpeakHelper pipe, and ProcessBridge");
+                            return E_FAIL;
+                        }
+                        LogMessage(L"ProcessBridge fallback succeeded");
                     }
-                    LogMessage(L"ProcessBridge fallback succeeded");
+                    else
+                    {
+                        LogMessage(L"AACSpeakHelper pipe service succeeded");
+                    }
                 }
                 else
                 {
@@ -534,6 +546,327 @@ HRESULT CNativeTTSWrapper::GenerateAudioViaDirectSherpaOnnx(const std::wstring& 
     {
         LogMessage(L"Unknown exception in GenerateAudioViaDirectSherpaOnnx");
         return E_FAIL;
+    }
+}
+
+// NEW: AACSpeakHelper Pipe Service Implementation
+HRESULT CNativeTTSWrapper::GenerateAudioViaPipeService(const std::wstring& text, std::vector<BYTE>& audioData)
+{
+    try
+    {
+        LogMessage(L"Starting AACSpeakHelper pipe service audio generation...");
+
+        // Connect to AACSpeakHelper pipe
+        HANDLE hPipe = INVALID_HANDLE_VALUE;
+        if (!ConnectToAACSpeakHelper(hPipe))
+        {
+            LogMessage(L"Failed to connect to AACSpeakHelper pipe service");
+            return E_FAIL;
+        }
+
+        LogMessage(L"Connected to AACSpeakHelper pipe service");
+
+        // Create JSON message for AACSpeakHelper
+        std::string jsonMessage = CreateAACSpeakHelperMessage(text);
+        LogMessage((L"Sending message: " + UTF8ToWString(jsonMessage)).c_str());
+
+        // Send message to pipe
+        if (!SendPipeMessage(hPipe, jsonMessage))
+        {
+            LogMessage(L"Failed to send message to AACSpeakHelper");
+            CloseHandle(hPipe);
+            return E_FAIL;
+        }
+
+        LogMessage(L"Message sent successfully");
+
+        // Receive audio response
+        if (!ReceivePipeResponse(hPipe, audioData))
+        {
+            LogMessage(L"Failed to receive audio response from AACSpeakHelper");
+            CloseHandle(hPipe);
+            return E_FAIL;
+        }
+
+        LogMessage((L"Received " + std::to_wstring(audioData.size()) + L" bytes of audio data").c_str());
+
+        CloseHandle(hPipe);
+        return S_OK;
+    }
+    catch (const std::exception& ex)
+    {
+        std::string error = "Exception in GenerateAudioViaPipeService: ";
+        error += ex.what();
+        LogMessage(std::wstring(error.begin(), error.end()).c_str());
+        return E_FAIL;
+    }
+    catch (...)
+    {
+        LogMessage(L"Unknown exception in GenerateAudioViaPipeService");
+        return E_FAIL;
+    }
+}
+
+bool CNativeTTSWrapper::ConnectToAACSpeakHelper(HANDLE& hPipe)
+{
+    const wchar_t* pipeName = L"\\\\.\\pipe\\AACSpeakHelper";
+    const int maxRetries = 5;
+    const int retryDelayMs = 1000;
+
+    for (int retry = 0; retry < maxRetries; retry++)
+    {
+        LogMessage((L"Attempting to connect to pipe (attempt " + std::to_wstring(retry + 1) + L")").c_str());
+
+        hPipe = CreateFileW(
+            pipeName,
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            nullptr,
+            OPEN_EXISTING,
+            0,
+            nullptr
+        );
+
+        if (hPipe != INVALID_HANDLE_VALUE)
+        {
+            LogMessage(L"Successfully connected to AACSpeakHelper pipe");
+            return true;
+        }
+
+        DWORD error = GetLastError();
+        if (error == ERROR_PIPE_BUSY)
+        {
+            LogMessage(L"Pipe is busy, waiting...");
+            if (!WaitNamedPipeW(pipeName, 30000)) // 30 second timeout
+            {
+                LogMessage(L"Timeout waiting for pipe to become available");
+                continue;
+            }
+        }
+        else
+        {
+            LogMessage((L"Failed to connect to pipe, error: " + std::to_wstring(error)).c_str());
+        }
+
+        if (retry < maxRetries - 1)
+        {
+            Sleep(retryDelayMs);
+        }
+    }
+
+    LogMessage(L"Failed to connect to AACSpeakHelper pipe after all retries");
+    return false;
+}
+
+bool CNativeTTSWrapper::SendPipeMessage(HANDLE hPipe, const std::string& jsonMessage)
+{
+    try
+    {
+        // Send message length first
+        uint32_t messageLength = static_cast<uint32_t>(jsonMessage.length());
+        DWORD bytesWritten = 0;
+
+        if (!WriteFile(hPipe, &messageLength, sizeof(messageLength), &bytesWritten, nullptr) ||
+            bytesWritten != sizeof(messageLength))
+        {
+            LogMessage(L"Failed to write message length to pipe");
+            return false;
+        }
+
+        // Send message content
+        if (!WriteFile(hPipe, jsonMessage.c_str(), messageLength, &bytesWritten, nullptr) ||
+            bytesWritten != messageLength)
+        {
+            LogMessage(L"Failed to write message content to pipe");
+            return false;
+        }
+
+        LogMessage(L"Message sent to pipe successfully");
+        return true;
+    }
+    catch (...)
+    {
+        LogMessage(L"Exception in SendPipeMessage");
+        return false;
+    }
+}
+
+bool CNativeTTSWrapper::ReceivePipeResponse(HANDLE hPipe, std::vector<BYTE>& audioData)
+{
+    try
+    {
+        // Read response length first
+        uint32_t responseLength = 0;
+        DWORD bytesRead = 0;
+
+        if (!ReadFile(hPipe, &responseLength, sizeof(responseLength), &bytesRead, nullptr) ||
+            bytesRead != sizeof(responseLength))
+        {
+            LogMessage(L"Failed to read response length from pipe");
+            return false;
+        }
+
+        LogMessage((L"Expecting " + std::to_wstring(responseLength) + L" bytes of response").c_str());
+
+        if (responseLength == 0 || responseLength > 100 * 1024 * 1024) // 100MB max
+        {
+            LogMessage(L"Invalid response length");
+            return false;
+        }
+
+        // Read response content
+        audioData.resize(responseLength);
+        if (!ReadFile(hPipe, audioData.data(), responseLength, &bytesRead, nullptr) ||
+            bytesRead != responseLength)
+        {
+            LogMessage(L"Failed to read response content from pipe");
+            return false;
+        }
+
+        LogMessage(L"Response received from pipe successfully");
+        return true;
+    }
+    catch (...)
+    {
+        LogMessage(L"Exception in ReceivePipeResponse");
+        return false;
+    }
+}
+
+std::string CNativeTTSWrapper::CreateAACSpeakHelperMessage(const std::wstring& text)
+{
+    try
+    {
+        // Load voice configuration
+        std::wstring voiceConfig = LoadVoiceConfiguration();
+
+        // Convert text to UTF-8
+        std::string utf8Text = WStringToUTF8(text);
+
+        // Create JSON message in AACSpeakHelper format
+        std::string jsonMessage = "{\n";
+        jsonMessage += "  \"text\": \"";
+
+        // Escape text for JSON
+        for (char c : utf8Text)
+        {
+            if (c == '"') jsonMessage += "\\\"";
+            else if (c == '\\') jsonMessage += "\\\\";
+            else if (c == '\n') jsonMessage += "\\n";
+            else if (c == '\r') jsonMessage += "\\r";
+            else if (c == '\t') jsonMessage += "\\t";
+            else jsonMessage += c;
+        }
+
+        jsonMessage += "\",\n";
+
+        // Add voice configuration from loaded config or use defaults
+        if (!voiceConfig.empty())
+        {
+            std::string utf8Config = WStringToUTF8(voiceConfig);
+            jsonMessage += "  " + utf8Config + "\n";
+        }
+        else
+        {
+            // Default SherpaOnnx configuration
+            jsonMessage += "  \"args\": {\n";
+            jsonMessage += "    \"engine\": \"sherpaonnx\",\n";
+            jsonMessage += "    \"voice\": \"en_GB-jenny_dioco-medium\",\n";
+            jsonMessage += "    \"rate\": 0,\n";
+            jsonMessage += "    \"volume\": 100\n";
+            jsonMessage += "  }\n";
+        }
+
+        jsonMessage += "}";
+
+        return jsonMessage;
+    }
+    catch (...)
+    {
+        LogMessage(L"Exception in CreateAACSpeakHelperMessage");
+        // Return default message
+        std::string utf8Text = WStringToUTF8(text);
+        return "{\"text\":\"" + utf8Text + "\",\"args\":{\"engine\":\"sherpaonnx\",\"voice\":\"en_GB-jenny_dioco-medium\",\"rate\":0,\"volume\":100}}";
+    }
+}
+
+std::wstring CNativeTTSWrapper::LoadVoiceConfiguration()
+{
+    try
+    {
+        if (!m_pToken)
+        {
+            LogMessage(L"No token available for voice configuration");
+            return L"";
+        }
+
+        // Get voice name from token
+        CSpDynamicString voiceName;
+        HRESULT hr = m_pToken->GetStringValue(L"VoiceName", &voiceName);
+        if (FAILED(hr) || !voiceName)
+        {
+            LogMessage(L"Failed to get voice name from token");
+            return L"";
+        }
+
+        std::wstring voiceNameStr = static_cast<LPCWSTR>(voiceName);
+        LogMessage((L"Loading configuration for voice: " + voiceNameStr).c_str());
+
+        // Try to load configuration file
+        std::wstring configPath = L"voice_configs\\" + voiceNameStr + L".json";
+
+        std::ifstream configFile(configPath);
+        if (!configFile.is_open())
+        {
+            LogMessage((L"Voice configuration file not found: " + configPath).c_str());
+            return L"";
+        }
+
+        std::string configContent((std::istreambuf_iterator<char>(configFile)),
+                                 std::istreambuf_iterator<char>());
+        configFile.close();
+
+        // Parse JSON to extract ttsConfig.args section
+        size_t argsStart = configContent.find("\"args\":");
+        if (argsStart == std::string::npos)
+        {
+            LogMessage(L"No args section found in voice configuration");
+            return L"";
+        }
+
+        // Find the args object
+        size_t braceStart = configContent.find("{", argsStart);
+        if (braceStart == std::string::npos)
+        {
+            LogMessage(L"Invalid args section in voice configuration");
+            return L"";
+        }
+
+        // Find matching closing brace
+        int braceCount = 1;
+        size_t pos = braceStart + 1;
+        while (pos < configContent.length() && braceCount > 0)
+        {
+            if (configContent[pos] == '{') braceCount++;
+            else if (configContent[pos] == '}') braceCount--;
+            pos++;
+        }
+
+        if (braceCount != 0)
+        {
+            LogMessage(L"Malformed JSON in voice configuration");
+            return L"";
+        }
+
+        std::string argsSection = "\"args\":" + configContent.substr(braceStart, pos - braceStart);
+        LogMessage((L"Loaded voice configuration: " + UTF8ToWString(argsSection)).c_str());
+
+        return UTF8ToWString(argsSection);
+    }
+    catch (...)
+    {
+        LogMessage(L"Exception in LoadVoiceConfiguration");
+        return L"";
     }
 }
 
