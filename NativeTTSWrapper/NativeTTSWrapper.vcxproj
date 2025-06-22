@@ -67,7 +67,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);$(ProjectDir)azure-speech-sdk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -75,12 +75,12 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>NativeTTSWrapper.def</ModuleDefinitionFile>
-      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;Microsoft.CognitiveServices.Speech.core.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)libs;$(ProjectDir)azure-speech-sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
-      <Message>Copying Azure Speech SDK DLLs to output directory</Message>
+      <Command>copy "$(ProjectDir)libs\*.dll" "$(OutDir)" /Y</Command>
+      <Message>Copying SherpaOnnx DLLs to output directory</Message>
     </PostBuildEvent>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -105,7 +105,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);$(ProjectDir)azure-speech-sdk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\$(WindowsSDKVersion)um;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -115,12 +115,12 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>NativeTTSWrapper.def</ModuleDefinitionFile>
-      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;Microsoft.CognitiveServices.Speech.core.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)libs;$(ProjectDir)azure-speech-sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sapi.lib;ole32.lib;oleaut32.lib;uuid.lib;$(ProjectDir)libs\sherpa-onnx-c-api.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
-      <Message>Copying Azure Speech SDK DLLs to output directory</Message>
+      <Command>copy "$(ProjectDir)libs\*.dll" "$(OutDir)" /Y</Command>
+      <Message>Copying SherpaOnnx DLLs to output directory</Message>
     </PostBuildEvent>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -144,7 +144,6 @@
     <ClInclude Include="ITTSEngine.h" />
     <ClInclude Include="TTSEngineManager.h" />
     <ClInclude Include="SherpaOnnxEngine.h" />
-    <ClInclude Include="AzureTTSEngine.h" />
     <ClInclude Include="sherpa-onnx-c-api.h" />
   </ItemGroup>
   <ItemGroup>
@@ -161,7 +160,6 @@
     <ClCompile Include="ITTSEngine.cpp" />
     <ClCompile Include="TTSEngineManager.cpp" />
     <ClCompile Include="SherpaOnnxEngine.cpp" />
-    <ClCompile Include="AzureTTSEngine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="NativeTTSWrapper.rc" />

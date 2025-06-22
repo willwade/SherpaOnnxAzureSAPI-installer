@@ -69,26 +69,17 @@ private:
     void LogMessage(const wchar_t* message);
     std::wstring ExtractTextFromFragList(const SPVTEXTFRAG* pTextFragList);
 
-    // NEW: Direct engine integration methods
-    HRESULT GenerateAudioViaNativeEngine(const std::wstring& text, std::vector<BYTE>& audioData);
-    HRESULT InitializeEngineFromToken(ISpObjectToken* pToken);
-    HRESULT ConvertFloatSamplesToBytes(const std::vector<float>& samples, int sampleRate, std::vector<BYTE>& audioData);
-
-    // DIRECT: SherpaOnnx C API fallback (when engine manager fails)
-    HRESULT GenerateAudioViaDirectSherpaOnnx(const std::wstring& text, std::vector<BYTE>& audioData);
-
-    // NEW: AACSpeakHelper pipe service communication
+    // AACSpeakHelper pipe service communication (ONLY method)
     HRESULT GenerateAudioViaPipeService(const std::wstring& text, std::vector<BYTE>& audioData);
     bool ConnectToAACSpeakHelper(HANDLE& hPipe);
     bool SendPipeMessage(HANDLE hPipe, const std::string& jsonMessage);
     bool ReceivePipeResponse(HANDLE hPipe, std::vector<BYTE>& audioData);
     std::string CreateAACSpeakHelperMessage(const std::wstring& text);
     std::wstring LoadVoiceConfiguration();
-
-    // LEGACY: ProcessBridge fallback methods (for backward compatibility)
-    bool GenerateAudioViaProcessBridge(const std::wstring& text, std::vector<BYTE>& audioData);
-    bool CallSherpaWorker(const std::wstring& requestPath, std::wstring& responsePath);
-    bool ReadWavFile(const std::wstring& filePath, std::vector<BYTE>& audioData);
+    std::string CreateConfigSection();
+    std::string CreateDefaultConfig();
+    std::string CreateSherpaOnnxConfig();
+    std::string CreateAzureConfig();
 
     // Utility methods
     std::string WStringToUTF8(const std::wstring& wstr);
