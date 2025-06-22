@@ -21,8 +21,14 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo ✅ Running as Administrator
 
-REM Check if DLL exists
-if not exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
+REM Check if DLL exists (try new version first, then old version)
+if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper_New.dll" (
+    echo ✅ Found updated COM wrapper DLL: NativeTTSWrapper_New.dll
+    set "DLL_PATH=NativeTTSWrapper\x64\Release\NativeTTSWrapper_New.dll"
+) else if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
+    echo ✅ Found COM wrapper DLL: NativeTTSWrapper.dll
+    set "DLL_PATH=NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+) else (
     echo ❌ COM wrapper DLL not found
     echo    Please build the C++ project first:
     echo    .\build_com_wrapper.bat
@@ -30,8 +36,6 @@ if not exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
     pause
     exit /b 1
 )
-
-echo ✅ Found COM wrapper DLL
 
 REM Copy required DLLs to the same directory
 echo 📋 Copying required dependencies...

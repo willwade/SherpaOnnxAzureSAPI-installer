@@ -241,30 +241,17 @@ HRESULT CNativeTTSWrapper::GenerateAudioViaPipeService(const std::wstring& text,
 
         LogMessage(L"Message sent successfully");
 
+        // Now receive audio bytes back from AACSpeakHelper
+        if (!ReceivePipeResponse(hPipe, audioData))
+        {
+            LogMessage(L"Failed to receive audio bytes from AACSpeakHelper");
+            CloseHandle(hPipe);
+            return E_FAIL;
+        }
+
         CloseHandle(hPipe);
 
-        // AACSpeakHelper processes TTS and plays audio directly, but doesn't send audio back through pipe
-        // For SAPI compatibility, we need to provide some audio data
-        // TODO: Optimize this to get actual audio data from AACSpeakHelper
-        LogMessage(L"AACSpeakHelper request sent successfully - TTS will play through system audio");
-
-        // Create a minimal WAV file with silence for SAPI compatibility
-        // This satisfies SAPI's requirement for audio data while AACSpeakHelper handles actual playback
-        audioData.resize(1024); // Small audio buffer
-
-        // WAV header for 22050Hz, 16-bit, mono (matches our GetOutputFormat)
-        BYTE wavHeader[] = {
-            'R','I','F','F', 0x00,0x04,0x00,0x00, 'W','A','V','E',  // RIFF header
-            'f','m','t',' ', 0x10,0x00,0x00,0x00, 0x01,0x00, 0x01,0x00,  // fmt chunk
-            0x22,0x56,0x00,0x00, 0x44,0xAC,0x00,0x00, 0x02,0x00, 0x10,0x00,  // 22050Hz, mono, 16-bit
-            'd','a','t','a', 0xC0,0x03,0x00,0x00  // data chunk (960 bytes of data)
-        };
-
-        memcpy(audioData.data(), wavHeader, sizeof(wavHeader));
-        // Fill rest with silence (zeros) - this creates a brief silent audio clip
-        memset(audioData.data() + sizeof(wavHeader), 0, audioData.size() - sizeof(wavHeader));
-
-        LogMessage(L"Generated silent audio data for SAPI compatibility - actual audio plays through AACSpeakHelper");
+        LogMessage((L"Successfully received " + std::to_wstring(audioData.size()) + L" bytes of audio from AACSpeakHelper").c_str());
         return S_OK;
     }
     catch (const std::exception& ex)
@@ -361,55 +348,64 @@ bool CNativeTTSWrapper::ReceivePipeResponse(HANDLE hPipe, std::vector<BYTE>& aud
 {
     try
     {
-        // AACSpeakHelper sends audio file path as response, not raw audio data
-        // Read the response (should be a file path)
-        char buffer[1024];
+        LogMessage(L"Waiting to receive audio bytes from AACSpeakHelper...");
+
+        // First, read the length prefix (4 bytes, little-endian uint32)
+        BYTE lengthBuffer[4];
         DWORD bytesRead = 0;
 
-        if (!ReadFile(hPipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr))
+        if (!ReadFile(hPipe, lengthBuffer, sizeof(lengthBuffer), &bytesRead, nullptr) ||
+            bytesRead != sizeof(lengthBuffer))
         {
-            LogMessage(L"Failed to read response from pipe");
+            LogMessage(L"Failed to read length prefix from pipe");
             return false;
         }
 
-        if (bytesRead == 0)
+        // Extract audio data length from little-endian uint32
+        DWORD audioLength =
+            (static_cast<DWORD>(lengthBuffer[0])) |
+            (static_cast<DWORD>(lengthBuffer[1]) << 8) |
+            (static_cast<DWORD>(lengthBuffer[2]) << 16) |
+            (static_cast<DWORD>(lengthBuffer[3]) << 24);
+
+        LogMessage((L"Expecting " + std::to_wstring(audioLength) + L" bytes of audio data").c_str());
+
+        if (audioLength == 0 || audioLength > 10 * 1024 * 1024) // Sanity check: max 10MB
         {
-            LogMessage(L"No response received from pipe");
+            LogMessage((L"Invalid audio length: " + std::to_wstring(audioLength)).c_str());
             return false;
         }
 
-        buffer[bytesRead] = '\0'; // Null terminate
-        std::string response(buffer, bytesRead);
-        LogMessage((L"Received response: " + UTF8ToWString(response)).c_str());
+        // Resize buffer to hold the audio data
+        audioData.resize(audioLength);
 
-        // AACSpeakHelper returns a file path to the generated audio
-        // We need to read the audio file and return the data
-        std::wstring audioFilePath = UTF8ToWString(response);
+        // Read the audio data in chunks
+        DWORD totalBytesRead = 0;
+        const DWORD chunkSize = 64 * 1024; // 64KB chunks
 
-        // Remove any trailing whitespace/newlines
-        audioFilePath.erase(audioFilePath.find_last_not_of(L" \t\r\n") + 1);
-
-        LogMessage((L"Loading audio file: " + audioFilePath).c_str());
-
-        // Read the audio file
-        std::ifstream audioFile(audioFilePath, std::ios::binary);
-        if (!audioFile.is_open())
+        while (totalBytesRead < audioLength)
         {
-            LogMessage((L"Failed to open audio file: " + audioFilePath).c_str());
-            return false;
+            DWORD remainingBytes = audioLength - totalBytesRead;
+            DWORD bytesToRead = min(chunkSize, remainingBytes);
+            DWORD chunkBytesRead = 0;
+
+            if (!ReadFile(hPipe, audioData.data() + totalBytesRead, bytesToRead, &chunkBytesRead, nullptr))
+            {
+                LogMessage((L"Failed to read audio chunk at offset " + std::to_wstring(totalBytesRead)).c_str());
+                return false;
+            }
+
+            if (chunkBytesRead == 0)
+            {
+                LogMessage(L"Unexpected end of pipe data");
+                return false;
+            }
+
+            totalBytesRead += chunkBytesRead;
+            LogMessage((L"Read " + std::to_wstring(totalBytesRead) + L"/" + std::to_wstring(audioLength) + L" bytes").c_str());
         }
 
-        // Get file size
-        audioFile.seekg(0, std::ios::end);
-        size_t fileSize = audioFile.tellg();
-        audioFile.seekg(0, std::ios::beg);
-
-        // Read file content
-        audioData.resize(fileSize);
-        audioFile.read(reinterpret_cast<char*>(audioData.data()), fileSize);
-        audioFile.close();
-
-        LogMessage((L"Loaded " + std::to_wstring(audioData.size()) + L" bytes from audio file").c_str());
+        LogMessage((L"Successfully received " + std::to_wstring(audioData.size()) + L" bytes of audio data").c_str());
         return true;
     }
     catch (...)
@@ -461,7 +457,8 @@ std::string CNativeTTSWrapper::CreateAACSpeakHelperMessage(const std::wstring& t
             jsonMessage += "    \"voice\": \"en_GB-jenny_dioco-medium\",\n";
             jsonMessage += "    \"rate\": 0,\n";
             jsonMessage += "    \"volume\": 100,\n";
-            jsonMessage += "    \"listvoices\": false\n";
+            jsonMessage += "    \"listvoices\": false,\n";
+            jsonMessage += "    \"return_audio_bytes\": true\n";
             jsonMessage += "  },\n";
         }
 
@@ -484,7 +481,8 @@ std::string CNativeTTSWrapper::CreateAACSpeakHelperMessage(const std::wstring& t
                "    \"voice\": \"en_GB-jenny_dioco-medium\",\n"
                "    \"rate\": 0,\n"
                "    \"volume\": 100,\n"
-               "    \"listvoices\": false\n"
+               "    \"listvoices\": false,\n"
+               "    \"return_audio_bytes\": true\n"
                "  },\n"
                "  \"config\": " + CreateDefaultConfig() + "\n"
                "}";
@@ -576,6 +574,29 @@ std::wstring CNativeTTSWrapper::LoadVoiceConfiguration()
                 else
                 {
                     beforeClosing += "\n      \"listvoices\": false\n    }";
+                }
+                argsContent = beforeClosing;
+            }
+        }
+
+        // Check if return_audio_bytes is already present
+        if (argsContent.find("\"return_audio_bytes\"") == std::string::npos)
+        {
+            // Add return_audio_bytes parameter before the closing brace
+            size_t closingBrace = argsContent.find_last_of('}');
+            if (closingBrace != std::string::npos)
+            {
+                // Insert return_audio_bytes before the closing brace
+                std::string beforeClosing = argsContent.substr(0, closingBrace);
+                // Add comma if there are other parameters
+                if (beforeClosing.find_last_not_of(" \t\n\r") != std::string::npos &&
+                    beforeClosing.back() != '{')
+                {
+                    beforeClosing += ",\n      \"return_audio_bytes\": true\n    }";
+                }
+                else
+                {
+                    beforeClosing += "\n      \"return_audio_bytes\": true\n    }";
                 }
                 argsContent = beforeClosing;
             }
