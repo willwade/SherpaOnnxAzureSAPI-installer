@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "ITTSEngine.h"
 #include "SherpaOnnxEngine.h"
-#include "AzureTTSEngine.h"
 #include <memory>
 
 namespace NativeTTS {
@@ -12,7 +11,8 @@ namespace NativeTTS {
                 return std::make_unique<SherpaOnnxEngine>();
                 
             case EngineType::Azure:
-                return std::make_unique<AzureTTSEngine>();
+                // Azure TTS engine removed - using AACSpeakHelper pipe service instead
+                return nullptr;
                 
             case EngineType::Plugin:
                 // TODO: Implement plugin engine

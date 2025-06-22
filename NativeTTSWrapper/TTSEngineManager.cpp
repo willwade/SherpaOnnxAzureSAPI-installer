@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "TTSEngineManager.h"
 #include "SherpaOnnxEngine.h"
-#include "AzureTTSEngine.h"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -76,8 +75,9 @@ namespace NativeTTS {
                     engine = std::make_unique<SherpaOnnxEngine>();
                     break;
                 case EngineType::Azure:
-                    engine = std::make_unique<AzureTTSEngine>();
-                    break;
+                    // Azure TTS engine removed - using AACSpeakHelper pipe service instead
+                    LogError(L"Azure engine not available - use AACSpeakHelper pipe service", E_NOTIMPL);
+                    return E_NOTIMPL;
                 case EngineType::Mock:
                     // For testing - we'll implement a mock engine later
                     LogError(L"Mock engine not implemented yet", E_NOTIMPL);

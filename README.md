@@ -1,16 +1,15 @@
-# C++ SAPI Bridge to AACSpeakHelper
+# SherpaOnnxAzureSAPI-installer
 
-A **complete C++ SAPI COM wrapper** that bridges Windows SAPI applications to the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, etc.) through a unified interface.
+A **simplified Python + C++ SAPI bridge** that connects Windows SAPI applications to the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, etc.) through a unified interface.
 
-## 🎉 **Implementation Status: 100% COMPLETE**
+## 🎯 **Simplified Architecture**
 
-**Ready for production testing!** All components are implemented and integrated:
-- ✅ C++ SAPI COM wrapper with AACSpeakHelper pipe communication
-- ✅ Voice registration system with correct CLSID alignment
-- ✅ Non-interactive CLI tool for voice management
-- ✅ Comprehensive testing framework
-- ✅ Complete CI/CD pipeline with automated builds
-- ✅ Professional installer package creation
+**Clean, maintainable codebase with two main components:**
+- ✅ **C++ COM Wrapper** - Pure SAPI interface, communicates only with AACSpeakHelper pipe
+- ✅ **Python Voice Installer** - Unified installer replacing .NET complexity
+- ✅ **AACSpeakHelper Service** - Multi-engine TTS backend (separate repository)
+- ✅ **No fallback chains** - Simple, reliable pipe communication only
+- ✅ **Configuration-based voices** - JSON voice definitions
 
 ## 🎯 Key Features
 
@@ -38,6 +37,17 @@ AACSpeakHelper Python Service
 Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 ```
 
+## 🔑 Component CLSIDs
+
+**IMPORTANT**: All voices must be registered with the correct C++ COM wrapper CLSID:
+
+| Component | CLSID | Purpose |
+|-----------|-------|---------|
+| **C++ NativeTTSWrapper** | `{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}` | ✅ **CORRECT** - Use this for all voices |
+| ~~Old .NET Wrapper~~ | ~~`{4A8B9C2D-1E3F-4567-8901-234567890ABC}`~~ | ❌ **WRONG** - Do not use |
+
+**All SAPI voices must use the C++ wrapper CLSID**: `{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}`
+
 ### Key Components
 
 - **C++ COM Wrapper**: Native SAPI interface with full compatibility
@@ -50,24 +60,10 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 ### Prerequisites
 - Windows 10/11
 - Administrator privileges (for COM registration)
-- Python 3.11+ with uv package manager
-- .NET 6.0 Runtime (included in installer package)
+- Python 3.11+ with required packages
+- AACSpeakHelper service running
 
-### Option 1: Use Pre-built Package (Recommended)
-
-Download the latest release package from GitHub Actions artifacts or releases:
-
-```powershell
-# Extract the package and run installer as Administrator
-install.bat
-
-# The installer will:
-# - Register the C++ COM wrapper
-# - Set up voice configurations
-# - Prepare the system for AACSpeakHelper integration
-```
-
-### Option 2: Build from Source
+### Installation Steps
 
 #### Step 1: Set up AACSpeakHelper Service
 ```bash
@@ -80,25 +76,22 @@ uv venv && uv sync --all-extras
 uv run python AACSpeakHelperServer.py
 ```
 
-#### Step 2: Build and Install SAPI Bridge
+#### Step 2: Install SAPI Bridge
 ```powershell
 # Clone this repository
 git clone https://github.com/willwade/SherpaOnnxAzureSAPI-installer.git
 cd SherpaOnnxAzureSAPI-installer
 
-# Run the complete test workflow (builds everything)
-.\test_windows_integration.ps1
-
-# Or create installer package
-.\create_installer.ps1
+# Install a voice using the Python installer (requires admin PowerShell)
+sudo python sapi_voice_installer.py install English-SherpaOnnx-Jenny
 ```
 
 ### Quick Test
 ```powershell
-# Install a voice (no credentials needed)
-uv run python SapiVoiceManager.py --install English-SherpaOnnx-Jenny
+# Test the voice installation
+.\test-voice.ps1 Jenny
 
-# Test SAPI synthesis
+# Or test SAPI synthesis directly
 $voice = New-Object -ComObject SAPI.SpVoice
 $voice.Speak("Hello from SherpaOnnx via AACSpeakHelper!")
 ```
@@ -113,51 +106,39 @@ $voice.Speak("Hello from SherpaOnnx via AACSpeakHelper!")
 - **`British-English-Azure-Libby`** - Azure TTS British voice (requires API key)
 - **`American-English-Azure-Jenny`** - Azure TTS American voice (requires API key)
 
-#### CLI Voice Manager (Interactive Mode)
-```bash
-# Start the interactive voice manager
-uv run python SapiVoiceManager.py
-```
-
-This provides a user-friendly menu for:
-- Installing voices from AACSpeakHelper configurations
-- Managing voice registrations in Windows SAPI
-- Testing voice synthesis
-- Uninstalling voices
-
-#### Non-Interactive Commands
+#### Voice Installation Commands
 
 **Install Voice**:
-```bash
+```powershell
 # Install SherpaOnnx voice (no credentials needed)
-uv run python SapiVoiceManager.py --install English-SherpaOnnx-Jenny
+sudo python sapi_voice_installer.py install English-SherpaOnnx-Jenny
 
 # Install Google TTS voice (no credentials needed)
-uv run python SapiVoiceManager.py --install English-Google-Basic
+sudo python sapi_voice_installer.py install English-Google-Basic
 
 # Install Azure TTS voice (requires API key in AACSpeakHelper)
-uv run python SapiVoiceManager.py --install British-English-Azure-Libby
+sudo python sapi_voice_installer.py install British-English-Azure-Libby
 ```
 
-**List and View Voices**:
-```bash
-# List all available voice configurations
-uv run python SapiVoiceManager.py --list
+**List Voices**:
+```powershell
+# List all installed SAPI voices
+python sapi_voice_installer.py list
+```
 
-# View specific voice configuration
-uv run python SapiVoiceManager.py --view English-SherpaOnnx-Jenny
+**Test Voices**:
+```powershell
+# Test specific voice
+.\test-voice.ps1 Jenny
 
-# List installed SAPI voices
-uv run python SapiVoiceManager.py --list-installed
+# List all available SAPI voices
+.\test-voice.ps1
 ```
 
 **Remove Voices**:
-```bash
-# Remove a specific voice
-uv run python SapiVoiceManager.py --remove English-SherpaOnnx-Jenny
-
-# Remove all installed voices
-uv run python SapiVoiceManager.py --remove-all
+```powershell
+# Remove a voice
+sudo python sapi_voice_installer.py uninstall English-SherpaOnnx-Jenny
 ```
 
 ### Testing Installation
@@ -271,20 +252,20 @@ SherpaOnnxAzureSAPI-installer/
 │   ├── Program.cs                # Entry point and CLI interface
 │   ├── ConfigBasedVoiceManager.cs # Voice configuration management
 │   └── Installer.csproj          # .NET project file
+├── AACSpeakHelper/               # Python TTS service (submodule)
+│   └── AACSpeakHelperServer.py   # Main service entry point
 ├── voice_configs/                # Voice configuration files (AACSpeakHelper format)
 │   ├── English-SherpaOnnx-Jenny.json      # SherpaOnnx neural voice
 │   ├── English-Google-Basic.json          # Google TTS voice
 │   ├── British-English-Azure-Libby.json   # Azure TTS British voice
 │   └── American-English-Azure-Jenny.json  # Azure TTS American voice
-├── .github/workflows/            # CI/CD pipeline
-│   └── build-simple.yml          # GitHub Actions workflow
-├── SapiVoiceManager.py           # Python CLI tool (non-interactive)
-├── test_complete_workflow.ps1    # Complete build and test automation
-├── test_windows_integration.ps1  # Windows integration testing
-├── create_installer.ps1          # Installer package creation
+├── archive/                      # Archived old code
+│   └── old-dotnet-projects/      # Legacy .NET implementations
+├── install-voice.bat             # Voice installation script
+├── register-com-wrapper.bat      # COM wrapper registration
+├── test-voice.ps1               # Voice testing script
 ├── INTEGRATION_TESTING.md        # Complete testing guide
 ├── TODO.md                       # Project status and roadmap
-├── pyproject.toml                # Python dependencies
 └── README.md                     # This file
 ```
 

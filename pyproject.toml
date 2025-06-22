@@ -1,65 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "sherpaonnx-sapi-installer"
+name = "sherpaonnx-azure-sapi-installer"
 version = "1.0.0"
-description = "C++ SAPI Bridge to AACSpeakHelper - Voice installer and manager"
+description = "SAPI Voice Installer for AACSpeakHelper - A unified Python installer for managing SAPI voices"
 authors = [
-    {name = "Will Wade", email = "wwade@acecentre.org.uk"}
+    {name = "Will Wade", email = "willwade@gmail.com"}
 ]
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = {text = "MIT"}
 requires-python = ">=3.11"
+
 dependencies = [
-    # Core dependencies for voice management
-    "click>=8.0.0",
-    "colorama>=0.4.0",
-    "rich>=13.0.0",
-    
-    # JSON handling
-    "pydantic>=2.0.0",
-    
-    # Windows registry access
-    "winreg2>=1.0.0; sys_platform == 'win32'",
-    
-    # Optional: For future TTS testing
-    "requests>=2.28.0",
+    "pywin32>=310",
+    "pathlib",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
+    "black",  # for code formatting
+    "ruff",   # for linting
+    "pytest", # for testing
 ]
+
 build = [
-    "pyinstaller>=6.0.0",
-    "setuptools>=68.0.0",
+    "pyinstaller",
+]
+
+[tool.setuptools]
+py-modules = [
+    "sapi_voice_installer",
 ]
 
 [project.scripts]
-sapi-voice-manager = "SapiVoiceManager:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+sapi-voice-installer = "sapi_voice_installer:main"
 
 [tool.black]
 line-length = 88
 target-version = ['py311']
 
-[tool.isort]
-profile = "black"
-line_length = 88
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+[tool.ruff]
+line-length = 88
+target-version = "py311"
