@@ -14,31 +14,63 @@ import winreg
 import subprocess
 from pathlib import Path
 
-# Import the TTS engine definitions from cli_config_creator
-try:
-    from AACSpeakHelper.cli_config_creator import TTS_ENGINES
-except ImportError:
-    # Fallback TTS engines if cli_config_creator is not available
-    TTS_ENGINES = {
-        "sherpa": {
-            "name": "Sherpa-ONNX",
-            "config_section": "SherpaOnnxTTS", 
-            "credential_fields": [],
-            "voice_list": {"English": "en_GB-jenny_dioco-medium"},
-        },
-        "azure": {
-            "name": "Azure TTS",
-            "config_section": "azureTTS",
-            "credential_fields": ["key", "location"],
-            "voice_list": {"English (US)": "en-US-JennyNeural", "English (UK)": "en-GB-LibbyNeural"},
-        },
-        "google": {
-            "name": "Google TTS", 
-            "config_section": "googleTTS",
-            "credential_fields": ["creds"],
-            "voice_list": {"English (US)": "en-US-Wavenet-C"},
-        }
-    }
+# TTS engine definitions (moved from removed cli_config_creator.py)
+TTS_ENGINES = {
+    "sherpa": {
+        "name": "Sherpa-ONNX",
+        "config_section": "SherpaOnnxTTS",
+        "credential_fields": [],
+        "voice_list": {"English": "en_GB-jenny_dioco-medium"},
+    },
+    "azure": {
+        "name": "Azure TTS",
+        "config_section": "azureTTS",
+        "credential_fields": ["key", "location"],
+        "voice_list": {"English (US)": "en-US-JennyNeural", "English (UK)": "en-GB-LibbyNeural"},
+    },
+    "google": {
+        "name": "Google TTS",
+        "config_section": "googleTTS",
+        "credential_fields": ["creds"],
+        "voice_list": {"English (US)": "en-US-Wavenet-C"},
+    },
+    "elevenlabs": {
+        "name": "ElevenLabs",
+        "config_section": "ElevenLabsTTS",
+        "credential_fields": ["api_key"],
+        "voice_list": {},
+    },
+    "playht": {
+        "name": "PlayHT",
+        "config_section": "PlayHTTTS",
+        "credential_fields": ["api_key", "user_id"],
+        "voice_list": {},
+    },
+    "polly": {
+        "name": "AWS Polly",
+        "config_section": "PollyTTS",
+        "credential_fields": ["region", "aws_key_id", "aws_access_key"],
+        "voice_list": {},
+    },
+    "watson": {
+        "name": "IBM Watson",
+        "config_section": "WatsonTTS",
+        "credential_fields": ["api_key", "region", "instance_id"],
+        "voice_list": {},
+    },
+    "openai": {
+        "name": "OpenAI TTS",
+        "config_section": "OpenAITTS",
+        "credential_fields": ["api_key"],
+        "voice_list": {},
+    },
+    "witai": {
+        "name": "Wit.AI",
+        "config_section": "WitAiTTS",
+        "credential_fields": ["token"],
+        "voice_list": {},
+    },
+}
 
 # Constants
 NATIVE_TTS_WRAPPER_CLSID = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"

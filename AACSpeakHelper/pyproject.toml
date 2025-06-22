@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aacspeakhelper"
+version = "0.1.0"
+description = "A tool for windows to take text from the pasteboard or command line then translate or speak or both that string"
+authors = [
+    {name = "Will Wade", email = "willwade@gmail.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10,<3.13"
+
+dependencies = [
+    "PyAudio",
+    "numpy",
+    "comtypes",
+    "pytz",
+    "setuptools",
+    "langcodes",
+    "deep-translator[ai]",
+    "posthog",
+    "PySide6",
+    "translate",
+    "configparser",
+    "pyperclip",
+    "py3-tts-wrapper[controlaudio,elevenlabs,google,googletrans,microsoft,openai,playht,polly,sherpaonnx,watson,witai]==0.10.17",
+    "python-dotenv",
+    "cryptography",
+    "pyinstaller", # Move to main dependencies since it's needed for distribution
+    "pywin32>=310",
+    "openai>=1.0.0",
+    "aiohttp>=3.12.7",
+    "azure-cognitiveservices-speech>=1.44.0",
+    "ruff>=0.11.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",  # for code formatting
+    "ruff",   # for linting
+    "pytest", # for testing
+]
+
+# Keep build for backward compatibility if needed
+build = [
+    "pyinstaller",
+]
+
+[tool.setuptools]
+py-modules = [
+    "AACSpeakHelperServer",
+    "configure_enc_utils",
+    "utils",
+    "tts_utils",
+    "test_pipe"
+]
+# GUI_TranslateAndTTS package excluded from build
+# packages = ["GUI_TranslateAndTTS"]
+
+
+

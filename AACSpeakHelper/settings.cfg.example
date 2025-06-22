@@ -1,0 +1,53 @@
+[App]
+collectstats = True
+
+[translate]
+no_translate = True
+start_lang = en
+end_lang = en
+replace_pb = True
+provider = GoogleTranslator
+microsoft_translator_secret_key = 
+papago_translator_client_id = 
+papago_translator_secret_key = 
+my_memory_translator_secret_key = 
+email = 
+libre_translator_secret_key = 
+url = 
+deep_l_translator_secret_key = 
+deepl_pro = false
+region = 
+yandex_translator_secret_key = 
+qcri_translator_secret_key = 
+baidu_translator_appid = 
+baidu_translator_secret_key = 
+
+[TTS]
+engine = azureTTS
+bypass_tts = False
+save_audio_file = True
+rate = 0
+volume = 100
+voice_id = en_GB-jenny_dioco-medium
+
+[googleTTS]
+creds = 
+voice_id = en-US-Wavenet-C
+
+[googleTransTTS]
+voice_id = 
+
+[sapi5TTS]
+voice_id = HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+
+[SherpaOnnxTTS]
+voice_id = en_GB-jenny_dioco-medium
+
+[appCache]
+threshold = 7
+
+[azureTTS]
+key = YOUR_AZURE_TTS_KEY_HERE
+location = uksouth
+voice_id = en-GB-LibbyNeural
+

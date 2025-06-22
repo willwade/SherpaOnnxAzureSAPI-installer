@@ -55,6 +55,15 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 - **Voice Configurations**: JSON files defining TTS engine settings
 - **CLI Installer**: Python tool for voice management (matches AACSpeakHelper pattern)
 
+## 🔒 Security Notice
+
+**IMPORTANT**: This project handles TTS API credentials. Please follow these security practices:
+
+- ✅ **Never commit real API keys** to the repository
+- ✅ Use `settings.cfg.example` as a template and create your own `settings.cfg`
+- ✅ The `.gitignore` file protects `settings.cfg` from being committed
+- ✅ Store production credentials securely and separately from the codebase
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -67,9 +76,13 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 
 #### Step 1: Set up AACSpeakHelper Service
 ```bash
-# Clone and set up AACSpeakHelper
-git clone https://github.com/AceCentre/AACSpeakHelper
+# Navigate to AACSpeakHelper directory (integrated in this project)
 cd AACSpeakHelper
+
+# Set up configuration (IMPORTANT: Never commit real API keys!)
+cp settings.cfg.example settings.cfg
+# Edit settings.cfg with your real Azure TTS keys and other credentials
+
 uv venv && uv sync --all-extras
 
 # Start the service
@@ -257,8 +270,11 @@ SherpaOnnxAzureSAPI-installer/
 │   ├── Program.cs                # Entry point and CLI interface
 │   ├── ConfigBasedVoiceManager.cs # Voice configuration management
 │   └── Installer.csproj          # .NET project file
-├── AACSpeakHelper/               # Python TTS service (submodule)
-│   └── AACSpeakHelperServer.py   # Main service entry point
+├── AACSpeakHelper/               # Python TTS service (integrated)
+│   ├── AACSpeakHelperServer.py   # Main service entry point
+│   ├── tts_utils.py              # TTS engine utilities
+│   ├── utils.py                  # General utilities
+│   └── test_pipe.py              # Testing script for pipe service
 ├── voice_configs/                # Voice configuration files (AACSpeakHelper format)
 │   ├── English-SherpaOnnx-Jenny.json      # SherpaOnnx neural voice
 │   ├── English-Google-Basic.json          # Google TTS voice

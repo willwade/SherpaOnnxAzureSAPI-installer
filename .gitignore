@@ -102,6 +102,7 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -121,8 +122,38 @@ env.bak/
 venv.bak/
 .uv/
 
-# External repositories
-AACSpeakHelper/
+# Testing and coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# AACSpeakHelper specific
+# Generated audio files from testing
+Audio Files/
+*.wav
+
+# Configuration files with sensitive data
+.envrc
+settings.cfg
+**/settings.cfg
+# Azure TTS keys and other credentials
+*.key
+*.secret
+
+# macOS
+.DS_Store
+
+# External repositories (removed AACSpeakHelper - now integrated)
 
 # Build output directories
 build-output/
