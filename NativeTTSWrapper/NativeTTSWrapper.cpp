@@ -241,17 +241,30 @@ HRESULT CNativeTTSWrapper::GenerateAudioViaPipeService(const std::wstring& text,
 
         LogMessage(L"Message sent successfully");
 
-        // Receive audio response
-        if (!ReceivePipeResponse(hPipe, audioData))
-        {
-            LogMessage(L"Failed to receive audio response from AACSpeakHelper");
-            CloseHandle(hPipe);
-            return E_FAIL;
-        }
-
-        LogMessage((L"Received " + std::to_wstring(audioData.size()) + L" bytes of audio data").c_str());
-
         CloseHandle(hPipe);
+
+        // AACSpeakHelper processes TTS and plays audio directly, but doesn't send audio back through pipe
+        // For SAPI compatibility, we need to provide some audio data
+        // TODO: Optimize this to get actual audio data from AACSpeakHelper
+        LogMessage(L"AACSpeakHelper request sent successfully - TTS will play through system audio");
+
+        // Create a minimal WAV file with silence for SAPI compatibility
+        // This satisfies SAPI's requirement for audio data while AACSpeakHelper handles actual playback
+        audioData.resize(1024); // Small audio buffer
+
+        // WAV header for 22050Hz, 16-bit, mono (matches our GetOutputFormat)
+        BYTE wavHeader[] = {
+            'R','I','F','F', 0x00,0x04,0x00,0x00, 'W','A','V','E',  // RIFF header
+            'f','m','t',' ', 0x10,0x00,0x00,0x00, 0x01,0x00, 0x01,0x00,  // fmt chunk
+            0x22,0x56,0x00,0x00, 0x44,0xAC,0x00,0x00, 0x02,0x00, 0x10,0x00,  // 22050Hz, mono, 16-bit
+            'd','a','t','a', 0xC0,0x03,0x00,0x00  // data chunk (960 bytes of data)
+        };
+
+        memcpy(audioData.data(), wavHeader, sizeof(wavHeader));
+        // Fill rest with silence (zeros) - this creates a brief silent audio clip
+        memset(audioData.data() + sizeof(wavHeader), 0, audioData.size() - sizeof(wavHeader));
+
+        LogMessage(L"Generated silent audio data for SAPI compatibility - actual audio plays through AACSpeakHelper");
         return S_OK;
     }
     catch (const std::exception& ex)

@@ -214,11 +214,16 @@ $voice.Speak("This is Jenny from SherpaOnnx neural TTS!")
 #### Build C++ COM Wrapper
 ```powershell
 # Build the native SAPI COM wrapper
-msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64
+.\build_com_wrapper.bat
 
-# Register the COM wrapper (as Administrator)
-regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+# Register the COM wrapper (as Administrator) - USE THE BATCH SCRIPT!
+sudo .\register-com-wrapper.bat
+
+# Alternative manual build (if needed)
+# msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64
 ```
+
+**⚠️ Important**: Always use `sudo .\register-com-wrapper.bat` for COM registration. Direct `regsvr32` calls often fail due to missing dependencies.
 
 #### Build .NET Installer
 ```powershell
@@ -330,6 +335,35 @@ regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
 
 # Check CLSID registration
 Get-ItemProperty "HKCR:\CLSID\{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"
+```
+
+#### COM Registration Issues
+**⚠️ IMPORTANT**: Use the batch script for reliable COM registration:
+
+```powershell
+# ✅ RECOMMENDED: Use the registration script (most reliable)
+sudo .\register-com-wrapper.bat
+
+# ❌ AVOID: Direct regsvr32 often fails
+# regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+```
+
+**Why the batch script works better:**
+- Handles dependency copying automatically
+- Uses proper error handling
+- Includes required DLL dependencies
+- More reliable than direct regsvr32 calls
+
+**If COM registration fails:**
+```powershell
+# Clean registry first
+sudo reg delete "HKEY_CLASSES_ROOT\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}" /f
+
+# Then use the batch script
+sudo .\register-com-wrapper.bat
+
+# Verify registration
+.\debug-com-direct.ps1
 ```
 
 #### AACSpeakHelper Service Not Running
