@@ -1,0 +1,131 @@
+name: Build SherpaOnnx Azure SAPI Installer
+
+on:
+  push:
+    branches: [ main, config-based-sapi-voices ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install uv
+        pip install pyinstaller
+        uv sync
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.3
+      with:
+        vs-version: latest
+    
+    - name: Setup NSIS
+      run: |
+        Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.09/nsis-3.09-setup.exe" -OutFile "nsis-setup.exe"
+        Start-Process -FilePath "nsis-setup.exe" -ArgumentList "/S" -Wait
+        echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    
+    - name: Build C++ COM Wrapper
+      run: |
+        cd NativeTTSWrapper
+        msbuild NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Clean
+        msbuild NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=x64
+        cd ..
+    
+    - name: Build Python Installer
+      run: |
+        pyinstaller --onefile --console --name sapi_voice_installer sapi_voice_installer.py
+    
+    - name: Build AACSpeakHelper Server
+      run: |
+        cd AACSpeakHelper
+        uv run pyinstaller --onefile --console --name AACSpeakHelperServer AACSpeakHelperServer.py
+        cd ..
+    
+    - name: Create NSIS Installer
+      run: |
+        makensis installer.nsi
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: SherpaOnnxAzureSAPI-installer-${{ github.sha }}
+        path: |
+          SherpaOnnxAzureSAPI-installer.exe
+          dist/sapi_voice_installer.exe
+          AACSpeakHelper/dist/AACSpeakHelperServer.exe
+          NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll
+          NativeTTSWrapper/x64/Release/*.dll
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          SherpaOnnxAzureSAPI-installer.exe
+          dist/sapi_voice_installer.exe
+          AACSpeakHelper/dist/AACSpeakHelperServer.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-installer:
+    needs: build-windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: SherpaOnnxAzureSAPI-installer-${{ github.sha }}
+    
+    - name: Test installer (dry run)
+      run: |
+        # Test that executables were created
+        if (Test-Path "dist/sapi_voice_installer.exe") {
+          Write-Host "✅ sapi_voice_installer.exe created"
+        } else {
+          Write-Host "❌ sapi_voice_installer.exe missing"
+          exit 1
+        }
+        
+        if (Test-Path "AACSpeakHelper/dist/AACSpeakHelperServer.exe") {
+          Write-Host "✅ AACSpeakHelperServer.exe created"
+        } else {
+          Write-Host "❌ AACSpeakHelperServer.exe missing"
+          exit 1
+        }
+        
+        if (Test-Path "NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll") {
+          Write-Host "✅ NativeTTSWrapper.dll created"
+        } else {
+          Write-Host "❌ NativeTTSWrapper.dll missing"
+          exit 1
+        }
+        
+        if (Test-Path "SherpaOnnxAzureSAPI-installer.exe") {
+          Write-Host "✅ NSIS installer created"
+        } else {
+          Write-Host "❌ NSIS installer missing"
+          exit 1
+        }
+        
+        Write-Host "🎉 All build artifacts present!"

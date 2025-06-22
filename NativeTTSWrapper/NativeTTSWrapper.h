@@ -59,6 +59,8 @@ public:
     STDMETHOD(SetObjectToken)(ISpObjectToken* pToken) override;
     STDMETHOD(GetObjectToken)(ISpObjectToken** ppToken) override;
 
+
+
 private:
     // Member variables
     CComPtr<ISpObjectToken> m_pToken;
