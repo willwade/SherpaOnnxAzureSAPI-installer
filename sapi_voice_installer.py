@@ -443,8 +443,9 @@ class SAPIVoiceInstaller:
             sys.exit(1)
     
     def register_com_wrapper(self, unattended_mode=False):
-        """Register the C++ COM wrapper DLL with sophisticated error handling"""
-        dll_path = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
+        """Register both x86 and x64 C++ COM wrapper DLLs with sophisticated error handling"""
+        dll_path_x64 = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
+        dll_path_x86 = Path("NativeTTSWrapper/Win32/Release/NativeTTSWrapper.dll")
 
         # Check if running in unattended mode (CI/automated)
         if not unattended_mode:
@@ -459,8 +460,11 @@ class SAPIVoiceInstaller:
         else:
             print("[INTERACTIVE] Running COM registration in interactive mode")
 
-        if not dll_path.exists():
-            print(f"❌ COM wrapper DLL not found: {dll_path}")
+        # Check if at least one DLL exists
+        if not dll_path_x64.exists() and not dll_path_x86.exists():
+            print(f"❌ No COM wrapper DLLs found:")
+            print(f"   x64: {dll_path_x64}")
+            print(f"   x86: {dll_path_x86}")
             print("   Please build the C++ project first")
             return False
 
@@ -474,34 +478,37 @@ class SAPIVoiceInstaller:
         else:
             print("[OK] Running as Administrator")
 
-        print(f"[INFO] Registering COM wrapper: {dll_path}")
+        # Register both architectures
+        success_count = 0
+        total_count = 0
 
-        try:
-            # First registration attempt
-            result = subprocess.run([
-                "regsvr32", "/s", str(dll_path.absolute())
-            ], capture_output=True)
+        for dll_path, arch_name in [(dll_path_x64, "x64"), (dll_path_x86, "x86")]:
+            if not dll_path.exists():
+                print(f"[INFO] Skipping {arch_name} registration - DLL not found: {dll_path}")
+                continue
 
-            if result.returncode == 0:
-                print("[OK] COM wrapper registered successfully!")
-                print("     SAPI voices should now work for speech synthesis.")
+            total_count += 1
+            print(f"[INFO] Registering {arch_name} COM wrapper: {dll_path}")
 
-                # Verify registration
-                print("[INFO] Verifying registration...")
-                if self._verify_com_registration():
-                    print("[OK] CLSID registration verified")
+            try:
+                # First registration attempt
+                result = subprocess.run([
+                    "regsvr32", "/s", str(dll_path.absolute())
+                ], capture_output=True)
+
+                if result.returncode == 0:
+                    print(f"[OK] {arch_name} COM wrapper registered successfully!")
+                    success_count += 1
                 else:
-                    print("[WARNING] CLSID not found in registry - registration may have failed")
+                    print(f"[WARNING] {arch_name} registration failed (exit code: {result.returncode})")
+                    print(f"[INFO] Attempting cleanup and retry for {arch_name}...")
 
-                return True
-            else:
-                print(f"[ERROR] COM wrapper registration failed with exit code: {result.returncode}")
-                print("[INFO] Attempting automatic cleanup and retry...")
-                print("       Running cleanup to remove stale registry entries...")
-
-                # Attempt cleanup and retry
-                if self._cleanup_com_registration():
-                    print("[INFO] Cleanup completed. Retrying COM registration...")
+                    # Clean up any stale registrations
+                    cleanup_success = self._cleanup_com_registration()
+                    if cleanup_success:
+                        print(f"[OK] Cleanup completed successfully for {arch_name}")
+                    else:
+                        print(f"[WARNING] Cleanup had some issues for {arch_name}, but continuing...")
 
                     # Wait a moment for cleanup to complete
                     time.sleep(2)
@@ -512,38 +519,39 @@ class SAPIVoiceInstaller:
                     ], capture_output=True)
 
                     if retry_result.returncode == 0:
-                        print("[OK] COM wrapper registered successfully after cleanup!")
-                        print("     SAPI voices should now work for speech synthesis.")
-                        return True
+                        print(f"[OK] {arch_name} COM wrapper registered successfully after cleanup!")
+                        success_count += 1
                     else:
-                        print("[ERROR] COM registration failed again after cleanup.")
-                        if unattended_mode:
-                            print("[CI MODE] COM registration failed in unattended mode")
-                            print("         This is expected in CI environments without admin privileges")
-                            print("         The build will continue - COM registration will be needed on target systems")
-                        else:
-                            print("")
-                            print("[SOLUTION] This usually indicates file locks or permission issues.")
-                            print("           Please try the following:")
-                            print("")
-                            print("           1. RESTART your computer")
-                            print("           2. Run this installer again as administrator")
-                            print("")
-                            print("           If the problem persists:")
-                            print("           - Check Windows Event Viewer for COM errors")
-                            print("           - Ensure no SAPI applications are running")
-                            print("           - Verify all DLL dependencies are present")
-                            print("")
-                        return False
-                else:
-                    print("[ERROR] Cleanup failed")
-                    if not unattended_mode:
-                        print("        Please restart your computer and try again")
-                    return False
+                        print(f"[ERROR] {arch_name} registration failed even after cleanup (exit code: {retry_result.returncode})")
 
-        except Exception as e:
-            print(f"❌ Failed to register COM wrapper: {e}")
+                        # Try to get more detailed error information
+                        if retry_result.stderr:
+                            error_msg = retry_result.stderr.decode('utf-8', errors='ignore').strip()
+                            if error_msg:
+                                print(f"[ERROR] {arch_name} error details: {error_msg}")
+
+            except Exception as e:
+                print(f"❌ Failed to register {arch_name} COM wrapper: {e}")
+
+        # Summary
+        if success_count == 0:
+            print("❌ Failed to register any COM wrappers")
+            print("[INFO] This might be due to:")
+            print("        - Missing Visual C++ Redistributables")
+            print("        - Antivirus blocking the registration")
+            print("        - Insufficient permissions")
+            print("        - DLL dependencies not found")
+            if not unattended_mode:
+                print("        Please restart your computer and try again")
             return False
+        elif success_count == total_count:
+            print(f"✅ Successfully registered all {success_count} COM wrappers!")
+            print("   SAPI voices should now work in both 32-bit and 64-bit applications.")
+            return True
+        else:
+            print(f"⚠️ Partially successful: {success_count}/{total_count} COM wrappers registered")
+            print("   Some SAPI applications may not see the voices.")
+            return True  # Partial success is still success
 
     def _verify_com_registration(self):
         """Verify COM registration by checking registry"""
@@ -562,9 +570,10 @@ class SAPIVoiceInstaller:
         try:
             print("[INFO] Cleaning up stale COM registrations...")
 
-            # Unregister any existing COM wrappers
+            # Unregister any existing COM wrappers (both architectures)
             dll_paths = [
                 Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll"),
+                Path("NativeTTSWrapper/Win32/Release/NativeTTSWrapper.dll"),
                 Path("C:/Program Files/SherpaOnnx Azure SAPI Bridge/NativeTTSWrapper.dll"),
                 Path("C:/Program Files (x86)/SherpaOnnx Azure SAPI Bridge/NativeTTSWrapper.dll")
             ]
@@ -638,8 +647,9 @@ class SAPIVoiceInstaller:
             return False
 
     def unregister_com_wrapper(self, unattended_mode=False):
-        """Unregister the C++ COM wrapper DLL with sophisticated error handling"""
-        dll_path = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
+        """Unregister both x86 and x64 C++ COM wrapper DLLs with sophisticated error handling"""
+        dll_path_x64 = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
+        dll_path_x86 = Path("NativeTTSWrapper/Win32/Release/NativeTTSWrapper.dll")
 
         # Check if running in unattended mode (CI/automated)
         if not unattended_mode:
@@ -669,41 +679,59 @@ class SAPIVoiceInstaller:
         # Always run cleanup regardless of DLL existence
         cleanup_success = self._cleanup_com_registration()
 
-        if not dll_path.exists():
-            print(f"[INFO] COM wrapper DLL not found: {dll_path}")
+        # Check if any DLLs exist
+        if not dll_path_x64.exists() and not dll_path_x86.exists():
+            print("[INFO] No COM wrapper DLLs found")
             if cleanup_success:
-                print("✅ COM wrapper unregistered (cleanup completed)")
+                print("✅ COM wrappers unregistered (cleanup completed)")
                 return True
             else:
-                print("⚠️ DLL not found, but cleanup had issues")
-                return True  # Still consider it successful if DLL doesn't exist
+                print("⚠️ DLLs not found, but cleanup had issues")
+                return True  # Still consider it successful if DLLs don't exist
 
-        try:
-            # Unregister the specific DLL
-            result = subprocess.run([
-                "regsvr32", "/s", "/u", str(dll_path.absolute())
-            ], capture_output=True)
+        # Unregister both architectures
+        success_count = 0
+        total_count = 0
 
-            if result.returncode == 0:
-                print(f"✅ COM wrapper unregistered successfully: {dll_path}")
-                print("   All SAPI voice registrations should be removed")
-                return True
-            else:
-                print(f"[WARNING] COM unregistration returned exit code: {result.returncode}")
-                if cleanup_success:
-                    print("✅ Registry cleanup completed - unregistration should be effective")
-                    return True
+        for dll_path, arch_name in [(dll_path_x64, "x64"), (dll_path_x86, "x86")]:
+            if not dll_path.exists():
+                print(f"[INFO] Skipping {arch_name} unregistration - DLL not found: {dll_path}")
+                continue
+
+            total_count += 1
+            print(f"[INFO] Unregistering {arch_name} COM wrapper: {dll_path}")
+
+            try:
+                # Unregister the specific DLL
+                result = subprocess.run([
+                    "regsvr32", "/s", "/u", str(dll_path.absolute())
+                ], capture_output=True)
+
+                if result.returncode == 0:
+                    print(f"✅ {arch_name} COM wrapper unregistered successfully")
+                    success_count += 1
                 else:
-                    print("❌ Both DLL unregistration and cleanup had issues")
-                    return False
+                    print(f"[WARNING] {arch_name} unregistration returned exit code: {result.returncode}")
 
-        except Exception as e:
-            print(f"[ERROR] Failed to unregister COM wrapper: {e}")
-            if cleanup_success:
-                print("✅ Registry cleanup completed - this may be sufficient")
+            except Exception as e:
+                print(f"[ERROR] Failed to unregister {arch_name} COM wrapper: {e}")
+
+        # Summary
+        if cleanup_success:
+            print("✅ Registry cleanup completed")
+            if success_count == total_count:
+                print(f"✅ Successfully unregistered all {success_count} COM wrappers!")
+            elif success_count > 0:
+                print(f"⚠️ Partially successful: {success_count}/{total_count} COM wrappers unregistered")
+            else:
+                print("⚠️ DLL unregistration had issues, but registry cleanup completed")
+            return True
+        else:
+            if success_count == total_count and total_count > 0:
+                print(f"✅ Successfully unregistered all {success_count} COM wrappers!")
                 return True
             else:
-                print("❌ Both DLL unregistration and cleanup failed")
+                print("❌ Both DLL unregistration and cleanup had issues")
                 return False
 
     def create_aacspeakhelper_config(self, engine_key="sherpa", azure_key=None, azure_region="uksouth"):
@@ -985,7 +1013,7 @@ class SAPIVoiceInstaller:
         print(f"✅ Voice installation complete: {voice_name}")
         return True
 
-    def uninstall_voice(self, voice_name):
+    def uninstall_voice(self, voice_name, config_path=None):
         """Uninstall a SAPI voice"""
         print(f"\n🗑️ Uninstalling voice: {voice_name}")
 
@@ -994,11 +1022,19 @@ class SAPIVoiceInstaller:
             return False
 
         # Step 2: Remove configuration file
-        config_path = VOICE_CONFIGS_DIR / f"{voice_name}.json"
+        if config_path:
+            # Use the provided config path
+            config_file_path = Path(config_path)
+        else:
+            # Fallback to constructing the path
+            config_file_path = VOICE_CONFIGS_DIR / f"{voice_name}.json"
+
         try:
-            if config_path.exists():
-                config_path.unlink()
-                print(f"✅ Voice config removed: {config_path}")
+            if config_file_path.exists():
+                config_file_path.unlink()
+                print(f"✅ Voice config removed: {config_file_path}")
+            else:
+                print(f"⚠️ Config file not found: {config_file_path}")
         except Exception as e:
             print(f"⚠️ Failed to remove voice config: {e}")
 
@@ -1448,14 +1484,17 @@ class SAPIVoiceInstaller:
                     return
                 elif 0 <= choice < len(voices):
                     selected_voice = voices[choice]
+                    voice_name = selected_voice.get('name', 'Unknown')
+                    display_name = selected_voice.get('display_name', voice_name)
+                    config_path = selected_voice.get('config_path')
 
                     # Confirm uninstallation
-                    confirm = input(f"\nAre you sure you want to uninstall '{selected_voice}'? (y/N): ").strip().lower()
+                    confirm = input(f"\nAre you sure you want to uninstall '{display_name}'? (y/N): ").strip().lower()
                     if confirm == 'y':
-                        if self.uninstall_voice(selected_voice):
-                            print(f"✅ Voice '{selected_voice}' uninstalled successfully!")
+                        if self.uninstall_voice(voice_name, config_path):
+                            print(f"✅ Voice '{display_name}' uninstalled successfully!")
                         else:
-                            print(f"❌ Failed to uninstall voice '{selected_voice}'")
+                            print(f"❌ Failed to uninstall voice '{display_name}'")
                     else:
                         print("Uninstallation cancelled.")
                     return
@@ -1516,7 +1555,7 @@ PREDEFINED_VOICES = {
 def main():
     """Main CLI interface"""
     parser = argparse.ArgumentParser(
-        description="SAPI Voice Installer for AACSpeakHelper",
+        description="OpenSpeechSAPI - Universal SAPI Voice Installer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

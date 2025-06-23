@@ -1,4 +1,4 @@
-name: Build SherpaOnnx SAPI Installer (Simple)
+name: Build OpenSpeechSAPI Installer (Simple)
 
 on:
   push:
@@ -165,7 +165,7 @@ jobs:
           ```
           
           ## Repository:
-          https://github.com/willwade/SherpaOnnxAzureSAPI-installer
+          https://github.com/willwade/OpenSpeechSAPI
           '@
           
           $readmeContent | Out-File "build-output\README.md" -Encoding UTF8
@@ -185,7 +185,7 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SherpaOnnx-SAPI-CI-Build
+          name: OpenSpeechSAPI-CI-Build
           path: build-output/
           retention-days: 30
 

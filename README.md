@@ -1,6 +1,6 @@
-# SherpaOnnxAzureSAPI-installer
+# OpenSpeechSAPI
 
-A **simplified Python + C++ SAPI bridge** that connects Windows SAPI applications to the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, etc.) through a unified interface.
+A **universal SAPI bridge** that connects Windows SAPI applications to multiple TTS engines through the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, ElevenLabs, OpenAI, and more) through a unified interface.
 
 ## 🎯 **Simplified Architecture**
 
@@ -224,7 +224,7 @@ uv run pyinstaller --onefile --name "sapi_voice_installer" sapi_voice_installer.
 ## 📁 Project Structure
 
 ```
-SherpaOnnxAzureSAPI-installer/
+OpenSpeechSAPI/
 ├── NativeTTSWrapper/             # C++ SAPI COM wrapper
 │   ├── NativeTTSWrapper.cpp      # Main SAPI implementation
 │   ├── NativeTTSWrapper.h        # Interface definitions
@@ -407,4 +407,4 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 ---
 
-**🎉 Ready to bridge SAPI applications to multiple TTS engines? Install the C++ SAPI Bridge today!**
+**🎉 Ready to bridge SAPI applications to multiple TTS engines? Install OpenSpeechSAPI today!**

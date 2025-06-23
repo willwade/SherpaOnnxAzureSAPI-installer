@@ -2,9 +2,9 @@
 # pyproject.toml is used here only for dependency management with uv
 
 [project]
-name = "sherpaonnx-azure-sapi-installer"
+name = "openspeechsapi"
 version = "1.0.0"
-description = "Standalone SAPI Voice Installer and TTS Server Application"
+description = "OpenSpeechSAPI - Universal SAPI Bridge for Multiple TTS Engines"
 authors = [
     {name = "Will Wade", email = "willwade@gmail.com"}
 ]

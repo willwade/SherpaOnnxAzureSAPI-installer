@@ -1,4 +1,4 @@
-# Test SAPI Libby Voice - Comprehensive Test
+# OpenSpeechSAPI - Test SAPI Libby Voice - Comprehensive Test
 # This script lists all SAPI voices and specifically tests the Libby voice
 
 Write-Host "🎤 SAPI Voice Test - Libby Focus" -ForegroundColor Cyan

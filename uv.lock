@@ -1120,6 +1120,68 @@ wheels = [
 ]
 
 [[package]]
+name = "openspeechsapi"
+version = "1.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "azure-cognitiveservices-speech" },
+    { name = "comtypes" },
+    { name = "cryptography" },
+    { name = "deep-translator" },
+    { name = "langcodes" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "posthog" },
+    { name = "py3-tts-wrapper", extra = ["google", "googletrans", "microsoft", "openai", "polly", "sherpaonnx", "watson"] },
+    { name = "pyaudio" },
+    { name = "pyperclip" },
+    { name = "pyside6" },
+    { name = "python-dotenv" },
+    { name = "pytz" },
+    { name = "pywin32" },
+    { name = "setuptools" },
+    { name = "translate" },
+]
+
+[package.optional-dependencies]
+build = [
+    { name = "pyinstaller" },
+]
+dev = [
+    { name = "black" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.12.7" },
+    { name = "azure-cognitiveservices-speech", specifier = ">=1.44.0" },
+    { name = "black", marker = "extra == 'dev'" },
+    { name = "comtypes" },
+    { name = "cryptography" },
+    { name = "deep-translator", extras = ["ai"] },
+    { name = "langcodes" },
+    { name = "numpy" },
+    { name = "openai", specifier = ">=1.0.0" },
+    { name = "posthog" },
+    { name = "py3-tts-wrapper", extras = ["elevenlabs", "google", "googletrans", "microsoft", "openai", "playht", "polly", "sherpaonnx", "watson", "witai"], specifier = "==0.10.19" },
+    { name = "pyaudio" },
+    { name = "pyinstaller", marker = "extra == 'build'" },
+    { name = "pyperclip" },
+    { name = "pyside6" },
+    { name = "pytest", marker = "extra == 'dev'" },
+    { name = "python-dotenv" },
+    { name = "pytz" },
+    { name = "pywin32", specifier = ">=310" },
+    { name = "ruff", marker = "extra == 'dev'" },
+    { name = "setuptools" },
+    { name = "translate" },
+]
+provides-extras = ["dev", "build"]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1754,68 +1816,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/53/ce/1376051f06b7b5f9462df396827489ff7ebaa77dfa3e7ec8a5d51d9dd619/sherpa_onnx-1.12.1-cp313-cp313-win32.whl", hash = "sha256:e7b8ea0f202e03695c296e502a2c2b5ec9d12969f23e754f58b417766a92a128", size = 20809262, upload-time = "2025-06-03T14:16:26.97Z" },
     { url = "https://files.pythonhosted.org/packages/13/c2/839ce2f38a065e65916900ede998ad223e3698a633788ce92e84253ffe41/sherpa_onnx-1.12.1-cp313-cp313-win_amd64.whl", hash = "sha256:3ee6d99e4196e39b89008587292450b56621a1fba07891faadfc159f4d885c93", size = 24288426, upload-time = "2025-06-03T14:58:13.382Z" },
 ]
-
-[[package]]
-name = "sherpaonnx-azure-sapi-installer"
-version = "1.0.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "azure-cognitiveservices-speech" },
-    { name = "comtypes" },
-    { name = "cryptography" },
-    { name = "deep-translator" },
-    { name = "langcodes" },
-    { name = "numpy" },
-    { name = "openai" },
-    { name = "posthog" },
-    { name = "py3-tts-wrapper", extra = ["google", "googletrans", "microsoft", "openai", "polly", "sherpaonnx", "watson"] },
-    { name = "pyaudio" },
-    { name = "pyperclip" },
-    { name = "pyside6" },
-    { name = "python-dotenv" },
-    { name = "pytz" },
-    { name = "pywin32" },
-    { name = "setuptools" },
-    { name = "translate" },
-]
-
-[package.optional-dependencies]
-build = [
-    { name = "pyinstaller" },
-]
-dev = [
-    { name = "black" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", specifier = ">=3.12.7" },
-    { name = "azure-cognitiveservices-speech", specifier = ">=1.44.0" },
-    { name = "black", marker = "extra == 'dev'" },
-    { name = "comtypes" },
-    { name = "cryptography" },
-    { name = "deep-translator", extras = ["ai"] },
-    { name = "langcodes" },
-    { name = "numpy" },
-    { name = "openai", specifier = ">=1.0.0" },
-    { name = "posthog" },
-    { name = "py3-tts-wrapper", extras = ["elevenlabs", "google", "googletrans", "microsoft", "openai", "playht", "polly", "sherpaonnx", "watson", "witai"], specifier = "==0.10.19" },
-    { name = "pyaudio" },
-    { name = "pyinstaller", marker = "extra == 'build'" },
-    { name = "pyperclip" },
-    { name = "pyside6" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "python-dotenv" },
-    { name = "pytz" },
-    { name = "pywin32", specifier = ">=310" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "setuptools" },
-    { name = "translate" },
-]
-provides-extras = ["dev", "build"]
 
 [[package]]
 name = "shiboken6"

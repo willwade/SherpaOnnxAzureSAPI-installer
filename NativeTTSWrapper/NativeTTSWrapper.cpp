@@ -18,13 +18,7 @@
 #include <sstream>
 #include <algorithm>
 
-// Include SherpaOnnx C API for direct fallback
-extern "C" {
-    #include "sherpa-onnx-c-api.h"
-}
-
-// Include TTSEngineManager for native engine support
-#include "TTSEngineManager.h"
+// Pure pipe client - no external TTS libraries needed
 
 // Implementation of CNativeTTSWrapper
 
@@ -386,7 +380,7 @@ bool CNativeTTSWrapper::ReceivePipeResponse(HANDLE hPipe, std::vector<BYTE>& aud
         while (totalBytesRead < audioLength)
         {
             DWORD remainingBytes = audioLength - totalBytesRead;
-            DWORD bytesToRead = min(chunkSize, remainingBytes);
+            DWORD bytesToRead = (chunkSize < remainingBytes) ? chunkSize : remainingBytes;
             DWORD chunkBytesRead = 0;
 
             if (!ReadFile(hPipe, audioData.data() + totalBytesRead, bytesToRead, &chunkBytesRead, nullptr))

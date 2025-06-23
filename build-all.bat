@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================================
-REM SherpaOnnx Azure SAPI Installer - Complete Build Script
+REM OpenSpeechSAPI - Universal SAPI Bridge - Complete Build Script
 REM ============================================================================
 REM This script builds the entire project:
 REM 1. C++ COM Wrapper (NativeTTSWrapper)
@@ -127,24 +127,39 @@ echo [STEP 1] Building C++ COM Wrapper...
 echo ----------------------------------------
 cd /d "%PROJECT_ROOT%NativeTTSWrapper"
 
-echo Cleaning previous build...
+echo Cleaning previous builds...
 "!MSBUILD_PATH!" NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Clean
+"!MSBUILD_PATH!" NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=Win32 /t:Clean
 if %errorLevel% neq 0 (
     echo [ERROR] Failed to clean C++ project
     if "%UNATTENDED_MODE%"=="false" pause
     exit /b 1
 )
 
-echo Building C++ COM Wrapper...
+echo Building C++ COM Wrapper (x64)...
 "!MSBUILD_PATH!" NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=x64
 if %errorLevel% neq 0 (
-    echo [ERROR] Failed to build C++ COM Wrapper
+    echo [ERROR] Failed to build x64 C++ COM Wrapper
+    if "%UNATTENDED_MODE%"=="false" pause
+    exit /b 1
+)
+
+echo Building C++ COM Wrapper (x86)...
+"!MSBUILD_PATH!" NativeTTSWrapper.vcxproj /p:Configuration=Release /p:Platform=Win32
+if %errorLevel% neq 0 (
+    echo [ERROR] Failed to build x86 C++ COM Wrapper
     if "%UNATTENDED_MODE%"=="false" pause
     exit /b 1
 )
 
 if not exist "x64\Release\NativeTTSWrapper.dll" (
-    echo [ERROR] NativeTTSWrapper.dll was not created
+    echo [ERROR] x64 NativeTTSWrapper.dll was not created
+    if "%UNATTENDED_MODE%"=="false" pause
+    exit /b 1
+)
+
+if not exist "Win32\Release\NativeTTSWrapper.dll" (
+    echo [ERROR] x86 NativeTTSWrapper.dll was not created
     if "%UNATTENDED_MODE%"=="false" pause
     exit /b 1
 )

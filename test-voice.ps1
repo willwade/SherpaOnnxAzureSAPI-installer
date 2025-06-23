@@ -1,4 +1,4 @@
-# Test SAPI Voice Installation
+# OpenSpeechSAPI - Test SAPI Voice Installation
 # Usage: .\test-voice.ps1 [VoiceName]
 
 param(

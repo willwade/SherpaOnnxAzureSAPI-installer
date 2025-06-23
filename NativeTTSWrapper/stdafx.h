@@ -23,8 +23,6 @@
 #include <codecvt>
 #include <locale>
 
-// Third-party libraries
-#include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
+// Pure pipe client - no third-party libraries needed
 
 using namespace ATL;

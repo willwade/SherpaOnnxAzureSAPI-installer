@@ -1,10 +1,10 @@
-; SherpaOnnx Azure SAPI Installer - NSIS Script
+; OpenSpeechSAPI - Universal SAPI Bridge Installer - NSIS Script
 ; ============================================================================
 
-!define PRODUCT_NAME "SherpaOnnx Azure SAPI Bridge"
+!define PRODUCT_NAME "OpenSpeechSAPI"
 !define PRODUCT_VERSION "1.0.0"
 !define PRODUCT_PUBLISHER "AceCentre"
-!define PRODUCT_WEB_SITE "https://github.com/willwade/SherpaOnnxAzureSAPI-installer"
+!define PRODUCT_WEB_SITE "https://github.com/willwade/OpenSpeechSAPI"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\sapi_voice_installer.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
@@ -17,7 +17,7 @@ RequestExecutionLevel admin
 
 ; General
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "SherpaOnnxAzureSAPI-installer.exe"
+OutFile "OpenSpeechSAPI-installer.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show

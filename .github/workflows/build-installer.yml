@@ -1,4 +1,4 @@
-name: Build SherpaOnnx Azure SAPI Installer
+name: Build OpenSpeechSAPI Installer
 
 on:
   push:
@@ -64,9 +64,9 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: SherpaOnnxAzureSAPI-installer-${{ github.sha }}
+        name: OpenSpeechSAPI-installer-${{ github.sha }}
         path: |
-          SherpaOnnxAzureSAPI-installer.exe
+          OpenSpeechSAPI-installer.exe
           dist/sapi_voice_installer.exe
           AACSpeakHelper/dist/AACSpeakHelperServer.exe
           NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll
@@ -77,7 +77,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          SherpaOnnxAzureSAPI-installer.exe
+          OpenSpeechSAPI-installer.exe
           dist/sapi_voice_installer.exe
           AACSpeakHelper/dist/AACSpeakHelperServer.exe
         draft: false
@@ -94,7 +94,7 @@ jobs:
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: SherpaOnnxAzureSAPI-installer-${{ github.sha }}
+        name: OpenSpeechSAPI-installer-${{ github.sha }}
     
     - name: Test installer (dry run)
       run: |

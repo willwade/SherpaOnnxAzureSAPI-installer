@@ -1,8 +1,6 @@
 #pragma once
 
 #include "resource.h"
-#include "ITTSEngine.h"
-#include "TTSEngineManager.h"
 #include <windows.h>
 #include <sapi.h>
 #include <sphelper.h>
@@ -12,7 +10,7 @@
 #include <vector>
 #include <memory>
 
-// Native COM wrapper for Multi-Engine TTS System
+// OpenSpeechSAPI - Native COM wrapper for Multi-Engine TTS System
 // This provides the native COM interface that SAPI expects
 // while delegating to our high-performance engine system (SherpaOnnx, Azure, etc.)
 //

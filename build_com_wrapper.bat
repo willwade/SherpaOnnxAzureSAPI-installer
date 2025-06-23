@@ -40,34 +40,59 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo Visual Studio environment set up successfully
 
-REM Clean build directory
-echo Cleaning build directory...
+REM Clean build directories
+echo Cleaning build directories...
 if exist "NativeTTSWrapper\x64\Release\*.obj" del "NativeTTSWrapper\x64\Release\*.obj" /Q
 if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.tlog" rmdir "NativeTTSWrapper\x64\Release\NativeTTSWrapper.tlog" /S /Q
+if exist "NativeTTSWrapper\Win32\Release\*.obj" del "NativeTTSWrapper\Win32\Release\*.obj" /Q
+if exist "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.tlog" rmdir "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.tlog" /S /Q
 
-REM Try to rename old DLL if it exists and is locked
+REM Try to rename old DLLs if they exist and are locked
 if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
-    echo Attempting to rename old DLL...
+    echo Attempting to rename old x64 DLL...
     ren "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" "NativeTTSWrapper_old.dll" 2>nul
     if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
-        echo Warning: Could not rename old DLL - it may be in use
+        echo Warning: Could not rename old x64 DLL - it may be in use
+    )
+)
+if exist "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.dll" (
+    echo Attempting to rename old x86 DLL...
+    ren "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.dll" "NativeTTSWrapper_old.dll" 2>nul
+    if exist "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.dll" (
+        echo Warning: Could not rename old x86 DLL - it may be in use
     )
 )
 
-REM Build the project
-echo Building project...
+REM Build both x86 and x64 versions
+echo Building x64 version...
 msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=x64 /p:VerbosityLevel=minimal
 if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: Build failed
+    echo ERROR: x64 Build failed
     pause
     exit /b 1
 )
 
-echo Build successful!
+echo Building x86 version...
+msbuild "NativeTTSWrapper\NativeTTSWrapper.vcxproj" /p:Configuration=Release /p:Platform=Win32 /p:VerbosityLevel=minimal
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: x86 Build failed
+    pause
+    exit /b 1
+)
 
-REM Copy dependencies
-echo Copying dependencies...
-copy "NativeTTSWrapper\libs\*.dll" "NativeTTSWrapper\x64\Release\" /Y >nul
-copy "NativeTTSWrapper\azure-speech-sdk\bin\*.dll" "NativeTTSWrapper\x64\Release\" /Y >nul
+echo Both builds successful!
+
+echo Verifying output files...
+if exist "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" (
+    echo ✅ x64 DLL created successfully
+) else (
+    echo ❌ x64 DLL not found
+)
+
+if exist "NativeTTSWrapper\Win32\Release\NativeTTSWrapper.dll" (
+    echo ✅ x86 DLL created successfully
+) else (
+    echo ❌ x86 DLL not found
+)
 
 echo Build complete successfully!
