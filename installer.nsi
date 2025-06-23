@@ -50,30 +50,46 @@ Section "Main Application" SEC01
   
   ; Copy main executables
   File "dist\sapi_voice_installer.exe"
-  File "AACSpeakHelper\dist\AACSpeakHelperServer.exe"
-  
-  ; Copy C++ COM Wrapper
+  File "dist\AACSpeakHelperServer.exe"
+
+  ; Copy C++ COM Wrapper and all dependencies
   File "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
-  File "NativeTTSWrapper\x64\Release\*.dll"
-  
+  File "NativeTTSWrapper\x64\Release\fmt.dll"
+  File "NativeTTSWrapper\x64\Release\onnxruntime.dll"
+  File "NativeTTSWrapper\x64\Release\onnxruntime_providers_shared.dll"
+  File "NativeTTSWrapper\x64\Release\sherpa-onnx-c-api.dll"
+
   ; Copy voice configurations
   SetOutPath "$INSTDIR\voice_configs"
   File /r "voice_configs\*.*"
-  
-  ; Copy AACSpeakHelper files
-  SetOutPath "$INSTDIR\AACSpeakHelper"
-  File "AACSpeakHelper\*.py"
-  File "AACSpeakHelper\*.cfg"
-  File /nonfatal "AACSpeakHelper\requirements.txt"
+
+  ; Copy configuration files
+  SetOutPath "$INSTDIR"
+  File /nonfatal "settings.cfg.example"
   
   ; Create shortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SAPI Voice Installer.lnk" "$INSTDIR\sapi_voice_installer.exe"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\AACSpeakHelper Server.lnk" "$INSTDIR\AACSpeakHelperServer.exe"
   CreateShortCut "$DESKTOP\SAPI Voice Installer.lnk" "$INSTDIR\sapi_voice_installer.exe"
+
+  ; Create startup shortcut for AACSpeakHelper Server (auto-start with Windows)
+  CreateShortCut "$SMSTARTUP\AACSpeakHelperServer.lnk" "$INSTDIR\AACSpeakHelperServer.exe" "" "$INSTDIR\AACSpeakHelperServer.exe" 0 SW_SHOWMINIMIZED
   
-  ; Register COM wrapper
-  ExecWait 'regsvr32 /s "$INSTDIR\NativeTTSWrapper.dll"'
+  ; Register COM wrapper using SAPI Voice Installer
+  DetailPrint "Registering COM wrapper using SAPI Voice Installer..."
+  DetailPrint "Executing: $\"$INSTDIR\sapi_voice_installer.exe$\" register-com"
+  ExecWait '"$INSTDIR\sapi_voice_installer.exe" register-com' $0
+  DetailPrint "SAPI Voice Installer COM registration completed with exit code: $0"
+
+  ${If} $0 != 0
+    DetailPrint "ERROR: COM registration failed with exit code $0"
+    DetailPrint "The SAPI Voice Installer includes sophisticated error handling and cleanup"
+    MessageBox MB_ICONEXCLAMATION|MB_OK "COM registration failed!$\r$\n$\r$\nExit code: $0$\r$\n$\r$\nThe SAPI Voice Installer attempted automatic cleanup and retry.$\r$\nIf this persists:$\r$\n1. Restart your computer$\r$\n2. Run the installer again as Administrator$\r$\n3. Check Windows Event Viewer for COM errors"
+  ${Else}
+    DetailPrint "SUCCESS: COM wrapper registered successfully using SAPI Voice Installer"
+    DetailPrint "The installer includes automatic verification and cleanup on failure"
+  ${EndIf}
   
 SectionEnd
 
@@ -101,10 +117,36 @@ Section -Post
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 SectionEnd
 
+; Post-installation function
+Function .onInstSuccess
+  ; Ask user if they want to start AACSpeakHelper Server now
+  MessageBox MB_ICONQUESTION|MB_YESNO "Installation completed successfully!$\r$\n$\r$\nWould you like to start AACSpeakHelper Server now?$\r$\n$\r$\n(It will also start automatically with Windows)" IDYES StartServer IDNO SkipStart
+
+  StartServer:
+    DetailPrint "Starting AACSpeakHelper Server..."
+    ExecShell "open" "$INSTDIR\AACSpeakHelperServer.exe"
+    Goto ShowFinalMessage
+
+  SkipStart:
+    DetailPrint "AACSpeakHelper Server will start automatically with Windows"
+
+  ShowFinalMessage:
+    MessageBox MB_ICONINFORMATION|MB_OK "Setup complete!$\r$\n$\r$\nNext steps:$\r$\n1. AACSpeakHelper Server is running (or will start with Windows)$\r$\n2. Use SAPI Voice Installer to install voices$\r$\n3. Test with any SAPI application$\r$\n$\r$\nNote: If COM registration failed, you may need to restart your computer."
+FunctionEnd
+
 ; Uninstaller sections
 Section Uninstall
-  ; Unregister COM wrapper
-  ExecWait 'regsvr32 /u /s "$INSTDIR\NativeTTSWrapper.dll"'
+  ; Unregister COM wrapper using SAPI Voice Installer
+  DetailPrint "Unregistering COM wrapper using SAPI Voice Installer..."
+  DetailPrint "Executing: $\"$INSTDIR\sapi_voice_installer.exe$\" unregister-com"
+  ExecWait '"$INSTDIR\sapi_voice_installer.exe" unregister-com' $0
+  ${If} $0 != 0
+    DetailPrint "COM unregistration failed with exit code $0"
+    DetailPrint "The SAPI Voice Installer includes comprehensive cleanup - this may still be effective"
+  ${Else}
+    DetailPrint "COM wrapper unregistered successfully using SAPI Voice Installer"
+    DetailPrint "All SAPI voice registrations and registry entries have been cleaned"
+  ${EndIf}
   
   ; Remove files
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
@@ -112,11 +154,14 @@ Section Uninstall
   Delete "$INSTDIR\sapi_voice_installer.exe"
   Delete "$INSTDIR\AACSpeakHelperServer.exe"
   Delete "$INSTDIR\NativeTTSWrapper.dll"
-  Delete "$INSTDIR\*.dll"
+  Delete "$INSTDIR\fmt.dll"
+  Delete "$INSTDIR\onnxruntime.dll"
+  Delete "$INSTDIR\onnxruntime_providers_shared.dll"
+  Delete "$INSTDIR\sherpa-onnx-c-api.dll"
+  Delete "$INSTDIR\settings.cfg.example"
   
   ; Remove directories
   RMDir /r "$INSTDIR\voice_configs"
-  RMDir /r "$INSTDIR\AACSpeakHelper"
   RMDir /r "$INSTDIR\docs"
   
   ; Remove shortcuts
@@ -125,6 +170,7 @@ Section Uninstall
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\SAPI Voice Installer.lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\AACSpeakHelper Server.lnk"
   Delete "$DESKTOP\SAPI Voice Installer.lnk"
+  Delete "$SMSTARTUP\AACSpeakHelperServer.lnk"
   
   RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
   RMDir "$INSTDIR"
@@ -148,10 +194,13 @@ Function .onInit
   UserInfo::GetAccountType
   pop $0
   ${If} $0 != "admin"
-    MessageBox MB_ICONSTOP "Administrator rights required!"
+    MessageBox MB_ICONSTOP "Administrator rights required!$\r$\n$\r$\nThis installer needs admin privileges to register COM components.$\r$\n$\r$\nPlease right-click the installer and select 'Run as administrator'."
     SetErrorLevel 740 ; ERROR_ELEVATION_REQUIRED
     Quit
   ${EndIf}
+
+  ; Show admin confirmation
+  DetailPrint "Running with administrator privileges - COM registration should work"
 FunctionEnd
 
 Function un.onUninstSuccess

@@ -12,6 +12,9 @@ import json
 import argparse
 import winreg
 import subprocess
+import configparser
+import ctypes
+import time
 from pathlib import Path
 
 # TTS engine definitions (moved from removed cli_config_creator.py)
@@ -78,6 +81,352 @@ VOICE_CONFIGS_DIR = Path("C:/Program Files/OpenAssistive/OpenSpeech/voice_config
 AACSPEAKHELPER_CONFIG_PATH = Path("AACSpeakHelper/settings.cfg")
 SAPI_REGISTRY_PATH = r"SOFTWARE\Microsoft\SPEECH\Voices\Tokens"
 
+def is_admin():
+    """Check if the current process is running with administrator privileges"""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+def warn_admin_required():
+    """Warn user that administrator privileges are required"""
+    if not is_admin():
+        print("\n⚠️  ADMINISTRATOR PRIVILEGES REQUIRED")
+        print("=" * 50)
+        print("This installer needs to register COM components with Windows.")
+        print("COM registration requires administrator privileges.")
+        print("")
+        print("Please:")
+        print("1. Close this installer")
+        print("2. Right-click on PowerShell or Command Prompt")
+        print("3. Select 'Run as administrator'")
+        print("4. Navigate to this directory and run the installer again")
+        print("")
+        print("Or run directly as admin:")
+        print(f"   uv run {sys.argv[0]}")
+        print("=" * 50)
+        return False
+    return True
+
+def get_config_dir():
+    """Get the configuration directory path"""
+    if getattr(sys, "frozen", False):
+        config_dir = os.path.join(
+            os.path.expanduser("~"),
+            "AppData",
+            "Roaming",
+            "Ace Centre",
+            "AACSpeakHelper",
+        )
+    else:
+        config_dir = os.path.dirname(os.path.abspath(__file__))
+
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
+
+def load_config(custom_config_path=None):
+    """Load configuration from file"""
+    config = configparser.ConfigParser()
+
+    if custom_config_path and os.path.exists(custom_config_path):
+        config_path = custom_config_path
+    else:
+        config_path = os.path.join(get_config_dir(), "settings.cfg")
+
+    if os.path.exists(config_path):
+        config.read(config_path)
+        print(f"Configuration loaded from {config_path}")
+    else:
+        print("No existing configuration found. Using default settings.")
+        # Create minimal default config for voice discovery
+        config["TTS"] = {"engine": "SherpaOnnxTTS"}
+        config["azureTTS"] = {"key": "", "location": "uksouth"}
+        config["SherpaOnnxTTS"] = {"voice_id": "en_GB-jenny_dioco-medium"}
+
+    return config, config_path
+
+def normalize_voice_data(voices):
+    """Normalize voice data from any TTS engine to a consistent format"""
+    if not voices:
+        return []
+
+    voice_list = []
+    for voice in voices:
+        # Handle both dict and object formats
+        if isinstance(voice, dict):
+            normalized_voice = {
+                'id': voice.get('id', voice.get('voice_id', '')),
+                'name': voice.get('name', voice.get('display_name', '')),
+                'language': voice.get('language', voice.get('locale', '')),
+                'gender': voice.get('gender', 'Unknown')
+            }
+        else:
+            normalized_voice = {
+                'id': getattr(voice, 'id', getattr(voice, 'voice_id', '')),
+                'name': getattr(voice, 'name', getattr(voice, 'display_name', '')),
+                'language': getattr(voice, 'language', getattr(voice, 'locale', '')),
+                'gender': getattr(voice, 'gender', 'Unknown')
+            }
+        voice_list.append(normalized_voice)
+    return voice_list
+
+def get_voices_from_engine(engine_key, config):
+    """Get voices from the actual TTS engine using py3-tts-wrapper"""
+    try:
+        from tts_wrapper import (
+            MicrosoftClient, MicrosoftTTS,
+            SherpaOnnxClient, SherpaOnnxTTS,
+            GoogleTransTTS,
+            ElevenLabsClient, ElevenLabsTTS,
+            PlayHTClient, PlayHTTTS,
+            PollyClient, PollyTTS,
+            WatsonClient, WatsonTTS,
+            OpenAIClient,
+            WitAiClient, WitAiTTS
+        )
+
+        engine_config = TTS_ENGINES[engine_key]
+        section_name = engine_config["config_section"]
+
+        if engine_key == "azure":
+            # Get Azure TTS credentials
+            key = config.get(section_name, "key", fallback="")
+            location = config.get(section_name, "location", fallback="")
+            if not key:
+                key = os.getenv("AZURE_TTS_KEY", "")
+            if not location:
+                location = os.getenv("AZURE_TTS_LOCATION", "uksouth")
+
+            if not key or not location:
+                print("❌ Azure TTS credentials not configured. Please configure them first.")
+                return None
+
+            print(f"🔍 Testing Azure TTS credentials (region: {location})...")
+            client = MicrosoftClient(credentials=(key, location))
+            tts = MicrosoftTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from Azure TTS")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "sherpa":
+            # SherpaOnnx doesn't need credentials
+            print("🔍 Getting SherpaOnnx voices...")
+            client = SherpaOnnxClient()
+            tts = SherpaOnnxTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices) if voices else 0} voices from SherpaOnnx")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "google_trans":
+            # Google Trans TTS doesn't need credentials
+            print("🔍 Getting GoogleTrans voices...")
+            try:
+                tts = GoogleTransTTS(voice_id="en")
+                voices = tts.get_voices()
+                print(f"✅ Retrieved {len(voices) if voices else 0} voices from GoogleTrans")
+                return normalize_voice_data(voices)
+            except Exception as e:
+                print(f"❌ Error with GoogleTrans: {e}")
+                return None
+
+        elif engine_key == "elevenlabs":
+            # Get ElevenLabs credentials
+            api_key = config.get(section_name, "api_key", fallback="")
+            if not api_key:
+                api_key = os.getenv("ELEVENLABS_API_KEY", "")
+            if not api_key:
+                print("❌ ElevenLabs API key not configured. Please configure it first.")
+                return None
+
+            print("🔍 Testing ElevenLabs credentials...")
+            client = ElevenLabsClient(credentials=(api_key,))
+            tts = ElevenLabsTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from ElevenLabs")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "playht":
+            # Get PlayHT credentials
+            api_key = config.get(section_name, "api_key", fallback="")
+            user_id = config.get(section_name, "user_id", fallback="")
+            if not api_key:
+                api_key = os.getenv("PLAYHT_API_KEY", "")
+            if not user_id:
+                user_id = os.getenv("PLAYHT_USER_ID", "")
+            if not api_key or not user_id:
+                print("❌ PlayHT credentials not configured. Please configure them first.")
+                return None
+
+            print("🔍 Testing PlayHT credentials...")
+            client = PlayHTClient(credentials=(api_key, user_id))
+            tts = PlayHTTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from PlayHT")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "polly":
+            # Get Polly credentials
+            region = config.get(section_name, "region", fallback="")
+            aws_key_id = config.get(section_name, "aws_key_id", fallback="")
+            aws_access_key = config.get(section_name, "aws_access_key", fallback="")
+            if not region:
+                region = os.getenv("POLLY_REGION", "us-east-1")
+            if not aws_key_id:
+                aws_key_id = os.getenv("POLLY_AWS_KEY_ID", "")
+            if not aws_access_key:
+                aws_access_key = os.getenv("POLLY_AWS_ACCESS_KEY", "")
+            if not aws_key_id or not aws_access_key:
+                print("❌ AWS Polly credentials not configured. Please configure them first.")
+                return None
+
+            print(f"🔍 Testing AWS Polly credentials (region: {region})...")
+            client = PollyClient(credentials=(region, aws_key_id, aws_access_key))
+            tts = PollyTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from AWS Polly")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "watson":
+            # Get Watson credentials
+            api_key = config.get(section_name, "api_key", fallback="")
+            region = config.get(section_name, "region", fallback="")
+            instance_id = config.get(section_name, "instance_id", fallback="")
+            if not api_key:
+                api_key = os.getenv("WATSON_API_KEY", "")
+            if not region:
+                region = os.getenv("WATSON_REGION", "eu-gb")
+            if not instance_id:
+                instance_id = os.getenv("WATSON_INSTANCE_ID", "")
+            if not api_key:
+                print("❌ Watson credentials not configured. Please configure them first.")
+                return None
+
+            print(f"🔍 Testing Watson credentials (region: {region})...")
+            client = WatsonClient(credentials=(api_key, region, instance_id))
+            tts = WatsonTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from Watson")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "openai":
+            # Get OpenAI credentials
+            api_key = config.get(section_name, "api_key", fallback="")
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY", "")
+            if not api_key:
+                print("❌ OpenAI API key not configured. Please configure it first.")
+                return None
+
+            print("🔍 Testing OpenAI credentials...")
+            client = OpenAIClient(credentials=(api_key,))
+            voices = client.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from OpenAI")
+            return normalize_voice_data(voices)
+
+        elif engine_key == "witai":
+            # Get WitAI credentials
+            token = config.get(section_name, "token", fallback="")
+            if not token:
+                token = os.getenv("WITAI_TOKEN", "")
+            if not token:
+                print("❌ WitAI token not configured. Please configure it first.")
+                return None
+
+            print("🔍 Testing WitAI credentials...")
+            client = WitAiClient(credentials=(token,))
+            tts = WitAiTTS(client)
+            voices = tts.get_voices()
+            print(f"✅ Retrieved {len(voices)} voices from WitAI")
+            return normalize_voice_data(voices)
+
+        return None
+
+    except Exception as e:
+        print(f"❌ Error getting voices from {engine_key}: {e}")
+        return None
+
+def configure_engine_credentials(config, engine_key):
+    """Configure credentials for a specific TTS engine"""
+    engine_config = TTS_ENGINES.get(engine_key)
+    if not engine_config:
+        print(f"❌ Unknown engine: {engine_key}")
+        return config
+
+    section_name = engine_config["config_section"]
+    credential_fields = engine_config["credential_fields"]
+
+    if not credential_fields:
+        print(f"✅ {engine_config['name']} doesn't require credentials")
+        return config
+
+    print(f"\n🔧 Configuring {engine_config['name']} credentials:")
+    print("-" * 50)
+
+    # Ensure section exists
+    if not config.has_section(section_name):
+        config.add_section(section_name)
+
+    # Configure each credential field
+    for field in credential_fields:
+        current_value = config.get(section_name, field, fallback="")
+
+        # Show current value (masked if it looks like a key)
+        if current_value and any(keyword in field.lower() for keyword in ['key', 'secret', 'token', 'password']):
+            display_value = f"{current_value[:8]}..." if len(current_value) > 8 else current_value
+        else:
+            display_value = current_value
+
+        prompt = f"Enter {field}"
+        if display_value:
+            prompt += f" [current: {display_value}]"
+        prompt += ": "
+
+        new_value = input(prompt).strip()
+        if new_value:
+            config.set(section_name, field, new_value)
+        elif not current_value:
+            print(f"⚠️  Warning: {field} is required for {engine_config['name']}")
+
+    return config
+
+def test_engine_credentials(config, engine_key):
+    """Test if engine credentials are working by fetching voices"""
+    print(f"\n🧪 Testing {TTS_ENGINES[engine_key]['name']} credentials...")
+
+    voices = get_voices_from_engine(engine_key, config)
+    if voices:
+        print(f"✅ Credentials working! Found {len(voices)} voices")
+        return True
+    else:
+        print("❌ Credential test failed")
+        return False
+
+def get_credential_status(config, engine_key):
+    """Get the credential status for an engine"""
+    engine_config = TTS_ENGINES.get(engine_key)
+    if not engine_config:
+        return "❓ Unknown"
+
+    credential_fields = engine_config["credential_fields"]
+    if not credential_fields:
+        return "✅ No credentials needed"
+
+    section_name = engine_config["config_section"]
+    missing_creds = []
+
+    for field in credential_fields:
+        value = config.get(section_name, field, fallback="")
+        if not value:
+            # Check environment variables as fallback
+            env_var = f"{engine_key.upper()}_{field.upper()}"
+            if not os.getenv(env_var, ""):
+                missing_creds.append(field)
+
+    if missing_creds:
+        return f"❌ Missing: {', '.join(missing_creds)}"
+    else:
+        return "✅ Configured"
+
 class SAPIVoiceInstaller:
     """Manages SAPI voice installation and registration"""
     
@@ -93,48 +442,269 @@ class SAPIVoiceInstaller:
             print(f"❌ Failed to create directories: {e}")
             sys.exit(1)
     
-    def register_com_wrapper(self):
-        """Register the C++ COM wrapper DLL"""
+    def register_com_wrapper(self, unattended_mode=False):
+        """Register the C++ COM wrapper DLL with sophisticated error handling"""
         dll_path = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
-        
+
+        # Check if running in unattended mode (CI/automated)
+        if not unattended_mode:
+            unattended_mode = (
+                os.getenv("CI") == "true" or
+                os.getenv("GITHUB_ACTIONS") == "true" or
+                "--unattended" in sys.argv
+            )
+
+        if unattended_mode:
+            print("[CI MODE] Running COM registration in unattended mode")
+        else:
+            print("[INTERACTIVE] Running COM registration in interactive mode")
+
         if not dll_path.exists():
             print(f"❌ COM wrapper DLL not found: {dll_path}")
             print("   Please build the C++ project first")
             return False
-        
+
+        # Check for administrator privileges (skip in CI)
+        if not unattended_mode and not is_admin():
+            print("❌ COM registration requires administrator privileges")
+            print("   Please run as administrator")
+            return False
+        elif unattended_mode:
+            print("[CI MODE] Skipping administrator check in unattended mode")
+        else:
+            print("[OK] Running as Administrator")
+
+        print(f"[INFO] Registering COM wrapper: {dll_path}")
+
         try:
-            # Register the DLL
+            # First registration attempt
             result = subprocess.run([
                 "regsvr32", "/s", str(dll_path.absolute())
-            ], check=True, capture_output=True)
-            
-            print(f"✅ COM wrapper registered: {dll_path}")
-            return True
-            
-        except subprocess.CalledProcessError as e:
+            ], capture_output=True)
+
+            if result.returncode == 0:
+                print("[OK] COM wrapper registered successfully!")
+                print("     SAPI voices should now work for speech synthesis.")
+
+                # Verify registration
+                print("[INFO] Verifying registration...")
+                if self._verify_com_registration():
+                    print("[OK] CLSID registration verified")
+                else:
+                    print("[WARNING] CLSID not found in registry - registration may have failed")
+
+                return True
+            else:
+                print(f"[ERROR] COM wrapper registration failed with exit code: {result.returncode}")
+                print("[INFO] Attempting automatic cleanup and retry...")
+                print("       Running cleanup to remove stale registry entries...")
+
+                # Attempt cleanup and retry
+                if self._cleanup_com_registration():
+                    print("[INFO] Cleanup completed. Retrying COM registration...")
+
+                    # Wait a moment for cleanup to complete
+                    time.sleep(2)
+
+                    # Retry registration
+                    retry_result = subprocess.run([
+                        "regsvr32", "/s", str(dll_path.absolute())
+                    ], capture_output=True)
+
+                    if retry_result.returncode == 0:
+                        print("[OK] COM wrapper registered successfully after cleanup!")
+                        print("     SAPI voices should now work for speech synthesis.")
+                        return True
+                    else:
+                        print("[ERROR] COM registration failed again after cleanup.")
+                        if unattended_mode:
+                            print("[CI MODE] COM registration failed in unattended mode")
+                            print("         This is expected in CI environments without admin privileges")
+                            print("         The build will continue - COM registration will be needed on target systems")
+                        else:
+                            print("")
+                            print("[SOLUTION] This usually indicates file locks or permission issues.")
+                            print("           Please try the following:")
+                            print("")
+                            print("           1. RESTART your computer")
+                            print("           2. Run this installer again as administrator")
+                            print("")
+                            print("           If the problem persists:")
+                            print("           - Check Windows Event Viewer for COM errors")
+                            print("           - Ensure no SAPI applications are running")
+                            print("           - Verify all DLL dependencies are present")
+                            print("")
+                        return False
+                else:
+                    print("[ERROR] Cleanup failed")
+                    if not unattended_mode:
+                        print("        Please restart your computer and try again")
+                    return False
+
+        except Exception as e:
             print(f"❌ Failed to register COM wrapper: {e}")
             return False
-    
-    def unregister_com_wrapper(self):
-        """Unregister the C++ COM wrapper DLL"""
-        dll_path = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
 
-        if not dll_path.exists():
-            print(f"⚠️ COM wrapper DLL not found: {dll_path}")
-            return True  # Consider it unregistered if it doesn't exist
-
+    def _verify_com_registration(self):
+        """Verify COM registration by checking registry"""
         try:
-            # Unregister the DLL
+            # Check for our CLSID in registry
+            clsid_path = r"SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}"
             result = subprocess.run([
-                "regsvr32", "/s", "/u", str(dll_path.absolute())
-            ], check=True, capture_output=True)
+                "reg", "query", f"HKEY_LOCAL_MACHINE\\{clsid_path}"
+            ], capture_output=True, text=True)
+            return result.returncode == 0
+        except Exception:
+            return False
 
-            print(f"✅ COM wrapper unregistered: {dll_path}")
+    def _cleanup_com_registration(self):
+        """Clean up stale COM registrations and files"""
+        try:
+            print("[INFO] Cleaning up stale COM registrations...")
+
+            # Unregister any existing COM wrappers
+            dll_paths = [
+                Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll"),
+                Path("C:/Program Files/SherpaOnnx Azure SAPI Bridge/NativeTTSWrapper.dll"),
+                Path("C:/Program Files (x86)/SherpaOnnx Azure SAPI Bridge/NativeTTSWrapper.dll")
+            ]
+
+            for dll_path in dll_paths:
+                if dll_path.exists():
+                    try:
+                        subprocess.run([
+                            "regsvr32", "/u", "/s", str(dll_path.absolute())
+                        ], capture_output=True)
+                        print(f"[INFO] Unregistered: {dll_path}")
+                    except Exception:
+                        pass  # Ignore errors during cleanup
+
+            # Remove CLSID entries
+            clsid_entries = [
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}",
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABD}"
+            ]
+
+            for clsid in clsid_entries:
+                try:
+                    subprocess.run(["reg", "delete", clsid, "/f"], capture_output=True)
+                except Exception:
+                    pass  # Ignore errors during cleanup
+
+            # Remove AACSpeakHelper voice tokens
+            try:
+                result = subprocess.run([
+                    "reg", "query", r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens"
+                ], capture_output=True, text=True)
+
+                if result.returncode == 0:
+                    for line in result.stdout.split('\n'):
+                        if 'AACSpeakHelper' in line:
+                            token_path = line.strip()
+                            if token_path:
+                                try:
+                                    subprocess.run(["reg", "delete", token_path, "/f"], capture_output=True)
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
+
+            # Clean up log files
+            log_files = [
+                Path("C:/OpenSpeech/native_tts_debug.log"),
+                Path("AACSpeakHelper").glob("*.log")
+            ]
+
+            for log_file in log_files:
+                if isinstance(log_file, Path) and log_file.exists():
+                    try:
+                        log_file.unlink()
+                        print(f"[INFO] Removed log file: {log_file}")
+                    except Exception:
+                        pass
+                elif hasattr(log_file, '__iter__'):  # It's a glob result
+                    for lf in log_file:
+                        try:
+                            lf.unlink()
+                            print(f"[INFO] Removed log file: {lf}")
+                        except Exception:
+                            pass
+
+            print("[OK] Cleanup completed")
             return True
 
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Failed to unregister COM wrapper: {e}")
+        except Exception as e:
+            print(f"[ERROR] Cleanup failed: {e}")
             return False
+
+    def unregister_com_wrapper(self, unattended_mode=False):
+        """Unregister the C++ COM wrapper DLL with sophisticated error handling"""
+        dll_path = Path("NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll")
+
+        # Check if running in unattended mode (CI/automated)
+        if not unattended_mode:
+            unattended_mode = (
+                os.getenv("CI") == "true" or
+                os.getenv("GITHUB_ACTIONS") == "true" or
+                "--unattended" in sys.argv
+            )
+
+        if unattended_mode:
+            print("[CI MODE] Running COM unregistration in unattended mode")
+        else:
+            print("[INTERACTIVE] Running COM unregistration in interactive mode")
+
+        # Check for administrator privileges (skip in CI)
+        if not unattended_mode and not is_admin():
+            print("❌ COM unregistration requires administrator privileges")
+            print("   Please run as administrator")
+            return False
+        elif unattended_mode:
+            print("[CI MODE] Skipping administrator check in unattended mode")
+        else:
+            print("[OK] Running as Administrator")
+
+        print("[INFO] Starting comprehensive COM unregistration...")
+
+        # Always run cleanup regardless of DLL existence
+        cleanup_success = self._cleanup_com_registration()
+
+        if not dll_path.exists():
+            print(f"[INFO] COM wrapper DLL not found: {dll_path}")
+            if cleanup_success:
+                print("✅ COM wrapper unregistered (cleanup completed)")
+                return True
+            else:
+                print("⚠️ DLL not found, but cleanup had issues")
+                return True  # Still consider it successful if DLL doesn't exist
+
+        try:
+            # Unregister the specific DLL
+            result = subprocess.run([
+                "regsvr32", "/s", "/u", str(dll_path.absolute())
+            ], capture_output=True)
+
+            if result.returncode == 0:
+                print(f"✅ COM wrapper unregistered successfully: {dll_path}")
+                print("   All SAPI voice registrations should be removed")
+                return True
+            else:
+                print(f"[WARNING] COM unregistration returned exit code: {result.returncode}")
+                if cleanup_success:
+                    print("✅ Registry cleanup completed - unregistration should be effective")
+                    return True
+                else:
+                    print("❌ Both DLL unregistration and cleanup had issues")
+                    return False
+
+        except Exception as e:
+            print(f"[ERROR] Failed to unregister COM wrapper: {e}")
+            if cleanup_success:
+                print("✅ Registry cleanup completed - this may be sufficient")
+                return True
+            else:
+                print("❌ Both DLL unregistration and cleanup failed")
+                return False
 
     def create_aacspeakhelper_config(self, engine_key="sherpa", azure_key=None, azure_region="uksouth"):
         """Create or update AACSpeakHelper settings.cfg file"""
@@ -381,6 +951,10 @@ class SAPIVoiceInstaller:
         """Install a complete SAPI voice"""
         print(f"\n🔧 Installing voice: {voice_name}")
 
+        # Step 0: Check for administrator privileges
+        if not warn_admin_required():
+            return False
+
         # Step 1: Register COM wrapper if needed
         if not self.register_com_wrapper():
             return False
@@ -430,6 +1004,468 @@ class SAPIVoiceInstaller:
 
         print(f"✅ Voice uninstallation complete: {voice_name}")
         return True
+
+    def interactive_main_menu(self):
+        """Main interactive menu"""
+        print("\n🎤 Welcome to the SAPI Voice Installer!")
+        print("This tool helps you manage TTS voices for Windows SAPI.")
+        print("💡 Tip: Press Ctrl+C at any time to exit")
+
+        # Check for administrator privileges upfront
+        if not is_admin():
+            print("\n⚠️  NOTICE: Running without administrator privileges")
+            print("   Voice installation and COM registration require admin rights.")
+
+        while True:
+            print("\n" + "="*60)
+            print("Main Menu:")
+            print("="*60)
+            print("1. Install New Voice")
+            print("2. Configure TTS Engine Credentials")
+            print("3. List Installed Voices")
+            print("4. Uninstall Voice")
+            print("5. Register COM Server")
+            print("6. Unregister COM Server")
+            print("7. Exit")
+
+            # Get user selection
+            try:
+                user_input = input(f"\nSelect option (1-7) or 'q' to quit: ").strip().lower()
+
+                # Handle quit commands
+                if user_input in ['q', 'quit', 'exit']:
+                    print("Goodbye! 👋")
+                    return
+
+                # Handle numeric selection
+                choice = int(user_input)
+                if choice == 1:
+                    self.interactive_voice_selection()
+                elif choice == 2:
+                    self.interactive_credential_configuration()
+                elif choice == 3:
+                    print("\n📋 Installed SAPI Voices")
+                    print("="*60)
+                    voices = self.list_installed_voices()
+                    if not voices:
+                        print("No SAPI voices are currently installed.")
+                    else:
+                        print(f"\nFound {len(voices)} installed SAPI voices:")
+                        print("-" * 80)
+                        for i, voice in enumerate(voices):
+                            voice_name = voice.get('name', 'Unknown')
+                            display_name = voice.get('display_name', 'Unknown')
+                            is_ours = voice.get('is_ours', False)
+                            config_path = voice.get('config_path', 'N/A')
+
+                            status = "🎤 AACSpeakHelper" if is_ours else "🔊 System"
+                            print(f"{i+1:2d}. {display_name:<40} | {status:<15} | {voice_name}")
+                            if is_ours and config_path:
+                                print(f"    Config: {config_path}")
+                    input("\nPress Enter to continue...")
+                elif choice == 4:
+                    self.interactive_uninstall()
+                elif choice == 5:
+                    if self.register_com_wrapper():
+                        print("✅ COM server registered successfully!")
+                    input("\nPress Enter to continue...")
+                elif choice == 6:
+                    if self.unregister_com_wrapper():
+                        print("✅ COM server unregistered successfully!")
+                    input("\nPress Enter to continue...")
+                elif choice == 7:
+                    print("Goodbye! 👋")
+                    return
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a number or 'q' to quit.")
+            except KeyboardInterrupt:
+                print("\n\nExiting... Goodbye! 👋")
+                return
+
+    def interactive_credential_configuration(self):
+        """Interactive credential configuration menu"""
+        print("\n🔧 TTS Engine Credential Configuration")
+        print("Configure API keys and credentials for TTS engines.")
+
+        # Load current configuration
+        config, config_path = load_config()
+
+        while True:
+            print("\n" + "="*60)
+            print("Available TTS Engines:")
+            print("="*60)
+
+            # Show engines with credential status
+            engines = list(TTS_ENGINES.keys())
+
+            for i, engine_key in enumerate(engines):
+                engine_config = TTS_ENGINES[engine_key]
+                engine_name = engine_config["name"]
+                credential_status = get_credential_status(config, engine_key)
+
+                print(f"{i+1}. {engine_name:<20} {credential_status}")
+
+            print(f"{len(engines)+1}. Save & Exit")
+
+            # Get user selection
+            try:
+                user_input = input(f"\nSelect engine to configure (1-{len(engines)+1}) or 'q' to quit: ").strip().lower()
+
+                # Handle quit commands
+                if user_input in ['q', 'quit', 'exit']:
+                    return
+
+                # Handle numeric selection
+                choice = int(user_input) - 1
+                if choice == len(engines):  # Save & Exit
+                    # Save configuration
+                    try:
+                        with open(config_path, 'w', encoding='utf-8') as f:
+                            config.write(f)
+                        print(f"✅ Configuration saved to {config_path}")
+                    except Exception as e:
+                        print(f"❌ Failed to save configuration: {e}")
+                    return
+                elif 0 <= choice < len(engines):
+                    selected_engine = engines[choice]
+
+                    # Configure credentials for selected engine
+                    config = configure_engine_credentials(config, selected_engine)
+
+                    # Offer to test credentials
+                    engine_config = TTS_ENGINES[selected_engine]
+                    if engine_config["credential_fields"]:
+                        test_choice = input("\nTest credentials now? (y/N): ").strip().lower()
+                        if test_choice == 'y':
+                            test_engine_credentials(config, selected_engine)
+
+                    input("\nPress Enter to continue...")
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a number or 'q' to quit.")
+            except KeyboardInterrupt:
+                print("\n\nReturning to main menu...")
+                return
+
+    def interactive_voice_selection(self):
+        """Interactive voice selection and installation"""
+        print("\n🔍 Voice Installation")
+        print("Discover and install TTS voices from available engines.")
+
+        # Load configuration to check for credentials
+        config, config_path = load_config()
+
+        while True:
+            print("\n" + "="*60)
+            print("Available TTS Engines:")
+            print("="*60)
+
+            # Show available engines with credential status
+            engines = list(TTS_ENGINES.keys())
+            available_engines = []
+
+            for i, engine_key in enumerate(engines):
+                engine_config = TTS_ENGINES[engine_key]
+                engine_name = engine_config["name"]
+                credential_status = get_credential_status(config, engine_key)
+
+                print(f"{i+1}. {engine_name:<20} {credential_status}")
+                available_engines.append(engine_key)
+
+            print(f"{len(engines)+1}. Configure Credentials")
+            print(f"{len(engines)+2}. Exit")
+
+            # Get user selection
+            try:
+                user_input = input(f"\nSelect TTS engine (1-{len(engines)+2}) or 'q' to quit: ").strip().lower()
+
+                # Handle quit commands
+                if user_input in ['q', 'quit', 'exit']:
+                    return
+
+                # Handle numeric selection
+                choice = int(user_input) - 1
+                if choice == len(engines):  # Configure Credentials option
+                    self.interactive_credential_configuration()
+                elif choice == len(engines) + 1:  # Exit option
+                    return
+                elif 0 <= choice < len(engines):
+                    selected_engine = available_engines[choice]
+
+                    # Check if credentials are configured before proceeding
+                    engine_config = TTS_ENGINES[selected_engine]
+                    if engine_config["credential_fields"]:
+                        credential_status = get_credential_status(config, selected_engine)
+                        if "❌ Missing" in credential_status:
+                            print(f"\n⚠️  {engine_config['name']} requires credentials to be configured first.")
+                            configure_choice = input("Configure credentials now? (y/N): ").strip().lower()
+                            if configure_choice == 'y':
+                                config = configure_engine_credentials(config, selected_engine)
+                                # Save the updated config
+                                try:
+                                    config_path, _ = load_config()
+                                    with open(config_path, 'w', encoding='utf-8') as f:
+                                        config.write(f)
+                                    print("✅ Configuration saved")
+                                except Exception as e:
+                                    print(f"⚠️  Warning: Failed to save configuration: {e}")
+                            else:
+                                print("Cannot proceed without credentials.")
+                                input("Press Enter to continue...")
+                                continue
+
+                    self.browse_engine_voices(selected_engine, config)
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a number or 'q' to quit.")
+            except KeyboardInterrupt:
+                print("\n\nExiting... Goodbye! 👋")
+                return
+
+    def browse_engine_voices(self, engine_key, config):
+        """Browse and select voices from a specific engine"""
+        engine_config = TTS_ENGINES[engine_key]
+        engine_name = engine_config["name"]
+
+        print(f"\n🔍 Discovering voices from {engine_name}...")
+
+        # Try to get voices from the actual engine
+        voices = get_voices_from_engine(engine_key, config)
+
+        if not voices:
+            # Fallback to hardcoded voice list
+            print("Using fallback voice list...")
+            voice_list = engine_config["voice_list"]
+            if not voice_list:
+                print(f"No voices available for {engine_name}")
+                input("Press Enter to continue...")
+                return
+
+            # Convert dict to list format
+            voices = []
+            for voice_name, voice_id in voice_list.items():
+                voices.append({
+                    'id': voice_id,
+                    'name': voice_name,
+                    'language': voice_name,
+                    'gender': 'Unknown'
+                })
+
+        if not voices:
+            print(f"No voices found for {engine_name}")
+            input("Press Enter to continue...")
+            return
+
+        # Allow searching by language
+        try:
+            search_input = input(
+                "Search for a voice by language/name (Enter=all, 'q'=back): "
+            ).strip()
+
+            # Handle quit/back commands
+            if search_input.lower() in ['q', 'quit', 'back']:
+                return
+
+            search_term = search_input.lower()
+        except KeyboardInterrupt:
+            print("\n\nReturning to engine selection...")
+            return
+
+        matching_voices = []
+        for voice in voices:
+            voice_name = voice.get('name', voice.get('id', ''))
+            voice_id = voice.get('id', voice.get('voice_id', ''))
+            voice_language = voice.get('language', '')
+
+            # Create searchable text that includes extracted language info from voice ID
+            searchable_text = f"{voice_name} {voice_id} {voice_language}".lower()
+
+            # Extract language info from voice ID (e.g., "en-GB-LibbyNeural" -> "english british")
+            if voice_id:
+                # Comprehensive language mappings for better search
+                lang_mappings = {
+                    # Major languages
+                    'en-': 'english', 'fr-': 'french', 'de-': 'german', 'es-': 'spanish',
+                    'it-': 'italian', 'pt-': 'portuguese', 'ru-': 'russian', 'ja-': 'japanese',
+                    'ko-': 'korean', 'zh-': 'chinese', 'ar-': 'arabic', 'hi-': 'hindi',
+                    'nl-': 'dutch', 'sv-': 'swedish', 'da-': 'danish', 'no-': 'norwegian',
+                    'fi-': 'finnish', 'pl-': 'polish', 'cs-': 'czech', 'sk-': 'slovak',
+                    'hu-': 'hungarian', 'ro-': 'romanian', 'bg-': 'bulgarian', 'hr-': 'croatian',
+                    'sr-': 'serbian', 'sl-': 'slovenian', 'et-': 'estonian', 'lv-': 'latvian',
+                    'lt-': 'lithuanian', 'el-': 'greek', 'tr-': 'turkish', 'he-': 'hebrew',
+                    'th-': 'thai', 'vi-': 'vietnamese', 'id-': 'indonesian', 'ms-': 'malay',
+                    'tl-': 'filipino', 'ur-': 'urdu', 'bn-': 'bengali', 'ta-': 'tamil',
+                    'te-': 'telugu', 'ml-': 'malayalam', 'kn-': 'kannada', 'gu-': 'gujarati',
+                    'pa-': 'punjabi', 'mr-': 'marathi', 'ne-': 'nepali', 'si-': 'sinhala',
+                    'my-': 'burmese', 'km-': 'khmer', 'lo-': 'lao', 'ka-': 'georgian',
+                    'hy-': 'armenian', 'az-': 'azerbaijani', 'kk-': 'kazakh', 'ky-': 'kyrgyz',
+                    'uz-': 'uzbek', 'tg-': 'tajik', 'mn-': 'mongolian', 'ps-': 'pashto',
+                    'fa-': 'persian', 'sw-': 'swahili', 'am-': 'amharic', 'zu-': 'zulu',
+                    'af-': 'afrikaans', 'is-': 'icelandic', 'mt-': 'maltese', 'cy-': 'welsh',
+                    'ga-': 'irish', 'eu-': 'basque', 'ca-': 'catalan', 'gl-': 'galician',
+
+                    # Country/region mappings
+                    '-us': 'american', '-gb': 'british', '-au': 'australian', '-ca': 'canadian',
+                    '-fr': 'france', '-de': 'germany', '-es': 'spain', '-it': 'italy',
+                    '-in': 'indian', '-pk': 'pakistani', '-bd': 'bangladeshi', '-af': 'afghanistan',
+                    '-ir': 'iranian', '-iq': 'iraqi', '-sa': 'saudi', '-ae': 'emirates',
+                    '-eg': 'egyptian', '-ma': 'moroccan', '-dz': 'algerian', '-tn': 'tunisian',
+                    '-ly': 'libyan', '-sd': 'sudanese', '-so': 'somali', '-et': 'ethiopian',
+                    '-ke': 'kenyan', '-tz': 'tanzanian', '-za': 'south african', '-ng': 'nigerian',
+                    '-mx': 'mexican', '-ar': 'argentinian', '-br': 'brazilian', '-cl': 'chilean',
+                    '-co': 'colombian', '-pe': 'peruvian', '-ve': 'venezuelan', '-ec': 'ecuadorian'
+                }
+
+                for code, lang in lang_mappings.items():
+                    if code in voice_id.lower():
+                        searchable_text += f" {lang}"
+
+            if not search_term or search_term in searchable_text:
+                matching_voices.append(voice)
+
+        if not matching_voices:
+            print("No matching voices found.")
+            input("Press Enter to continue...")
+            return
+
+        # Display matching voices
+        print(f"\n🎵 Found {len(matching_voices)} matching voices:")
+        print("="*80)
+        for i, voice in enumerate(matching_voices):
+            voice_name = voice.get('name', voice.get('id', ''))
+            voice_id = voice.get('id', voice.get('voice_id', ''))
+            voice_language = voice.get('language', 'Unknown')
+            voice_gender = voice.get('gender', 'Unknown')
+            print(f"{i+1:2d}. {voice_name:<30} | {voice_language:<15} | {voice_gender:<8} | {voice_id}")
+
+        print(f"{len(matching_voices)+1:2d}. Back to engine selection")
+
+        # Get user selection
+        while True:
+            try:
+                user_input = input(f"\nSelect voice to install (1-{len(matching_voices)+1}) or 'q' to go back: ").strip().lower()
+
+                # Handle quit/back commands
+                if user_input in ['q', 'quit', 'back']:
+                    return
+
+                # Handle numeric selection
+                choice = int(user_input) - 1
+                if choice == len(matching_voices):  # Back option
+                    return
+                elif 0 <= choice < len(matching_voices):
+                    selected_voice = matching_voices[choice]
+                    self.install_selected_voice(engine_key, selected_voice)
+                    return
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a number or 'q' to go back.")
+            except KeyboardInterrupt:
+                print("\n\nReturning to engine selection...")
+                return
+
+    def install_selected_voice(self, engine_key, voice_data):
+        """Install a selected voice"""
+        voice_name = voice_data.get('name', voice_data.get('id', ''))
+        voice_id = voice_data.get('id', voice_data.get('voice_id', ''))
+
+        # Create a safe registry name
+        safe_name = "".join(c for c in voice_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_name = safe_name.replace(' ', '-')
+
+        print(f"\n🔧 Installing voice: {voice_name}")
+        print(f"   Engine: {TTS_ENGINES[engine_key]['name']}")
+        print(f"   Voice ID: {voice_id}")
+        print(f"   Registry Name: {safe_name}")
+
+        # Confirm installation
+        try:
+            confirm = input("\nProceed with installation? (y/N/q=back): ").strip().lower()
+            if confirm in ['q', 'quit', 'back']:
+                return
+            elif confirm != 'y':
+                print("Installation cancelled.")
+                return
+        except KeyboardInterrupt:
+            print("\n\nInstallation cancelled.")
+            return
+
+        # Prepare installation parameters
+        kwargs = {
+            'display_name': voice_name,
+            'language': voice_data.get('language', 'English'),
+            'locale': voice_data.get('locale', 'en-GB'),
+            'gender': voice_data.get('gender', 'Unknown'),
+            'description': f"{TTS_ENGINES[engine_key]['name']} voice - {voice_name}"
+        }
+
+        # Install the voice
+        success = self.install_voice(safe_name, engine_key, voice_id, **kwargs)
+
+        if success:
+            print(f"\n✅ Voice '{voice_name}' installed successfully!")
+            print("   You can now use this voice in any SAPI-compatible application.")
+        else:
+            print(f"\n❌ Failed to install voice '{voice_name}'")
+
+        input("\nPress Enter to continue...")
+
+    def interactive_uninstall(self):
+        """Interactive voice uninstallation"""
+        print("\n🗑️  Voice Uninstallation")
+
+        # Get list of installed voices
+        voices = self.list_installed_voices()
+        if not voices:
+            print("No SAPI voices are currently installed.")
+            return
+
+        print(f"\nFound {len(voices)} installed SAPI voices:")
+        print("="*60)
+
+        for i, voice in enumerate(voices):
+            print(f"{i+1:2d}. {voice}")
+
+        print(f"{len(voices)+1:2d}. Back to main menu")
+
+        # Get user selection
+        while True:
+            try:
+                user_input = input(f"\nSelect voice to uninstall (1-{len(voices)+1}) or 'q' to go back: ").strip().lower()
+
+                # Handle quit/back commands
+                if user_input in ['q', 'quit', 'back']:
+                    return
+
+                # Handle numeric selection
+                choice = int(user_input) - 1
+                if choice == len(voices):  # Back option
+                    return
+                elif 0 <= choice < len(voices):
+                    selected_voice = voices[choice]
+
+                    # Confirm uninstallation
+                    confirm = input(f"\nAre you sure you want to uninstall '{selected_voice}'? (y/N): ").strip().lower()
+                    if confirm == 'y':
+                        if self.uninstall_voice(selected_voice):
+                            print(f"✅ Voice '{selected_voice}' uninstalled successfully!")
+                        else:
+                            print(f"❌ Failed to uninstall voice '{selected_voice}'")
+                    else:
+                        print("Uninstallation cancelled.")
+                    return
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a number or 'q' to go back.")
+            except KeyboardInterrupt:
+                print("\n\nReturning to main menu...")
+                return
 
 
 # Predefined voice configurations
@@ -484,6 +1520,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Interactive mode (discover and install voices)
+  python sapi_voice_installer.py
+
   # Install a predefined voice
   python sapi_voice_installer.py install English-SherpaOnnx-Jenny
 
@@ -498,6 +1537,13 @@ Examples:
 
   # Register COM wrapper only
   python sapi_voice_installer.py register-com
+
+Interactive Mode:
+  When run without arguments, the installer enters interactive mode where you can:
+  - Browse available TTS engines (Azure, Sherpa-ONNX, Google, etc.)
+  - Search and discover voices from each engine
+  - Install voices with a user-friendly interface
+  - See credential status for each engine
         """
     )
 
@@ -533,7 +1579,9 @@ Examples:
     args = parser.parse_args()
 
     if not args.command:
-        parser.print_help()
+        # Interactive mode - no command provided
+        installer = SAPIVoiceInstaller()
+        installer.interactive_main_menu()
         return
 
     # Check for admin privileges

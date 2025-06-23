@@ -84,7 +84,7 @@ publish/
 # Cache
 *.cache/
 
-# Python
+# Python (this is a standalone application, not a library)
 __pycache__/
 *.py[cod]
 *$py.class

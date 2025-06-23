@@ -1,11 +1,10 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+# This is NOT a Python library - it's a standalone application
+# pyproject.toml is used here only for dependency management with uv
 
 [project]
 name = "sherpaonnx-azure-sapi-installer"
 version = "1.0.0"
-description = "SAPI Voice Installer for AACSpeakHelper - A unified Python installer for managing SAPI voices"
+description = "Standalone SAPI Voice Installer and TTS Server Application"
 authors = [
     {name = "Will Wade", email = "willwade@gmail.com"}
 ]
@@ -14,8 +13,26 @@ license = {text = "MIT"}
 requires-python = ">=3.11"
 
 dependencies = [
+    # Core dependencies
     "pywin32>=310",
-    "pathlib",
+    # TTS Server dependencies (merged from AACSpeakHelper)
+    "PyAudio",
+    "numpy",
+    "comtypes",
+    "pytz",
+    "setuptools",
+    "langcodes",
+    "deep-translator[ai]",
+    "posthog",
+    "PySide6",
+    "translate",
+    "pyperclip",
+    "py3-tts-wrapper[elevenlabs,google,googletrans,microsoft,openai,playht,polly,sherpaonnx,watson,witai]==0.10.19",
+    "python-dotenv",
+    "cryptography",
+    "openai>=1.0.0",
+    "aiohttp>=3.12.7",
+    "azure-cognitiveservices-speech>=1.44.0",
 ]
 
 [project.optional-dependencies]
@@ -29,13 +46,14 @@ build = [
     "pyinstaller",
 ]
 
-[tool.setuptools]
-py-modules = [
-    "sapi_voice_installer",
-]
+# No setuptools configuration needed - this is not a library
+# Scripts are run directly with: uv run script.py
 
-[project.scripts]
-sapi-voice-installer = "sapi_voice_installer:main"
+# [project.scripts] removed - not publishing to PyPI
+# Run scripts directly:
+#   uv run sapi_voice_installer.py    # Main SAPI voice installer
+#   uv run AACSpeakHelperServer.py    # TTS pipe server
+#   uv run test_pipe.py "Hello"       # Test client for pipe server
 
 [tool.black]
 line-length = 88

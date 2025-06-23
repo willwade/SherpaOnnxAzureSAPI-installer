@@ -76,8 +76,9 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 
 #### Step 1: Set up AACSpeakHelper Service
 ```bash
-# Navigate to AACSpeakHelper directory (integrated in this project)
-cd AACSpeakHelper
+# Clone this repository
+git clone https://github.com/willwade/SherpaOnnxAzureSAPI-installer.git
+cd SherpaOnnxAzureSAPI-installer
 
 # Set up configuration (IMPORTANT: Never commit real API keys!)
 cp settings.cfg.example settings.cfg
@@ -85,17 +86,13 @@ cp settings.cfg.example settings.cfg
 
 uv venv && uv sync --all-extras
 
-# Start the service
-uv run python AACSpeakHelperServer.py
+# Start the service (AACSpeakHelper is integrated in root directory)
+uv run AACSpeakHelperServer.py
 ```
 
 #### Step 2: Install SAPI Bridge
 ```powershell
-# Clone this repository
-git clone https://github.com/willwade/SherpaOnnxAzureSAPI-installer.git
-cd SherpaOnnxAzureSAPI-installer
-
-# Install a voice using the Python installer (requires admin PowerShell)
+# In a new admin PowerShell window, install a voice
 sudo python sapi_voice_installer.py install English-SherpaOnnx-Jenny
 ```
 
@@ -156,15 +153,6 @@ sudo python sapi_voice_installer.py uninstall English-SherpaOnnx-Jenny
 
 ### Testing Installation
 
-#### Automated Integration Testing
-```powershell
-# Run the complete integration test
-.\test_windows_integration.ps1
-
-# Test with Google TTS as well
-.\test_windows_integration.ps1 -TestGoogle
-```
-
 #### Manual SAPI Testing
 ```powershell
 # Test with PowerShell SAPI
@@ -201,25 +189,10 @@ $voice.Speak("This is Jenny from SherpaOnnx neural TTS!")
 
 ### Automated Build Process
 
-#### Complete Build and Test
+#### Complete Build
 ```powershell
-# Run the complete build and test workflow
-.\test_complete_workflow.ps1
-
-# Or run Windows integration test (includes build)
-.\test_windows_integration.ps1
-```
-
-#### Create Installer Package
-```powershell
-# Create complete installer package
-.\create_installer.ps1
-
-# Create with custom version
-.\create_installer.ps1 -Version "1.1.0"
-
-# Skip build if already built
-.\create_installer.ps1 -SkipBuild
+# Run the complete build workflow
+.\build-all.bat
 ```
 
 ### Manual Build Process
@@ -238,15 +211,6 @@ sudo .\register-com-wrapper.bat
 
 **⚠️ Important**: Always use `sudo .\register-com-wrapper.bat` for COM registration. Direct `regsvr32` calls often fail due to missing dependencies.
 
-#### Build .NET Installer
-```powershell
-# Build the .NET installer
-cd Installer
-dotnet build -c Release
-dotnet publish -c Release -o "..\build\installer" --self-contained true -r win-x64
-cd ..
-```
-
 #### Build Python CLI with PyInstaller
 ```bash
 # Set up Python environment
@@ -254,7 +218,7 @@ uv venv
 uv sync --extra build
 
 # Build standalone executable
-uv run pyinstaller --onefile --name "SapiVoiceManager" SapiVoiceManager.py
+uv run pyinstaller --onefile --name "sapi_voice_installer" sapi_voice_installer.py
 ```
 
 ## 📁 Project Structure
@@ -262,31 +226,31 @@ uv run pyinstaller --onefile --name "SapiVoiceManager" SapiVoiceManager.py
 ```
 SherpaOnnxAzureSAPI-installer/
 ├── NativeTTSWrapper/             # C++ SAPI COM wrapper
-│   ├── NativeTTSWrapper.cpp      # Main SAPI implementation with AACSpeakHelper pipe
+│   ├── NativeTTSWrapper.cpp      # Main SAPI implementation
 │   ├── NativeTTSWrapper.h        # Interface definitions
 │   ├── NativeTTSWrapper.idl      # COM interface definition
-│   └── NativeTTSWrapper.vcxproj  # Visual Studio project
-├── Installer/                    # .NET installer components
-│   ├── Program.cs                # Entry point and CLI interface
-│   ├── ConfigBasedVoiceManager.cs # Voice configuration management
-│   └── Installer.csproj          # .NET project file
-├── AACSpeakHelper/               # Python TTS service (integrated)
-│   ├── AACSpeakHelperServer.py   # Main service entry point
-│   ├── tts_utils.py              # TTS engine utilities
-│   ├── utils.py                  # General utilities
-│   └── test_pipe.py              # Testing script for pipe service
-├── voice_configs/                # Voice configuration files (AACSpeakHelper format)
+│   ├── NativeTTSWrapper.vcxproj  # Visual Studio project
+│   └── x64/Release/              # Build output directory
+├── voice_configs/                # Voice configuration files
 │   ├── English-SherpaOnnx-Jenny.json      # SherpaOnnx neural voice
 │   ├── English-Google-Basic.json          # Google TTS voice
 │   ├── British-English-Azure-Libby.json   # Azure TTS British voice
 │   └── American-English-Azure-Jenny.json  # Azure TTS American voice
-├── archive/                      # Archived old code
-│   └── old-dotnet-projects/      # Legacy .NET implementations
-├── install-voice.bat             # Voice installation script
+├── assets/                       # Application assets
+│   ├── configure.ico             # Configuration icon
+│   └── translate.ico             # Application icon
+├── AACSpeakHelperServer.py       # Python TTS service (integrated in root)
+├── sapi_voice_installer.py       # Python voice installer CLI
+├── test_pipe.py                  # Testing script for pipe service
+├── build-all.bat                 # Complete build script
+├── build_com_wrapper.bat         # C++ COM wrapper build script
 ├── register-com-wrapper.bat      # COM wrapper registration
-├── test-voice.ps1               # Voice testing script
-├── INTEGRATION_TESTING.md        # Complete testing guide
-├── TODO.md                       # Project status and roadmap
+├── uninstall-sapi-voices.bat     # Voice uninstaller script
+├── install-voice.bat             # Voice installation script
+├── test-voice.ps1                # Voice testing script
+├── test-sapi-libby.ps1          # Specific Libby voice test
+├── installer.nsi                 # NSIS installer script
+├── pyproject.toml                # Python project configuration
 └── README.md                     # This file
 ```
 
@@ -377,16 +341,12 @@ sudo reg delete "HKEY_CLASSES_ROOT\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}"
 
 # Then use the batch script
 sudo .\register-com-wrapper.bat
-
-# Verify registration
-.\debug-com-direct.ps1
 ```
 
 #### AACSpeakHelper Service Not Running
 ```bash
-# Start AACSpeakHelper service
-cd AACSpeakHelper
-uv run python AACSpeakHelperServer.py
+# Start AACSpeakHelper service (from project root)
+uv run AACSpeakHelperServer.py
 
 # Check if service is listening on pipe
 # (Service should show "Waiting for client connection..." message)
@@ -398,32 +358,31 @@ uv run python AACSpeakHelperServer.py
 #### Voice Synthesis Fails
 - Ensure AACSpeakHelper service is running and listening on pipe
 - Check voice configuration file exists in `voice_configs/`
-- Verify TTS engine credentials are configured in AACSpeakHelper (for cloud services)
+- Verify TTS engine credentials are configured in `settings.cfg` (for cloud services)
 - Check Windows Event Viewer for COM errors
-- Run integration test: `.\test_windows_integration.ps1`
+- Test with: `.\test-voice.ps1 Jenny`
 
 #### Build Issues
 ```powershell
 # Check prerequisites
-dotnet --version          # Should show 6.0.x+
 where msbuild            # Should find MSBuild.exe
 python --version         # Should show 3.11+
 uv --version             # Should show uv version
 
-# Run automated build test
-.\test_complete_workflow.ps1
+# Run complete build
+.\build-all.bat
 ```
 
-#### Integration Testing
+#### Manual Testing
 ```powershell
-# Run complete integration test
-.\test_windows_integration.ps1
-
 # Test specific voice
-.\test_windows_integration.ps1 -TestVoice "English-SherpaOnnx-Jenny"
+.\test-voice.ps1 Jenny
 
-# Test with Google TTS as well
-.\test_windows_integration.ps1 -TestGoogle
+# Test Libby voice specifically
+.\test-sapi-libby.ps1
+
+# List all SAPI voices
+.\test-voice.ps1
 ```
 
 ## 🤝 Contributing

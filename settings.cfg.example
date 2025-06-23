@@ -1,0 +1,36 @@
+# AACSpeakHelper Configuration Example
+# Copy this file to settings.cfg and edit with your actual credentials
+
+[TTS]
+# Default TTS engine (SherpaOnnxTTS, MicrosoftTTS, GoogleTTS)
+engine = SherpaOnnxTTS
+rate = 0
+volume = 100
+
+[Microsoft]
+# Azure TTS credentials (required for Azure voices)
+# Get your key from: https://portal.azure.com/
+subscription_key = YOUR_AZURE_TTS_KEY_HERE
+region = uksouth
+
+[Google]
+# Google TTS credentials (optional - works without key for basic usage)
+# credentials_path = path/to/google-credentials.json
+
+[SherpaOnnx]
+# SherpaOnnx settings (no credentials needed)
+model_path = models/
+voice = jenny
+
+[OpenAI]
+# OpenAI TTS credentials (optional)
+# api_key = YOUR_OPENAI_API_KEY_HERE
+
+[ElevenLabs]
+# ElevenLabs TTS credentials (optional)
+# api_key = YOUR_ELEVENLABS_API_KEY_HERE
+
+[General]
+# General settings
+debug = false
+log_level = INFO
