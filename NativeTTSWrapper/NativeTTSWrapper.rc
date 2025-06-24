@@ -51,6 +51,7 @@ END
 //
 
 IDR_NATIVETTSRAPPER     REGISTRY                "NativeTTSWrapper.rgs"
+IDR_SPVOICE             REGISTRY                "SpVoice.rgs"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

@@ -6,6 +6,7 @@
 
 import "oaidl.idl";
 import "ocidl.idl";
+import "sapi.idl";
 
 [
 	object,
@@ -30,5 +31,14 @@ library NativeTTSWrapperLib
 	coclass CNativeTTSWrapper
 	{
 		[default] interface INativeTTSWrapper;
+	};
+
+	[
+		uuid(F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B)
+	]
+	coclass OpenSpeechSpVoice
+	{
+		interface ISpVoice;
+		[default] interface IDispatch;
 	};
 };

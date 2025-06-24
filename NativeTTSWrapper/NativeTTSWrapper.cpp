@@ -4,6 +4,7 @@
 #include "NativeTTSWrapper_i.h"
 #include "dllmain.h"
 #include "NativeTTSWrapper.h"
+#include "SpVoice.h"
 #include <windows.h>
 #include <sapi.h>
 #include <sphelper.h>
@@ -776,3 +777,4 @@ std::wstring CNativeTTSWrapper::UTF8ToWString(const std::string& str)
 
 // COM class factory and registration
 OBJECT_ENTRY_AUTO(CLSID_CNativeTTSWrapper, CNativeTTSWrapper)
+OBJECT_ENTRY_AUTO(CLSID_OpenSpeechSpVoice, COpenSpeechSpVoice)

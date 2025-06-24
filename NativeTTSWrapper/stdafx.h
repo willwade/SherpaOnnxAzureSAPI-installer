@@ -13,6 +13,9 @@
 #include <sapi.h>
 #include <sphelper.h>
 
+// Include generated COM interface definitions
+#include "NativeTTSWrapper_i.h"
+
 #include <string>
 #include <vector>
 #include <memory>

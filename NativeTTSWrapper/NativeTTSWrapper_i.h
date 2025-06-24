@@ -71,9 +71,22 @@ typedef struct CNativeTTSWrapper CNativeTTSWrapper;
 #endif 	/* __CNativeTTSWrapper_FWD_DEFINED__ */
 
 
+#ifndef __OpenSpeechSpVoice_FWD_DEFINED__
+#define __OpenSpeechSpVoice_FWD_DEFINED__
+
+#ifdef __cplusplus
+typedef class OpenSpeechSpVoice OpenSpeechSpVoice;
+#else
+typedef struct OpenSpeechSpVoice OpenSpeechSpVoice;
+#endif /* __cplusplus */
+
+#endif 	/* __OpenSpeechSpVoice_FWD_DEFINED__ */
+
+
 /* header files for imported files */
 #include "oaidl.h"
 #include "ocidl.h"
+#include "sapi.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -223,6 +236,14 @@ EXTERN_C const CLSID CLSID_CNativeTTSWrapper;
 
 class DECLSPEC_UUID("E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B")
 CNativeTTSWrapper;
+#endif
+
+EXTERN_C const CLSID CLSID_OpenSpeechSpVoice;
+
+#ifdef __cplusplus
+
+class DECLSPEC_UUID("F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B")
+OpenSpeechSpVoice;
 #endif
 #endif /* __NativeTTSWrapperLib_LIBRARY_DEFINED__ */
 

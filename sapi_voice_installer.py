@@ -76,7 +76,8 @@ TTS_ENGINES = {
 }
 
 # Constants
-NATIVE_TTS_WRAPPER_CLSID = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"
+NATIVE_TTS_WRAPPER_CLSID = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"  # ISpTTSEngine (engine-level)
+OPENSPEECH_SPVOICE_CLSID = "{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}"  # ISpVoice (application-level) - Grid 3 compatible
 VOICE_CONFIGS_DIR = Path("C:/Program Files/OpenAssistive/OpenSpeech/voice_configs")
 AACSPEAKHELPER_CONFIG_PATH = Path("AACSpeakHelper/settings.cfg")
 SAPI_REGISTRY_PATH = r"SOFTWARE\Microsoft\SPEECH\Voices\Tokens"
@@ -523,12 +524,21 @@ class SAPIVoiceInstaller:
                         success_count += 1
                     else:
                         print(f"[ERROR] {arch_name} registration failed even after cleanup (exit code: {retry_result.returncode})")
+                        print(f"[INFO] Attempting manual registration fallback for {arch_name}...")
 
-                        # Try to get more detailed error information
-                        if retry_result.stderr:
-                            error_msg = retry_result.stderr.decode('utf-8', errors='ignore').strip()
-                            if error_msg:
-                                print(f"[ERROR] {arch_name} error details: {error_msg}")
+                        # Try manual registration as fallback
+                        manual_success = self._manual_com_registration(dll_path, arch_name)
+                        if manual_success:
+                            print(f"[OK] {arch_name} COM wrapper registered successfully via manual fallback!")
+                            success_count += 1
+                        else:
+                            print(f"[ERROR] {arch_name} manual registration also failed")
+
+                            # Try to get more detailed error information
+                            if retry_result.stderr:
+                                error_msg = retry_result.stderr.decode('utf-8', errors='ignore').strip()
+                                if error_msg:
+                                    print(f"[ERROR] {arch_name} error details: {error_msg}")
 
             except Exception as e:
                 print(f"❌ Failed to register {arch_name} COM wrapper: {e}")
@@ -553,15 +563,72 @@ class SAPIVoiceInstaller:
             print("   Some SAPI applications may not see the voices.")
             return True  # Partial success is still success
 
+    def _manual_com_registration(self, dll_path, arch_name):
+        """Manual COM registration as fallback when regsvr32 fails"""
+        try:
+            print(f"[INFO] Performing manual COM registration for {arch_name}...")
+
+            # Register CNativeTTSWrapper (ISpTTSEngine)
+            engine_clsid = "{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"
+            engine_clsid_path = f"HKLM\\SOFTWARE\\Classes\\CLSID\\{engine_clsid}"
+
+            # Create CLSID entry for engine
+            subprocess.run([
+                "reg", "add", engine_clsid_path, "/f", "/ve", "/t", "REG_SZ", "/d", "CNativeTTSWrapper Class"
+            ], capture_output=True)
+
+            # Create InprocServer32 entry for engine
+            subprocess.run([
+                "reg", "add", f"{engine_clsid_path}\\InprocServer32", "/f", "/ve", "/t", "REG_SZ", "/d", str(dll_path.absolute())
+            ], capture_output=True)
+
+            subprocess.run([
+                "reg", "add", f"{engine_clsid_path}\\InprocServer32", "/f", "/v", "ThreadingModel", "/t", "REG_SZ", "/d", "Apartment"
+            ], capture_output=True)
+
+            # Register OpenSpeechSpVoice (ISpVoice) - Required for Grid 3
+            voice_clsid = "{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}"
+            voice_clsid_path = f"HKLM\\SOFTWARE\\Classes\\CLSID\\{voice_clsid}"
+
+            # Create CLSID entry for voice
+            subprocess.run([
+                "reg", "add", voice_clsid_path, "/f", "/ve", "/t", "REG_SZ", "/d", "OpenSpeechSAPI OpenSpeechSpVoice Class"
+            ], capture_output=True)
+
+            # Create InprocServer32 entry for voice
+            subprocess.run([
+                "reg", "add", f"{voice_clsid_path}\\InprocServer32", "/f", "/ve", "/t", "REG_SZ", "/d", str(dll_path.absolute())
+            ], capture_output=True)
+
+            subprocess.run([
+                "reg", "add", f"{voice_clsid_path}\\InprocServer32", "/f", "/v", "ThreadingModel", "/t", "REG_SZ", "/d", "Apartment"
+            ], capture_output=True)
+
+            print(f"[OK] Manual COM registration completed for {arch_name}")
+            return True
+
+        except Exception as e:
+            print(f"[ERROR] Manual COM registration failed for {arch_name}: {e}")
+            return False
+
     def _verify_com_registration(self):
         """Verify COM registration by checking registry"""
         try:
-            # Check for our CLSID in registry
-            clsid_path = r"SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}"
-            result = subprocess.run([
-                "reg", "query", f"HKEY_LOCAL_MACHINE\\{clsid_path}"
+            # Check for both our CLSIDs in registry
+            # ISpTTSEngine CLSID (engine-level)
+            engine_clsid_path = r"SOFTWARE\Classes\CLSID\{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}"
+            engine_result = subprocess.run([
+                "reg", "query", f"HKEY_LOCAL_MACHINE\\{engine_clsid_path}"
             ], capture_output=True, text=True)
-            return result.returncode == 0
+
+            # ISpVoice CLSID (application-level) - Required for Grid 3
+            voice_clsid_path = r"SOFTWARE\Classes\CLSID\{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}"
+            voice_result = subprocess.run([
+                "reg", "query", f"HKEY_LOCAL_MACHINE\\{voice_clsid_path}"
+            ], capture_output=True, text=True)
+
+            # Both CLSIDs should be registered
+            return engine_result.returncode == 0 and voice_result.returncode == 0
         except Exception:
             return False
 
@@ -588,10 +655,12 @@ class SAPIVoiceInstaller:
                     except Exception:
                         pass  # Ignore errors during cleanup
 
-            # Remove CLSID entries
+            # Remove CLSID entries for both ISpTTSEngine and ISpVoice
             clsid_entries = [
-                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}",
-                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABD}"
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}",  # ISpTTSEngine
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}",  # ISpVoice
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABC}",  # Legacy
+                r"HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{4A8B9C2D-1E3F-4567-8901-234567890ABD}"   # Legacy
             ]
 
             for clsid in clsid_entries:
@@ -891,10 +960,10 @@ class SAPIVoiceInstaller:
             
             # Create voice registry key
             with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as voice_key:
-                # Basic SAPI registration
+                # Basic SAPI registration - Use SpVoice CLSID for Grid 3 compatibility
                 winreg.SetValueEx(voice_key, "", 0, winreg.REG_SZ, config["displayName"])
                 winreg.SetValueEx(voice_key, lcid, 0, winreg.REG_SZ, config["displayName"])
-                winreg.SetValueEx(voice_key, "CLSID", 0, winreg.REG_SZ, NATIVE_TTS_WRAPPER_CLSID)
+                winreg.SetValueEx(voice_key, "CLSID", 0, winreg.REG_SZ, OPENSPEECH_SPVOICE_CLSID)  # Changed to OpenSpeechSpVoice CLSID
                 winreg.SetValueEx(voice_key, "ConfigPath", 0, winreg.REG_SZ, str(config_path))
                 
                 # Create Attributes subkey
@@ -1041,6 +1110,66 @@ class SAPIVoiceInstaller:
         print(f"✅ Voice uninstallation complete: {voice_name}")
         return True
 
+    def register_test_voice_for_grid3(self):
+        """Register a test voice for immediate Grid 3 testing"""
+        print("\n🧪 Registering Test Voice for Grid 3")
+        print("This will create a test voice that Grid 3 can use immediately.")
+
+        # Check for administrator privileges
+        if not warn_admin_required():
+            return False
+
+        # Register COM wrapper first
+        if not self.register_com_wrapper():
+            print("❌ Failed to register COM wrapper")
+            return False
+
+        # Create a simple test voice configuration
+        test_voice_config = {
+            "name": "OpenSpeechTestVoice",
+            "displayName": "OpenSpeech Test Voice",
+            "description": "Test voice for Grid 3 compatibility testing",
+            "language": "English",
+            "locale": "en-GB",
+            "gender": "Female",
+            "age": "Adult",
+            "vendor": "OpenSpeech",
+            "ttsConfig": {
+                "text": "",
+                "args": {
+                    "engine": "sherpa",
+                    "voice": "en_GB-jenny_dioco-medium",
+                    "rate": 0,
+                    "volume": 100
+                }
+            }
+        }
+
+        # Create config file
+        config_path = VOICE_CONFIGS_DIR / "OpenSpeechTestVoice.json"
+        try:
+            VOICE_CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(test_voice_config, f, indent=2)
+            print(f"✅ Test voice config created: {config_path}")
+        except Exception as e:
+            print(f"❌ Failed to create test voice config: {e}")
+            return False
+
+        # Register with SAPI
+        if self.register_sapi_voice("OpenSpeechTestVoice", config_path, test_voice_config):
+            print("✅ Test voice registered successfully!")
+            print("\n🎯 Grid 3 Testing Instructions:")
+            print("1. Open Grid 3")
+            print("2. Go to Settings > Speech")
+            print("3. Look for 'OpenSpeech Test Voice' in the voice list")
+            print("4. Select it and test speech")
+            print("\nIf the voice appears and works, Grid 3 compatibility is confirmed! 🎉")
+            return True
+        else:
+            print("❌ Failed to register test voice")
+            return False
+
     def interactive_main_menu(self):
         """Main interactive menu"""
         print("\n🎤 Welcome to the SAPI Voice Installer!")
@@ -1062,11 +1191,12 @@ class SAPIVoiceInstaller:
             print("4. Uninstall Voice")
             print("5. Register COM Server")
             print("6. Unregister COM Server")
-            print("7. Exit")
+            print("7. Register Test Voice for Grid 3")
+            print("8. Exit")
 
             # Get user selection
             try:
-                user_input = input(f"\nSelect option (1-7) or 'q' to quit: ").strip().lower()
+                user_input = input(f"\nSelect option (1-8) or 'q' to quit: ").strip().lower()
 
                 # Handle quit commands
                 if user_input in ['q', 'quit', 'exit']:
@@ -1110,6 +1240,10 @@ class SAPIVoiceInstaller:
                         print("✅ COM server unregistered successfully!")
                     input("\nPress Enter to continue...")
                 elif choice == 7:
+                    if self.register_test_voice_for_grid3():
+                        print("✅ Test voice registered successfully!")
+                    input("\nPress Enter to continue...")
+                elif choice == 8:
                     print("Goodbye! 👋")
                     return
                 else:

@@ -4,6 +4,7 @@
 //
 #define IDS_PROJNAME                    100
 #define IDR_NATIVETTSRAPPER            101
+#define IDR_SPVOICE                    102
 
 // Next default values for new objects
 // 

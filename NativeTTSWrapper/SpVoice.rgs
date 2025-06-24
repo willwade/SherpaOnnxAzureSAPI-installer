@@ -1,0 +1,26 @@
+HKCR
+{
+	OpenSpeechSAPI.OpenSpeechSpVoice.1 = s 'OpenSpeechSAPI OpenSpeechSpVoice Class'
+	{
+		CLSID = s '{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}'
+	}
+	OpenSpeechSAPI.OpenSpeechSpVoice = s 'OpenSpeechSAPI OpenSpeechSpVoice Class'
+	{
+		CLSID = s '{F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B}'
+		CurVer = s 'OpenSpeechSAPI.OpenSpeechSpVoice.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {F2E8B6A1-3C4D-4E5F-8A7B-9C1D2E3F4A5B} = s 'OpenSpeechSAPI OpenSpeechSpVoice Class'
+		{
+			ProgID = s 'OpenSpeechSAPI.OpenSpeechSpVoice.1'
+			VersionIndependentProgID = s 'OpenSpeechSAPI.OpenSpeechSpVoice'
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			'TypeLib' = s '{B8F4A8E2-9C3D-4A5E-8F7C-2D1B3E4F5A6B}'
+		}
+	}
+}
