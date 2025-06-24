@@ -2,26 +2,6 @@
 
 A **universal SAPI bridge** that connects Windows SAPI applications to multiple TTS engines through the **AACSpeakHelper pipe service**. This allows any SAPI application to use multiple TTS engines (Azure TTS, SherpaOnnx, Google TTS, ElevenLabs, OpenAI, and more) through a unified interface.
 
-## 🎯 **Simplified Architecture**
-
-**Clean, maintainable codebase with two main components:**
-- ✅ **C++ COM Wrapper** - Pure SAPI interface, communicates only with AACSpeakHelper pipe
-- ✅ **Python Voice Installer** - Unified installer replacing .NET complexity
-- ✅ **AACSpeakHelper Service** - Multi-engine TTS backend (separate repository)
-- ✅ **No fallback chains** - Simple, reliable pipe communication only
-- ✅ **Configuration-based voices** - JSON voice definitions
-
-## 🎯 Key Features
-
-- **🎵 100% SAPI Compatibility**: Works with any Windows application that uses SAPI
-- **🚀 Multi-Engine Support**: Azure TTS, SherpaOnnx, Google TTS, ElevenLabs, and more
-- **⚡ Native C++ Performance**: C++ COM wrapper for maximum compatibility and speed
-- **🔧 Unified Interface**: All TTS engines accessible through AACSpeakHelper pipe service
-- **📦 Easy Installation**: Automated installer with one-click setup
-- **🎛️ Configuration-Based**: JSON voice configurations for easy management
-- **🌐 Extensible**: Easy to add new TTS engines via AACSpeakHelper
-- **🧪 Comprehensive Testing**: Complete integration testing framework
-- **🏗️ CI/CD Ready**: Automated builds with GitHub Actions
 
 ## 🏗️ Architecture
 
@@ -37,7 +17,7 @@ AACSpeakHelper Python Service
 Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 ```
 
-## 🔑 Component CLSIDs
+## 🔑 (Notes!) Component CLSIDs
 
 **IMPORTANT**: All voices must be registered with the correct C++ COM wrapper CLSID:
 
@@ -55,14 +35,6 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 - **Voice Configurations**: JSON files defining TTS engine settings
 - **CLI Installer**: Python tool for voice management (matches AACSpeakHelper pattern)
 
-## 🔒 Security Notice
-
-**IMPORTANT**: This project handles TTS API credentials. Please follow these security practices:
-
-- ✅ **Never commit real API keys** to the repository
-- ✅ Use `settings.cfg.example` as a template and create your own `settings.cfg`
-- ✅ The `.gitignore` file protects `settings.cfg` from being committed
-- ✅ Store production credentials securely and separately from the codebase
 
 ## 🚀 Quick Start
 
@@ -110,13 +82,6 @@ $voice.Speak("Hello from SherpaOnnx via AACSpeakHelper!")
 
 ### Voice Management
 
-#### Available Voice Configurations
-- **`English-SherpaOnnx-Jenny`** - High-quality neural TTS (no credentials needed)
-- **`English-Google-Basic`** - Google TTS (no credentials needed)
-- **`British-English-Azure-Libby`** - Azure TTS British voice (requires API key)
-- **`American-English-Azure-Jenny`** - Azure TTS American voice (requires API key)
-
-#### Voice Installation Commands
 
 **Install Voice**:
 ```powershell

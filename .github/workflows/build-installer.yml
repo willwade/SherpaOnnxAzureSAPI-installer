@@ -49,13 +49,11 @@ jobs:
     
     - name: Build Python Installer
       run: |
-        pyinstaller --onefile --console --name sapi_voice_installer sapi_voice_installer.py
+        uv run pyinstaller --onefile --console --name sapi_voice_installer sapi_voice_installer.py
     
     - name: Build AACSpeakHelper Server
       run: |
-        cd AACSpeakHelper
         uv run pyinstaller --onefile --console --name AACSpeakHelperServer AACSpeakHelperServer.py
-        cd ..
     
     - name: Create NSIS Installer
       run: |
@@ -79,7 +77,7 @@ jobs:
         files: |
           OpenSpeechSAPI-installer.exe
           dist/sapi_voice_installer.exe
-          AACSpeakHelper/dist/AACSpeakHelperServer.exe
+          dist/AACSpeakHelperServer.exe
         draft: false
         prerelease: false
         generate_release_notes: true
@@ -106,7 +104,7 @@ jobs:
           exit 1
         }
 
-        if (Test-Path "AACSpeakHelper/dist/AACSpeakHelperServer.exe") {
+        if (Test-Path "dist/AACSpeakHelperServer.exe") {
           Write-Host "✅ AACSpeakHelperServer.exe created"
         } else {
           Write-Host "❌ AACSpeakHelperServer.exe missing"
