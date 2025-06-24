@@ -36,6 +36,7 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 - **CLI Installer**: Python tool for voice management (matches AACSpeakHelper pattern)
 
 
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -45,6 +46,11 @@ Multiple TTS Engines (Azure, SherpaOnnx, Google, etc.)
 - AACSpeakHelper service running
 
 ### Installation Steps
+
+### Install OpenSpeechSAPI 
+
+build_com_wrapper.bat
+
 
 #### Step 1: Set up AACSpeakHelper Service
 ```bash
