@@ -41,13 +41,29 @@ STDMETHODIMP CNativeTTSWrapper::Speak(
     const SPVTEXTFRAG* pTextFragList,
     ISpTTSEngineSite* pOutputSite)
     {
-        LogMessage(L"*** NATIVE SPEAK METHOD CALLED ***");
-        
-        if (!pTextFragList || !pOutputSite)
+        LogMessage(L"=== CNativeTTSWrapper::Speak - ENTRY POINT ===");
+
+        // Log detailed parameters
+        wchar_t logBuffer[512];
+        swprintf_s(logBuffer, L"CNativeTTSWrapper::Speak - Parameters: dwSpeakFlags=0x%08X, pWaveFormatEx=%p, pTextFragList=%p, pOutputSite=%p",
+                   dwSpeakFlags, pWaveFormatEx, pTextFragList, pOutputSite);
+        LogMessage(logBuffer);
+
+        // Parameter validation with detailed logging
+        if (!pTextFragList)
         {
-            LogMessage(L"Invalid parameters to Speak method");
+            LogMessage(L"CNativeTTSWrapper::Speak - ERROR: pTextFragList is NULL");
             return E_INVALIDARG;
         }
+
+        if (!pOutputSite)
+        {
+            LogMessage(L"CNativeTTSWrapper::Speak - ERROR: pOutputSite is NULL - This is the likely cause of failure!");
+            LogMessage(L"CNativeTTSWrapper::Speak - NOTE: ISpTTSEngine requires a valid ISpTTSEngineSite for audio output");
+            return E_INVALIDARG;
+        }
+
+        LogMessage(L"CNativeTTSWrapper::Speak - Parameter validation passed");
 
         try
         {

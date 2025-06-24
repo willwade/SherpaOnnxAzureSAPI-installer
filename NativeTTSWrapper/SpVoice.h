@@ -24,7 +24,8 @@ class CNativeTTSWrapper;
 class ATL_NO_VTABLE COpenSpeechSpVoice :
     public CComObjectRootEx<CComMultiThreadModel>,
     public CComCoClass<COpenSpeechSpVoice, &CLSID_OpenSpeechSpVoice>,
-    public ISpVoice
+    public ISpVoice,
+    public ISpObjectWithToken
 {
 public:
     COpenSpeechSpVoice();
@@ -37,6 +38,7 @@ public:
         COM_INTERFACE_ENTRY(ISpVoice)
         COM_INTERFACE_ENTRY(ISpEventSource)
         COM_INTERFACE_ENTRY(ISpNotifySource)
+        COM_INTERFACE_ENTRY(ISpObjectWithToken)
     END_COM_MAP()
 
     // ISpVoice implementation - Core speech synthesis interface
@@ -129,6 +131,10 @@ public:
     STDMETHOD(Pause)(void) override;
     STDMETHOD(Resume)(void) override;
 
+    // ISpObjectWithToken implementation - Required for SAPI voice objects
+    STDMETHOD(SetObjectToken)(ISpObjectToken* pToken) override;
+    STDMETHOD(GetObjectToken)(ISpObjectToken** ppToken) override;
+
     // ISpEventSource implementation - Event management for speech synthesis
     // (These are inherited from ISpVoice which inherits from ISpEventSource)
     STDMETHOD(SetInterest)(
@@ -203,6 +209,12 @@ private:
     void CleanupTextFragments(SPVTEXTFRAG* pFragments);
     HRESULT FireEvent(SPEVENTENUM eEventId, WPARAM wParam, LPARAM lParam);
     HRESULT ProcessNotification();
+
+    // AACSpeakHelper pipe service methods
+    HRESULT CallAACSpeakHelperPipeService(const std::wstring& text, std::vector<BYTE>& audioData);
+    bool ConnectToAACSpeakHelper(HANDLE& hPipe);
+    HRESULT SendTextToPipe(HANDLE hPipe, const std::wstring& text);
+    HRESULT ReceiveAudioFromPipe(HANDLE hPipe, std::vector<BYTE>& audioData);
     
     // State management
     void InitializeDefaults();

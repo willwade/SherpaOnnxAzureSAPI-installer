@@ -960,10 +960,10 @@ class SAPIVoiceInstaller:
             
             # Create voice registry key
             with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, registry_path) as voice_key:
-                # Basic SAPI registration - Use SpVoice CLSID for Grid 3 compatibility
+                # Basic SAPI registration - Use ISpTTSEngine CLSID (voices must point to TTS engines, not ISpVoice objects)
                 winreg.SetValueEx(voice_key, "", 0, winreg.REG_SZ, config["displayName"])
                 winreg.SetValueEx(voice_key, lcid, 0, winreg.REG_SZ, config["displayName"])
-                winreg.SetValueEx(voice_key, "CLSID", 0, winreg.REG_SZ, OPENSPEECH_SPVOICE_CLSID)  # Changed to OpenSpeechSpVoice CLSID
+                winreg.SetValueEx(voice_key, "CLSID", 0, winreg.REG_SZ, NATIVE_TTS_WRAPPER_CLSID)  # FIXED: Use ISpTTSEngine CLSID like espeak-ng
                 winreg.SetValueEx(voice_key, "ConfigPath", 0, winreg.REG_SZ, str(config_path))
                 
                 # Create Attributes subkey
@@ -1124,11 +1124,42 @@ class SAPIVoiceInstaller:
             print("❌ Failed to register COM wrapper")
             return False
 
-        # Create a simple test voice configuration
+        # Check for Azure credentials
+        config, config_path = load_config()
+        azure_key = config.get("azureTTS", "key", fallback="")
+        azure_region = config.get("azureTTS", "location", fallback="uksouth")
+
+        if not azure_key:
+            print("\n⚠️  Azure TTS credentials not found!")
+            print("The test voice uses Azure TTS. Please configure your Azure credentials:")
+            print("")
+            azure_key = input("Enter your Azure TTS API key: ").strip()
+            if not azure_key:
+                print("❌ Azure TTS key is required for the test voice")
+                return False
+
+            azure_region = input(f"Enter Azure region [default: {azure_region}]: ").strip() or azure_region
+
+            # Save the credentials
+            if not config.has_section("azureTTS"):
+                config.add_section("azureTTS")
+            config.set("azureTTS", "key", azure_key)
+            config.set("azureTTS", "location", azure_region)
+
+            try:
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    config.write(f)
+                print("✅ Azure credentials saved")
+            except Exception as e:
+                print(f"⚠️  Warning: Failed to save credentials: {e}")
+        else:
+            print(f"✅ Using existing Azure TTS credentials (region: {azure_region})")
+
+        # Create a simple test voice configuration using Azure TTS
         test_voice_config = {
             "name": "OpenSpeechTestVoice",
-            "displayName": "OpenSpeech Test Voice",
-            "description": "Test voice for Grid 3 compatibility testing",
+            "displayName": "OpenSpeech Test Voice (Azure)",
+            "description": "Test voice for Grid 3 compatibility testing using Azure TTS",
             "language": "English",
             "locale": "en-GB",
             "gender": "Female",
@@ -1137,13 +1168,17 @@ class SAPIVoiceInstaller:
             "ttsConfig": {
                 "text": "",
                 "args": {
-                    "engine": "sherpa",
-                    "voice": "en_GB-jenny_dioco-medium",
+                    "engine": "azure",
+                    "voice": "en-GB-LibbyNeural",
                     "rate": 0,
                     "volume": 100
                 }
             }
         }
+
+        # Create/update AACSpeakHelper config with Azure credentials
+        if not self.create_aacspeakhelper_config("azure", azure_key, azure_region):
+            print("⚠️  Warning: Failed to create AACSpeakHelper config, but continuing...")
 
         # Create config file
         config_path = VOICE_CONFIGS_DIR / "OpenSpeechTestVoice.json"
