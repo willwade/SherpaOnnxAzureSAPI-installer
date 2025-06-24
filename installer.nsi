@@ -52,12 +52,8 @@ Section "Main Application" SEC01
   File "dist\sapi_voice_installer.exe"
   File "dist\AACSpeakHelperServer.exe"
 
-  ; Copy C++ COM Wrapper and all dependencies
+  ; Copy C++ COM Wrapper (pure pipe client - no external dependencies)
   File "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
-  File "NativeTTSWrapper\x64\Release\fmt.dll"
-  File "NativeTTSWrapper\x64\Release\onnxruntime.dll"
-  File "NativeTTSWrapper\x64\Release\onnxruntime_providers_shared.dll"
-  File "NativeTTSWrapper\x64\Release\sherpa-onnx-c-api.dll"
 
   ; Copy voice configurations
   SetOutPath "$INSTDIR\voice_configs"
@@ -154,10 +150,6 @@ Section Uninstall
   Delete "$INSTDIR\sapi_voice_installer.exe"
   Delete "$INSTDIR\AACSpeakHelperServer.exe"
   Delete "$INSTDIR\NativeTTSWrapper.dll"
-  Delete "$INSTDIR\fmt.dll"
-  Delete "$INSTDIR\onnxruntime.dll"
-  Delete "$INSTDIR\onnxruntime_providers_shared.dll"
-  Delete "$INSTDIR\sherpa-onnx-c-api.dll"
   Delete "$INSTDIR\settings.cfg.example"
   
   ; Remove directories
