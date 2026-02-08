@@ -28,7 +28,7 @@ extern "C" {
 
 // Implementation of CNativeTTSWrapper
 
-CNativeTTSWrapper::CNativeTTSWrapper() : m_engineInitialized(false)
+CNativeTTSWrapper::CNativeTTSWrapper() : m_engineInitialized(false), m_actualSampleRate(16000)
 {
     LogMessage(L"CNativeTTSWrapper constructor called");
 }
@@ -131,7 +131,9 @@ STDMETHODIMP CNativeTTSWrapper::GetOutputFormat(
 
         pFormat->wFormatTag = WAVE_FORMAT_PCM;
         pFormat->nChannels = 1;
-        pFormat->nSamplesPerSec = 22050;
+        // Use the actual sample rate from the engine (e.g., 16000 for SherpaOnnx models)
+        // This prevents pitch issues from mismatched sample rates
+        pFormat->nSamplesPerSec = m_actualSampleRate;
         pFormat->wBitsPerSample = 16;
         pFormat->nBlockAlign = pFormat->nChannels * pFormat->wBitsPerSample / 8;
         pFormat->nAvgBytesPerSec = pFormat->nSamplesPerSec * pFormat->nBlockAlign;
@@ -139,7 +141,7 @@ STDMETHODIMP CNativeTTSWrapper::GetOutputFormat(
 
         *ppCoMemOutputWaveFormatEx = pFormat;
 
-        LogMessage(L"Returned PCM format: 22050Hz, 16-bit, mono");
+        LogMessage((L"Returned PCM format: " + std::to_wstring(m_actualSampleRate) + L"Hz, 16-bit, mono").c_str());
         return S_OK;
     }
 
@@ -349,6 +351,24 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
             if (manager.GetEngine(m_currentEngineId))
             {
                 LogMessage(L"Engine already loaded");
+
+                // Query the engine for its actual sample rate
+                ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+                if (engine)
+                {
+                    int channels, bitsPerSample;
+                    HRESULT hr = engine->GetSupportedFormat(m_actualSampleRate, channels, bitsPerSample);
+                    if (SUCCEEDED(hr))
+                    {
+                        LogMessage((L"Engine sample rate: " + std::to_wstring(m_actualSampleRate) + L"Hz").c_str());
+                    }
+                    else
+                    {
+                        LogMessage(L"Could not query engine sample rate, using default 16000Hz");
+                        m_actualSampleRate = 16000;
+                    }
+                }
+
                 m_engineInitialized = true;
                 return S_OK;
             }
@@ -410,6 +430,24 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
                     if (SUCCEEDED(hr))
                     {
                         LogMessage(L"Loaded fallback Amy configuration");
+
+                        // Query the engine for its actual sample rate
+                        ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+                        if (engine)
+                        {
+                            int channels, bitsPerSample;
+                            HRESULT hrQuery = engine->GetSupportedFormat(m_actualSampleRate, channels, bitsPerSample);
+                            if (SUCCEEDED(hrQuery))
+                            {
+                                LogMessage((L"Engine sample rate: " + std::to_wstring(m_actualSampleRate) + L"Hz").c_str());
+                            }
+                            else
+                            {
+                                LogMessage(L"Could not query engine sample rate, using default 16000Hz");
+                                m_actualSampleRate = 16000;
+                            }
+                        }
+
                         m_engineInitialized = true;
                         return S_OK;
                     }
@@ -420,6 +458,29 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
             }
 
             LogMessage((L"Configuration loaded, using engine: " + m_currentEngineId).c_str());
+
+            // Query the engine for its actual sample rate
+            ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+            if (engine && engine->IsInitialized())
+            {
+                int channels, bitsPerSample;
+                HRESULT hr = engine->GetSupportedFormat(m_actualSampleRate, channels, bitsPerSample);
+                if (SUCCEEDED(hr))
+                {
+                    LogMessage((L"Engine sample rate: " + std::to_wstring(m_actualSampleRate) + L"Hz").c_str());
+                }
+                else
+                {
+                    LogMessage(L"Could not query engine sample rate, using default 16000Hz");
+                    m_actualSampleRate = 16000;
+                }
+            }
+            else
+            {
+                LogMessage(L"Engine not initialized yet, will query sample rate later");
+                m_actualSampleRate = 16000; // Default for SherpaOnnx models
+            }
+
             m_engineInitialized = true;
             return S_OK;
         }

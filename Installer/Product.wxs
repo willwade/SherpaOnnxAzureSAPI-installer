@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="SherpaOnnx SAPI5 TTS Engine"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="OpenAssistive"
+           UpgradeCode="8E5F3A2D-7B4C-4D8E-9F1A-2C3B4D5E6F7A">
+
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Installation Folder -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="OpenAssistiveFolder" Name="OpenAssistive">
+          <Directory Id="OPENASSISTIVEFOLDER" Name="OpenSpeech">
+            <!-- Components will be added here -->
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="SherpaOnnx SAPI"/>
+      </Directory>
+    </Directory>
+
+    <!-- Files and Components -->
+    <ComponentGroup Id="ProductComponents" Directory="OPENASSISTIVEFOLDER">
+      <!-- Native DLL -->
+      <Component Id="NativeDll" Guid="B2C4D6E8-1A2B-3C4D-5E6F-7A8B9C0D1E2F">
+        <File Id="NativeTTSWrapperDll" Source="NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" KeyPath="yes" Checksum="yes"/>
+        <!-- Register DLL as COM server -->
+        <Class Id="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" Context="InprocServer32" ThreadingModel="both">
+          <ProgId Id="SherpaOnnx.TTSEngine.1" Description="SherpaOnnx TTS Engine">
+            <ProgId Id="SherpaOnnx.TTSEngine" Description="SherpaOnnx TTS Engine" />
+          </ProgId>
+        </Class>
+        <RegistryValue Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}\InprocServer32" Type="string" Value="[OPENASSISTIVEFOLDER]NativeTTSWrapper.dll" />
+        <RegistryValue Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}\InprocServer32" Name="ThreadingModel" Type="string" Value="Both" />
+      </Component>
+
+      <!-- SherpaOnnx Libraries -->
+      <Component Id="SherpaOnnxLibs" Guid="C3D5E7F9-2B3C-4D5E-6F7A-8B9C0D1E2F3A">
+        <File Id="SherpaOnnxCoreDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\sherpa-onnx-core.dll" />
+        <File Id="SherpaOnnxCApiDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\sherpa-onnx-c-api.dll" />
+        <File Id="OnnxRuntimeDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\onnxruntime.dll" />
+      </Component>
+
+      <!-- Configuration File -->
+      <Component Id="ConfigFile" Guid="D4E6F8A0-3C4D-5E6F-7A8B-9C0D1E2F3A4B">
+        <File Id="EngineConfigJson" Source="NativeTTSWrapper\x64\Release\engines_config.json" />
+      </Component>
+
+      <!-- Installer Executable -->
+      <Component Id="InstallerExe" Guid="E5F7A9B1-4D5E-6F7A-8B9C-0D1E2F3A4B5C">
+        <File Id="InstallerExeFile" Source="bin\Release\net6.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes">
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx SAPI Installer" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx SAPI Installer" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
+        </File>
+      </Component>
+    </ComponentGroup>
+
+    <!-- SAPI5 Voice Registration -->
+    <ComponentGroup Id="SAPI5Registration" Directory="OPENASSISTIVEFOLDER">
+      <Component Id="SAPI5VoiceRegistry" Guid="F6A8B0C2-5E6F-7A8B-9C0D-1E2F3A4B5C6D">
+        <!-- Voice Token Registry Keys -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="" Type="string" Value="Test Sherpa Voice" />
+          <RegistryValue Name="CLSID" Type="string" Value="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" />
+          <RegistryValue Name="Language" Type="string" Value="409" />
+          <RegistryValue Name="Gender" Type="string" Value="Female" />
+          <RegistryValue Name="Age" Type="string" Value="Adult" />
+          <RegistryValue Name="Vendor" Type="string" Value="OpenAssistive" />
+          <RegistryValue Name="Name" Type="string" Value="TestSherpaVoice" />
+          <RegistryValue Name="VoiceType" Type="string" Value="sherpa-amy" />
+          <RegistryValue Name="VoiceName" Type="string" Value="amy" />
+        </RegistryKey>
+
+        <!-- Attributes -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="Language" Type="string" Value="409" />
+          <RegistryValue Name="Gender" Type="string" Value="Female" />
+          <RegistryValue Name="Age" Type="string" Value="Adult" />
+          <RegistryValue Name="Vendor" Type="string" Value="OpenAssistive" />
+          <RegistryValue Name="Name" Type="string" Value="TestSherpaVoice" />
+          <RegistryValue Name="VoiceType" Type="string" Value="sherpa-amy" />
+          <RegistryValue Name="VoiceName" Type="string" Value="amy" />
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="SherpaOnnx SAPI5 TTS Engine" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="SAPI5Registration" />
+    </Feature>
+
+    <!-- UI Configuration -->
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
+    </UI>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="OPENASSISTIVEFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch SherpaOnnx SAPI Installer" />
+
+    <!-- Launch application after install -->
+    <Property Id="WixShellExecTarget" Value="[#InstallerExeFile]" />
+    <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+
+  </Product>
+</Wix>

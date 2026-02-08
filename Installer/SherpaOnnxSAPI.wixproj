@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" InitialTargets="EnsureWixToolsetInstalled" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{E8F6A3D1-7B4C-4A2E-9F1D-3C8B7A2E1F4D}</ProjectGuid>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <OutputType>Package</OutputType>
+    <OutputName>SherpaOnnxSAPI</OutputName>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+    <DefineConstants>Configuration=$(Configuration);Platform=$(Platform)</DefineConstants>
+    <SuppressSpecificWarnings>1076</SuppressSpecificWarnings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="Installer.csproj">
+      <Name>Installer</Name>
+      <Project>{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLFOLDER</RefTargetDir>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <WixExtension Include="WixUIExtension" />
+    <WixExtension Include="WixUtilExtension" />
+  </ItemGroup>
+
+  <Import Project="$(WixTargetsPath)" Condition=" Exists('$(WixTargetsPath)') " />
+
+  <Target Name="EnsureWixToolsetInstalled" Condition=" !Exists('$(WixTargetsPath)') ">
+    <Error Text="WiX Toolset is not installed. Please install WiX Toolset v3.11 or later from https://wixtoolset.org/" />
+  </Target>
+
+</Project>

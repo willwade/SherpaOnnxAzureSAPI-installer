@@ -64,6 +64,7 @@ private:
     CComPtr<ISpObjectToken> m_pToken;
     std::wstring m_currentEngineId;  // ID of the engine for this voice
     bool m_engineInitialized;
+    int m_actualSampleRate;  // Actual sample rate from the engine (e.g., 16000 for SherpaOnnx)
 
     // Helper methods
     void LogMessage(const wchar_t* message);

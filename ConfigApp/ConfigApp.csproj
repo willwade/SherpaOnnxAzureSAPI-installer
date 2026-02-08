@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <RootNamespace>SherpaOnnxConfig</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SherpaOnnxConfig</AssemblyName>
+    <Version>1.0.0</Version>
+    <Authors>OpenAssistive</Authors>
+    <Description>SherpaOnnx SAPI5 TTS Configuration Application</Description>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <StartupObject>SherpaOnnxConfig.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Installer\EngineConfigManager.cs" Link="EngineConfigManager.cs" />
+  </ItemGroup>
+
+</Project>
