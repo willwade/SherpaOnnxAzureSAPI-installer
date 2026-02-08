@@ -4,10 +4,27 @@ bin/
 obj/
 Debug/
 Release/
-models/
+x64/
 *.wixpdb
 *.msi
 *.cab
+
+# NativeTTSWrapper build outputs
+NativeTTSWrapper/x64/
+NativeTTSWrapper/Debug/
+NativeTTSWrapper/Release/
+NativeTTSWrapper/build/
+NativeTTSWrapper/deps/
+NativeTTSWrapper/*.sdf
+NativeTTSWrapper/*.opensdf
+NativeTTSWrapper/*.VC.db
+NativeTTSWrapper/*.VC.VC.opendb
+
+# Models (large binary files)
+models/
+*.onnx
+*.tar.bz2
+*.zip
 
 # NuGet Packages
 *.nupkg
@@ -36,6 +53,7 @@ artifacts/
 *.bak
 *.swp
 *.sln.cache
+nul
 
 # NuGet Restore Files
 *.nuget.props
@@ -56,6 +74,7 @@ Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 *.lnk
+.DS_Store
 
 # Publish files
 publish/
@@ -69,9 +88,8 @@ publish/
 *.log
 *.dmp
 
-# Additional ignore for Windows
+# Additional ignore for Windows (but keep required DLLs in libs-win/)
 *.exe
-*.dll
 *.pdb
 *.mdb
 *.ilk
@@ -80,6 +98,48 @@ publish/
 *.exp
 *.iobj
 *.ipdb
+!NativeTTSWrapper/libs-win/**/*.lib
+!NativeTTSWrapper/libs-win/**/*.dll
 
 # Cache
 *.cache/
+
+# Claude Code
+.claude/
+
+# Temporary build scripts
+BUILD-*.bat
+FIX-*.bat
+FIX-*.ps1
+RUN-*.bat
+*-MANUAL.bat
+download_sherpa.ps1
+register_dll.ps1
+
+# Test registry files
+*.reg
+
+# Test scripts (keep main test scripts)
+test_com.vbs
+test_sapi.vbs
+test_tts*.vbs
+test_speak.vbs
+
+# Extracted/archived libraries
+sherpa-onnx-v*/
+sherpa-onnx/
+azure-speech-sdk-extracted/
+githubazure-speech-sdk.zip
+
+# Generated files
+NativeTTSWrapper/NativeTTSWrapper_i.c
+NativeTTSWrapper/NativeTTSWrapper_i.h
+NativeTTSWrapper/Microsoft.VCToolsVersion.*.props
+Microsoft.VCToolsVersion.*.props
+
+# CMake
+NativeTTSWrapper/CMakeLists.txt
+
+# Documentation drafts (keep final versions)
+CLEANUP_PLAN.md
+SAPI5_CLSID_TRACKING.md

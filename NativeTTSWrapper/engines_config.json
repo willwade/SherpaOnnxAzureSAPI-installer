@@ -3,15 +3,15 @@
     "sherpa-amy": {
       "type": "sherpaonnx",
       "config": {
-        "modelPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/model.onnx",
-        "tokensPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/tokens.txt",
-        "lexiconPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/lexicon.txt",
+        "modelPath": "C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/en_US-amy-low.onnx",
+        "tokensPath": "C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/tokens.txt",
+        "dataDir": "C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/espeak-ng-data",
         "noiseScale": 0.667,
         "noiseScaleW": 0.8,
-        "lengthScale": 1.0,
+        "lengthScale": 1.15,
         "numThreads": 1,
         "provider": "cpu",
-        "debug": false
+        "debug": true
       }
     },
     "azure-jenny": {
@@ -45,7 +45,7 @@
         "tokensPath": "C:/Program Files/OpenSpeech/models/piper-en-jenny-high/tokens.txt",
         "noiseScale": 0.667,
         "noiseScaleW": 0.8,
-        "lengthScale": 1.0,
+        "lengthScale": 1.15,
         "numThreads": 2,
         "provider": "cpu",
         "debug": false

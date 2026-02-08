@@ -221,7 +221,7 @@ EXTERN_C const CLSID CLSID_CNativeTTSWrapper;
 
 #ifdef __cplusplus
 
-class DECLSPEC_UUID("E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B")
+class DECLSPEC_UUID("A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D")
 CNativeTTSWrapper;
 #endif
 #endif /* __NativeTTSWrapperLib_LIBRARY_DEFINED__ */

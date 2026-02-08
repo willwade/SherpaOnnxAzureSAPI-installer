@@ -66,43 +66,14 @@ STDMETHODIMP CNativeTTSWrapper::Speak(
 
             LogMessage((L"Speaking text: " + text).c_str());
 
-            // Try native engine first, then direct SherpaOnnx, then ProcessBridge
+            // Generate audio using native engine
             std::vector<BYTE> audioData;
-
-            LogMessage(L"=== STARTING FALLBACK CHAIN ===");
-            LogMessage(L"Step 1: Attempting native engine...");
             HRESULT hr = GenerateAudioViaNativeEngine(text, audioData);
-            LogMessage((L"Native engine result: " + std::to_wstring(hr)).c_str());
-
             if (FAILED(hr))
             {
-                LogMessage(L"Native engine failed, trying direct SherpaOnnx...");
-                LogMessage(L"Step 2: Attempting direct SherpaOnnx...");
-                hr = GenerateAudioViaDirectSherpaOnnx(text, audioData);
-                LogMessage((L"Direct SherpaOnnx result: " + std::to_wstring(hr)).c_str());
-
-                if (FAILED(hr))
-                {
-                    LogMessage(L"Direct SherpaOnnx failed, trying ProcessBridge fallback...");
-                    LogMessage(L"Step 3: Attempting ProcessBridge...");
-                    if (!GenerateAudioViaProcessBridge(text, audioData))
-                    {
-                        LogMessage(L"All methods failed: native engine, direct SherpaOnnx, and ProcessBridge");
-                        return E_FAIL;
-                    }
-                    LogMessage(L"ProcessBridge fallback succeeded");
-                }
-                else
-                {
-                    LogMessage(L"Direct SherpaOnnx succeeded");
-                }
+                LogMessage(L"Failed to generate audio");
+                return hr;
             }
-            else
-            {
-                LogMessage(L"Native engine generation succeeded");
-            }
-
-            LogMessage(L"=== FALLBACK CHAIN COMPLETE ===");
 
             LogMessage((L"Generated " + std::to_wstring(audioData.size()) + L" bytes of audio").c_str());
 
@@ -177,9 +148,61 @@ STDMETHODIMP CNativeTTSWrapper::SetObjectToken(ISpObjectToken* pToken)
 {
     LogMessage(L"*** NATIVE SET OBJECT TOKEN CALLED ***");
 
+    if (!pToken)
+        return E_INVALIDARG;
+
     m_pToken = pToken;
 
-    LogMessage(L"SetObjectToken completed successfully");
+    // Get token ID (voice name) from the token
+    LPWSTR tokenId = nullptr;
+    HRESULT hr = pToken->GetId(&tokenId);
+    if (SUCCEEDED(hr) && tokenId)
+    {
+        LogMessage((L"SetObjectToken - Token ID: " + std::wstring(tokenId)).c_str());
+
+        // Convert token ID to voice name (extract just the name part)
+        std::wstring tokenStr(tokenId);
+        // Token ID format: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SPEECH\Voices\Tokens\{VoiceName}
+        size_t lastBackslash = tokenStr.find_last_of(L"\\");
+        if (lastBackslash != std::wstring::npos)
+        {
+            std::wstring voiceName = tokenStr.substr(lastBackslash + 1);
+            LogMessage((L"SetObjectToken - Voice Name: " + voiceName).c_str());
+
+            // For now, use a default engine ID based on the voice name
+            // In production, this should look up the engine ID from a mapping
+            if (voiceName.find(L"TestSherpa") != std::wstring::npos)
+            {
+                m_currentEngineId = L"sherpa-amy";  // Use sherpa-amy for testing
+                LogMessage(L"SetObjectToken - Using sherpa-amy engine for test voice");
+            }
+            else if (voiceName.find(L"Amy") != std::wstring::npos ||
+                     voiceName.find(L"amy") != std::wstring::npos)
+            {
+                m_currentEngineId = L"sherpa-amy";
+                LogMessage(L"SetObjectToken - Using sherpa-amy engine");
+            }
+            else if (voiceName.find(L"Jenny") != std::wstring::npos ||
+                     voiceName.find(L"jenny") != std::wstring::npos)
+            {
+                m_currentEngineId = L"azure-jenny";
+                LogMessage(L"SetObjectToken - Using azure-jenny engine");
+            }
+            else
+            {
+                m_currentEngineId = voiceName;
+                LogMessage((L"SetObjectToken - Using voice name as engine ID: " + m_currentEngineId).c_str());
+            }
+        }
+
+        CoTaskMemFree(tokenId);
+    }
+    else
+    {
+        LogMessage(L"SetObjectToken - Failed to get token ID");
+    }
+
+    LogMessage((L"SetObjectToken completed - Engine ID: " + m_currentEngineId).c_str());
     return S_OK;
 }
 
@@ -314,83 +337,95 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
             return E_INVALIDARG;
         }
 
-        // Get voice name from token
-        CSpDynamicString voiceName;
-        HRESULT hr = pToken->GetStringValue(L"VoiceName", &voiceName);
-        if (FAILED(hr) || !voiceName)
+        // Use the engine ID that was already set in SetObjectToken
+        if (!m_currentEngineId.empty())
         {
-            LogMessage(L"Failed to get voice name from token");
-            return hr;
-        }
+            LogMessage((L"Using engine ID from SetObjectToken: " + m_currentEngineId).c_str());
 
-        std::wstring voiceNameStr = static_cast<LPCWSTR>(voiceName);
-        LogMessage((L"Voice name: " + voiceNameStr).c_str());
+            // Get the engine manager
+            NativeTTS::TTSEngineManager& manager = NativeTTS::TTSEngineManagerSingleton::GetInstance();
 
-        // Get the engine manager and load configuration
-        NativeTTS::TTSEngineManager& manager = NativeTTS::TTSEngineManagerSingleton::GetInstance();
-
-        // Try to load configuration from the standard location
-        std::wstring configPath = L"engines_config.json";
-        hr = manager.LoadConfiguration(configPath);
-        if (FAILED(hr))
-        {
-            LogMessage(L"Failed to load engine configuration, trying fallback...");
-
-            // Try fallback configuration for Amy voice
-            if (voiceNameStr == L"amy" || voiceNameStr == L"Amy" || voiceNameStr == L"piper-en-amy-medium")
+            // Check if engine already exists
+            if (manager.GetEngine(m_currentEngineId))
             {
-                std::wstring amyConfig = LR"({
-                    "engines": {
-                        "piper-en-amy-medium": {
-                            "type": "sherpaonnx",
-                            "config": {
-                                "modelPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/model.onnx",
-                                "tokensPath": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/tokens.txt",
-                                "dataDir": "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/espeak-ng-data",
-                                "noiseScale": 0.667,
-                                "noiseScaleW": 0.8,
-                                "lengthScale": 1.0,
-                                "numThreads": 1
-                            }
-                        }
-                    },
-                    "voices": {
-                        "amy": "piper-en-amy-medium",
-                        "piper-en-amy-medium": "piper-en-amy-medium"
-                    }
-                })";
+                LogMessage(L"Engine already loaded");
+                m_engineInitialized = true;
+                return S_OK;
+            }
 
-                hr = manager.ParseConfiguration(amyConfig);
-                if (FAILED(hr))
+            // Try to load configuration from module directory
+            std::wstring moduleDir = GetModuleDirectory();
+            std::wstring configPath = moduleDir + L"\\engines_config.json";
+            LogMessage((L"Loading config from: " + configPath).c_str());
+            HRESULT hr = manager.LoadConfiguration(configPath);
+            if (FAILED(hr))
+            {
+                LogMessage(L"Failed to load configuration, using fallback...");
+
+                // Use fallback configuration based on engine ID
+                if (m_currentEngineId == L"sherpa-amy" || m_currentEngineId == L"piper-en-amy-medium")
                 {
-                    LogMessage(L"Failed to parse fallback Amy configuration");
-                    return hr;
+                    // Use relative paths from module directory
+                    std::wstring modelPath = L"C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/en_US-amy-low.onnx";
+                    std::wstring tokensPath = L"C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/tokens.txt";
+                    std::wstring dataDir = L"C:/github/SherpaOnnxAzureSAPI-installer/models/amy/vits-piper-en_US-amy-low/espeak-ng-data";
+
+                    std::wstring amyConfig = LR"({
+                        "engines": {
+                            "sherpa-amy": {
+                                "type": "sherpaonnx",
+                                "config": {
+                                    "modelPath": "MODEL_PATH_PLACEHOLDER",
+                                    "tokensPath": "TOKENS_PATH_PLACEHOLDER",
+                                    "dataDir": "DATA_DIR_PLACEHOLDER",
+                                    "noiseScale": 0.667,
+                                    "noiseScaleW": 0.8,
+                                    "lengthScale": 1.0,
+                                    "numThreads": 1
+                                }
+                            }
+                        },
+                        "voices": {
+                            "amy": "sherpa-amy",
+                            "sherpa-amy": "sherpa-amy"
+                        }
+                    })";
+
+                    // Replace placeholders with actual paths
+                    size_t pos = 0;
+                    while ((pos = amyConfig.find(L"MODEL_PATH_PLACEHOLDER", pos)) != std::wstring::npos) {
+                        amyConfig.replace(pos, 21, modelPath);
+                    }
+                    pos = 0;
+                    while ((pos = amyConfig.find(L"TOKENS_PATH_PLACEHOLDER", pos)) != std::wstring::npos) {
+                        amyConfig.replace(pos, 22, tokensPath);
+                    }
+                    pos = 0;
+                    while ((pos = amyConfig.find(L"DATA_DIR_PLACEHOLDER", pos)) != std::wstring::npos) {
+                        amyConfig.replace(pos, 19, dataDir);
+                    }
+
+                    LogMessage((L"Using model path: " + modelPath).c_str());
+                    hr = manager.ParseConfiguration(amyConfig);
+                    if (SUCCEEDED(hr))
+                    {
+                        LogMessage(L"Loaded fallback Amy configuration");
+                        m_engineInitialized = true;
+                        return S_OK;
+                    }
                 }
 
-                m_currentEngineId = L"piper-en-amy-medium";
-                LogMessage(L"Using fallback Amy configuration");
-            }
-            else
-            {
-                LogMessage(L"No fallback configuration available for this voice");
+                LogMessage(L"Failed to load fallback configuration");
                 return E_FAIL;
             }
-        }
-        else
-        {
-            // Get engine ID for this voice
-            m_currentEngineId = manager.GetEngineIdForVoice(voiceNameStr);
-            if (m_currentEngineId.empty())
-            {
-                LogMessage(L"No engine mapping found for voice");
-                return E_FAIL;
-            }
+
+            LogMessage((L"Configuration loaded, using engine: " + m_currentEngineId).c_str());
+            m_engineInitialized = true;
+            return S_OK;
         }
 
-        LogMessage((L"Using engine: " + m_currentEngineId).c_str());
-        m_engineInitialized = true;
-
-        return S_OK;
+        LogMessage(L"No engine ID set in SetObjectToken");
+        return E_FAIL;
     }
     catch (...)
     {
@@ -449,316 +484,6 @@ HRESULT CNativeTTSWrapper::ConvertFloatSamplesToBytes(const std::vector<float>& 
     }
 }
 
-HRESULT CNativeTTSWrapper::GenerateAudioViaDirectSherpaOnnx(const std::wstring& text, std::vector<BYTE>& audioData)
-{
-    try
-    {
-        LogMessage(L"Starting direct SherpaOnnx audio generation...");
-
-        // Create SherpaOnnx configuration
-        SherpaOnnxOfflineTtsConfig config;
-        memset(&config, 0, sizeof(config));
-
-        // Set up the model configuration for Amy
-        config.model.vits.model = "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/model.onnx";
-        config.model.vits.tokens = "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/tokens.txt";
-        config.model.vits.data_dir = "C:/Program Files/OpenAssistive/OpenSpeech/models/amy/espeak-ng-data";
-        config.model.vits.noise_scale = 0.667f;
-        config.model.vits.noise_scale_w = 0.8f;
-        config.model.vits.length_scale = 1.0f;
-        config.model.num_threads = 1;
-        config.model.provider = "cpu";
-        config.model.debug = 0;
-
-        LogMessage(L"Creating SherpaOnnx TTS instance...");
-
-        // Create the TTS instance
-        const SherpaOnnxOfflineTts* tts = SherpaOnnxCreateOfflineTts(&config);
-        if (!tts)
-        {
-            LogMessage(L"Failed to create SherpaOnnx TTS instance");
-            return E_FAIL;
-        }
-
-        LogMessage(L"SherpaOnnx TTS instance created successfully");
-
-        // Get sample rate
-        int sampleRate = SherpaOnnxOfflineTtsSampleRate(tts);
-        LogMessage((L"Sample rate: " + std::to_wstring(sampleRate) + L"Hz").c_str());
-
-        // Convert text to UTF-8
-        std::string utf8Text = WStringToUTF8(text);
-        LogMessage((L"Generating audio for: " + text).c_str());
-
-        // Generate audio
-        const SherpaOnnxGeneratedAudio* audio = SherpaOnnxOfflineTtsGenerate(
-            tts, utf8Text.c_str(), 0, 1.0f);
-
-        if (!audio || !audio->samples || audio->n <= 0)
-        {
-            LogMessage(L"SherpaOnnx generation failed or returned empty audio");
-            SherpaOnnxDestroyOfflineTts(tts);
-            return E_FAIL;
-        }
-
-        LogMessage((L"Generated " + std::to_wstring(audio->n) + L" audio samples").c_str());
-
-        // Convert float samples to vector
-        std::vector<float> samples(audio->samples, audio->samples + audio->n);
-
-        // Free the generated audio
-        SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
-
-        // Destroy the TTS instance
-        SherpaOnnxDestroyOfflineTts(tts);
-
-        // Convert float samples to byte array (16-bit PCM WAV)
-        HRESULT hr = ConvertFloatSamplesToBytes(samples, sampleRate, audioData);
-        if (FAILED(hr))
-        {
-            LogMessage(L"Failed to convert samples to bytes");
-            return hr;
-        }
-
-        LogMessage((L"Direct SherpaOnnx generated " + std::to_wstring(audioData.size()) + L" bytes of audio data").c_str());
-        return S_OK;
-    }
-    catch (const std::exception& ex)
-    {
-        std::string error = "Exception in GenerateAudioViaDirectSherpaOnnx: ";
-        error += ex.what();
-        LogMessage(std::wstring(error.begin(), error.end()).c_str());
-        return E_FAIL;
-    }
-    catch (...)
-    {
-        LogMessage(L"Unknown exception in GenerateAudioViaDirectSherpaOnnx");
-        return E_FAIL;
-    }
-}
-
-bool CNativeTTSWrapper::GenerateAudioViaProcessBridge(const std::wstring& text, std::vector<BYTE>& audioData)
-    {
-        try
-        {
-            LogMessage(L"Starting ProcessBridge audio generation...");
-
-            // Convert text to UTF-8 for JSON
-            std::string utf8Text = WStringToUTF8(text);
-
-            // Create temporary files
-            wchar_t tempPath[MAX_PATH];
-            GetTempPathW(MAX_PATH, tempPath);
-            wcscat_s(tempPath, L"OpenSpeechTTS\\");
-            CreateDirectoryW(tempPath, nullptr);
-
-            // Generate unique ID
-            GUID guid;
-            CoCreateGuid(&guid);
-            wchar_t guidStr[40];
-            StringFromGUID2(guid, guidStr, 40);
-
-            std::wstring requestPath = tempPath + std::wstring(L"native_request_") + guidStr + L".json";
-            std::wstring responsePath = tempPath + std::wstring(L"native_request_") + guidStr + L".response.json";
-            std::wstring audioPath = tempPath + std::wstring(L"native_audio_") + guidStr;
-
-            // Create JSON request with proper escaping
-            std::string escapedText = utf8Text;
-            std::string escapedPath = WStringToUTF8(audioPath);
-
-            // Escape backslashes and quotes for JSON
-            auto escapeForJson = [](std::string& str) {
-                std::string::size_type pos = 0;
-                // Escape backslashes first
-                while ((pos = str.find("\\", pos)) != std::string::npos) {
-                    str.replace(pos, 1, "\\\\");
-                    pos += 2;
-                }
-                // Escape quotes
-                pos = 0;
-                while ((pos = str.find("\"", pos)) != std::string::npos) {
-                    str.replace(pos, 1, "\\\"");
-                    pos += 2;
-                }
-            };
-
-            escapeForJson(escapedText);
-            escapeForJson(escapedPath);
-
-            std::string jsonRequest = "{\n";
-            jsonRequest += "  \"Text\": \"" + escapedText + "\",\n";
-            jsonRequest += "  \"Speed\": 1.0,\n";
-            jsonRequest += "  \"SpeakerId\": 0,\n";
-            jsonRequest += "  \"OutputPath\": \"" + escapedPath + "\"\n";
-            jsonRequest += "}";
-
-            // Write request file
-            std::ofstream requestFile(requestPath);
-            if (!requestFile.is_open())
-            {
-                LogMessage(L"Failed to create request file");
-                return false;
-            }
-            requestFile << jsonRequest;
-            requestFile.close();
-
-            LogMessage((L"Created request file: " + requestPath).c_str());
-
-            // Launch SherpaWorker
-            std::wstring sherpaWorkerPath = L"C:\\Program Files\\OpenAssistive\\OpenSpeech\\SherpaWorker.exe";
-            std::wstring commandLine = L"\"" + sherpaWorkerPath + L"\" \"" + requestPath + L"\"";
-
-            STARTUPINFOW si = { sizeof(si) };
-            PROCESS_INFORMATION pi = { 0 };
-
-            if (!CreateProcessW(nullptr, const_cast<wchar_t*>(commandLine.c_str()),
-                               nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                               nullptr, nullptr, &si, &pi))
-            {
-                LogMessage(L"Failed to launch SherpaWorker");
-                return false;
-            }
-
-            // Wait for completion (30 second timeout)
-            DWORD waitResult = WaitForSingleObject(pi.hProcess, 30000);
-            if (waitResult != WAIT_OBJECT_0)
-            {
-                LogMessage(L"SherpaWorker timed out");
-                TerminateProcess(pi.hProcess, 1);
-                CloseHandle(pi.hProcess);
-                CloseHandle(pi.hThread);
-                return false;
-            }
-
-            DWORD exitCode;
-            GetExitCodeProcess(pi.hProcess, &exitCode);
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-
-            if (exitCode != 0)
-            {
-                LogMessage((L"SherpaWorker failed with exit code: " + std::to_wstring(exitCode)).c_str());
-                return false;
-            }
-
-            LogMessage(L"SherpaWorker completed successfully");
-
-            // Read response
-            std::ifstream responseFile(responsePath);
-            if (!responseFile.is_open())
-            {
-                LogMessage(L"Response file not found");
-                return false;
-            }
-
-            std::string responseJson((std::istreambuf_iterator<char>(responseFile)),
-                                   std::istreambuf_iterator<char>());
-            responseFile.close();
-
-            // Parse response (simple parsing for AudioPath)
-            size_t audioPathStart = responseJson.find("\"AudioPath\": \"");
-            if (audioPathStart == std::string::npos)
-            {
-                LogMessage(L"AudioPath not found in response");
-                return false;
-            }
-
-            audioPathStart += 14; // Length of "\"AudioPath\": \""
-            size_t audioPathEnd = responseJson.find("\"", audioPathStart);
-            if (audioPathEnd == std::string::npos)
-            {
-                LogMessage(L"Invalid AudioPath in response");
-                return false;
-            }
-
-            std::string audioFilePath = responseJson.substr(audioPathStart, audioPathEnd - audioPathStart);
-            std::wstring audioFilePathW = UTF8ToWString(audioFilePath);
-
-            LogMessage((L"Loading audio file: " + audioFilePathW).c_str());
-
-            // Read audio file and extract PCM data (skip WAV header)
-            std::ifstream audioFile(audioFilePathW, std::ios::binary);
-            if (!audioFile.is_open())
-            {
-                LogMessage(L"Failed to open audio file");
-                return false;
-            }
-
-            // Read and validate WAV header
-            char riff[4];
-            audioFile.read(riff, 4);
-            if (strncmp(riff, "RIFF", 4) != 0)
-            {
-                LogMessage(L"Invalid WAV file - missing RIFF header");
-                audioFile.close();
-                return false;
-            }
-
-            // Skip file size
-            audioFile.seekg(4, std::ios::cur);
-
-            // Read WAVE header
-            char wave[4];
-            audioFile.read(wave, 4);
-            if (strncmp(wave, "WAVE", 4) != 0)
-            {
-                LogMessage(L"Invalid WAV file - missing WAVE header");
-                audioFile.close();
-                return false;
-            }
-
-            // Find data chunk
-            bool foundData = false;
-            uint32_t dataSize = 0;
-
-            while (!audioFile.eof() && !foundData)
-            {
-                char chunkId[4];
-                uint32_t chunkSize;
-
-                audioFile.read(chunkId, 4);
-                audioFile.read(reinterpret_cast<char*>(&chunkSize), 4);
-
-                if (strncmp(chunkId, "data", 4) == 0)
-                {
-                    foundData = true;
-                    dataSize = chunkSize;
-                }
-                else
-                {
-                    // Skip this chunk
-                    audioFile.seekg(chunkSize, std::ios::cur);
-                }
-            }
-
-            if (!foundData)
-            {
-                LogMessage(L"No data chunk found in WAV file");
-                audioFile.close();
-                return false;
-            }
-
-            // Read only the PCM audio data (skip WAV header)
-            audioData.resize(dataSize);
-            audioFile.read(reinterpret_cast<char*>(audioData.data()), dataSize);
-            audioFile.close();
-
-            LogMessage((L"Loaded " + std::to_wstring(audioData.size()) + L" bytes of audio").c_str());
-
-            // Cleanup
-            DeleteFileW(requestPath.c_str());
-            DeleteFileW(responsePath.c_str());
-            DeleteFileW(audioFilePathW.c_str());
-
-            return true;
-        }
-        catch (...)
-        {
-            LogMessage(L"Exception in GenerateAudioViaProcessBridge");
-            return false;
-        }
-    }
-
 std::string CNativeTTSWrapper::WStringToUTF8(const std::wstring& wstr)
     {
         if (wstr.empty()) return std::string();
@@ -776,6 +501,21 @@ std::wstring CNativeTTSWrapper::UTF8ToWString(const std::string& str)
         MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
         return wstrTo;
     }
+
+std::wstring CNativeTTSWrapper::GetModuleDirectory()
+{
+    wchar_t modulePath[MAX_PATH];
+    GetModuleFileNameW((HMODULE)&__ImageBase, modulePath, MAX_PATH);
+
+    // Get directory part
+    std::wstring path(modulePath);
+    size_t lastSlash = path.find_last_of(L"\\/");
+    if (lastSlash != std::wstring::npos)
+    {
+        return path.substr(0, lastSlash);
+    }
+    return path;
+}
 
 // COM class factory and registration
 OBJECT_ENTRY_AUTO(CLSID_CNativeTTSWrapper, CNativeTTSWrapper)

@@ -233,39 +233,57 @@ namespace NativeTTS {
     }
 
     HRESULT TTSEngineManager::ParseConfiguration(const std::wstring& jsonConfig) {
+        LogMessage(L"=== ParseConfiguration ENTERED ===");
         try {
-            // Convert wstring to string for JSON parsing
-            std::string configStr(jsonConfig.begin(), jsonConfig.end());
+            // Convert wstring to string for JSON parsing using proper UTF-8 conversion
+            std::string configStr = WStringToUTF8(jsonConfig);
             json config = json::parse(configStr);
+            LogMessage(L"JSON parsed successfully, engine count: " + std::to_wstring(config["engines"].size()));
 
             // Clear existing voice mappings
             m_voiceToEngineMap.clear();
+            LogMessage(L"Voice mappings cleared");
 
             // Parse engines section
             if (config.contains("engines")) {
+                LogMessage(L"Parsing engines section...");
                 for (const auto& [engineId, engineConfig] : config["engines"].items()) {
+                    LogMessage(L"Processing engine: " + std::wstring(engineId.begin(), engineId.end()));
                     std::string typeStr = engineConfig["type"];
                     EngineType type = TTSEngineFactory::GetEngineTypeFromString(std::wstring(typeStr.begin(), typeStr.end()));
-                    
+
                     std::string engineConfigStr = engineConfig["config"].dump();
                     std::wstring engineConfigWStr(engineConfigStr.begin(), engineConfigStr.end());
-                    
+
                     std::wstring engineIdWStr(engineId.begin(), engineId.end());
-                    
+
                     HRESULT hr = InitializeEngine(engineIdWStr, type, engineConfigWStr);
                     if (FAILED(hr)) {
                         LogError(L"Failed to initialize engine from config: " + engineIdWStr, hr);
                     }
                 }
+                LogMessage(L"Engines section parsed");
             }
 
             // Parse voices section
             if (config.contains("voices")) {
-                for (const auto& [voiceName, engineId] : config["voices"].items()) {
-                    std::wstring voiceNameWStr(voiceName.begin(), voiceName.end());
-                    std::wstring engineIdWStr(engineId.begin(), engineId.end());
+                LogMessage(L"Parsing voices section...");
+                auto voicesObj = config["voices"];
+                LogMessage(L"Voices object type: " + std::to_wstring((int)voicesObj.type()));
+                for (auto it = voicesObj.begin(); it != voicesObj.end(); ++it) {
+                    LogMessage(L"Processing voice key");
+                    json voiceNameJson = it.key();
+                    json engineIdJson = it.value();
+                    std::string voiceNameStr = voiceNameJson.get<std::string>();
+                    std::string engineIdStr = engineIdJson.get<std::string>();
+                    LogMessage(L"Converting to wstring");
+                    std::wstring voiceNameWStr(voiceNameStr.begin(), voiceNameStr.end());
+                    std::wstring engineIdWStr(engineIdStr.begin(), engineIdStr.end());
+                    LogMessage(L"Adding to map");
                     m_voiceToEngineMap[voiceNameWStr] = engineIdWStr;
+                    LogMessage(L"Voice processed: " + voiceNameWStr);
                 }
+                LogMessage(L"Voices section parsed");
             }
 
             LogMessage(L"Configuration parsed successfully");

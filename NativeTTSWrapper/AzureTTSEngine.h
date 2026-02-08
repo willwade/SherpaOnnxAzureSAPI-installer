@@ -14,7 +14,11 @@ namespace Microsoft {
             class SpeechConfig;
             class SpeechSynthesizer;
             class SpeechSynthesisResult;
-            class AudioConfig;
+        }
+        namespace Speech {
+            namespace Audio {
+                class AudioConfig;
+            }
         }
     }
 }
@@ -42,7 +46,7 @@ namespace NativeTTS {
         // Azure Speech SDK objects
         std::shared_ptr<Microsoft::CognitiveServices::Speech::SpeechConfig> m_speechConfig;
         std::shared_ptr<Microsoft::CognitiveServices::Speech::SpeechSynthesizer> m_synthesizer;
-        std::shared_ptr<Microsoft::CognitiveServices::Speech::AudioConfig> m_audioConfig;
+        std::shared_ptr<Microsoft::CognitiveServices::Speech::Audio::AudioConfig> m_audioConfig;
         
         // Configuration
         std::wstring m_subscriptionKey;

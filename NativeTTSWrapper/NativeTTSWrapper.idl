@@ -18,14 +18,14 @@ interface INativeTTSWrapper : IDispatch{
 };
 
 [
-	uuid(B8F4A8E2-9C3D-4A5E-8F7C-2D1B3E4F5A6B),
+	uuid(88B9DB87-7A85-4088-AE32-074F55718967),
 	version(1.0),
 ]
 library NativeTTSWrapperLib
 {
 	importlib("stdole2.tlb");
 	[
-		uuid(E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B)
+		uuid(A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D)
 	]
 	coclass CNativeTTSWrapper
 	{

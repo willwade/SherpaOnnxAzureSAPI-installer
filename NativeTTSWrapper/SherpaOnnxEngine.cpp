@@ -1,14 +1,11 @@
 #include "stdafx.h"
 #include "SherpaOnnxEngine.h"
-#include "sherpa-onnx-c-api.h"
+#include "sherpa-onnx/c-api/c-api.h"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <fstream>
 #include <cmath>
 #include <algorithm>
-
-// We'll need to link against the SherpaOnnx library
-// For now, we'll implement a hybrid approach that can work with or without the library
 
 using json = nlohmann::json;
 
@@ -34,7 +31,7 @@ namespace NativeTTS {
 
     HRESULT SherpaOnnxEngine::Initialize(const std::wstring& config) {
         LogMessage(L"Initializing SherpaOnnxEngine with config");
-        
+
         try {
             // Parse configuration
             HRESULT hr = ParseConfiguration(config);
@@ -69,7 +66,7 @@ namespace NativeTTS {
             m_initialized = true;
             LogMessage(L"SherpaOnnxEngine initialized successfully");
             LogMessage(L"Sample rate: " + std::to_wstring(m_sampleRate));
-            
+
             return S_OK;
         }
         catch (const std::exception& ex) {
@@ -122,10 +119,10 @@ namespace NativeTTS {
 
     HRESULT SherpaOnnxEngine::Shutdown() {
         LogMessage(L"Shutting down SherpaOnnxEngine");
-        
+
         CleanupSherpaObjects();
         m_initialized = false;
-        
+
         LogMessage(L"SherpaOnnxEngine shutdown complete");
         return S_OK;
     }
@@ -135,7 +132,7 @@ namespace NativeTTS {
     }
 
     std::wstring SherpaOnnxEngine::GetEngineInfo() const {
-        return L"SherpaOnnx TTS Engine v1.12.0 (Mock Implementation)";
+        return L"SherpaOnnx TTS Engine v1.12.10";
     }
 
     HRESULT SherpaOnnxEngine::GetSupportedFormat(int& sampleRate, int& channels, int& bitsPerSample) const {
@@ -181,7 +178,7 @@ namespace NativeTTS {
             LogMessage(L"Configuration parsed successfully");
             LogMessage(L"Model path: " + m_modelPath);
             LogMessage(L"Tokens path: " + m_tokensPath);
-            
+
             return S_OK;
         }
         catch (const std::exception& ex) {
@@ -210,12 +207,10 @@ namespace NativeTTS {
 
     void SherpaOnnxEngine::LogMessage(const std::wstring& message) const {
         try {
-            // Check if spdlog is initialized before using it
             if (spdlog::default_logger() != nullptr) {
                 std::string msg = WStringToUTF8(message);
                 spdlog::info("[SherpaOnnxEngine] {}", msg);
             } else {
-                // Fallback to OutputDebugString if spdlog not initialized
                 OutputDebugStringW((L"[SherpaOnnxEngine] " + message + L"\n").c_str());
             }
         }
@@ -231,12 +226,10 @@ namespace NativeTTS {
                 fullMessage += L" (HRESULT: 0x" + std::to_wstring(hr) + L")";
             }
 
-            // Check if spdlog is initialized before using it
             if (spdlog::default_logger() != nullptr) {
                 std::string msg = WStringToUTF8(fullMessage);
                 spdlog::error("[SherpaOnnxEngine] {}", msg);
             } else {
-                // Fallback to OutputDebugString if spdlog not initialized
                 OutputDebugStringW((L"[SherpaOnnxEngine] " + fullMessage + L"\n").c_str());
             }
         }
@@ -265,7 +258,7 @@ namespace NativeTTS {
     }
 
     HRESULT SherpaOnnxEngine::CreateSherpaConfig() {
-        LogMessage(L"Creating real SherpaOnnx configuration");
+        LogMessage(L"Creating SherpaOnnx configuration");
 
         try {
             // Allocate configuration structure
@@ -292,7 +285,6 @@ namespace NativeTTS {
             m_config->model.vits.noise_scale = m_noiseScale;
             m_config->model.vits.noise_scale_w = m_noiseScaleW;
             m_config->model.vits.length_scale = m_lengthScale;
-            m_config->model.vits.dict_dir = nullptr; // Not used for Piper models
 
             // Configure general model settings
             m_config->model.num_threads = m_numThreads;

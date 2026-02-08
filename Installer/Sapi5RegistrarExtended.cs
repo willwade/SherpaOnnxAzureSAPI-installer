@@ -11,8 +11,10 @@ namespace Installer
     public class Sapi5RegistrarExtended : Sapi5Registrar
     {
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
-        private const string SherpaOnnxClsid = "{3d8f5c5d-9d6b-4b92-a12b-1a6dff80b6b2}";
-        private const string AzureTtsClsid = "{3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3}";
+
+        // CLSID for the SAPI5 TTS Engine COM object (coclass)
+        // See SAPI5_CLSID_TRACKING.md for details
+        private const string TTS_ENGINE_CLSID = "{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}";
 
         private string GetLcidFromLanguage(LanguageInfo language)
         {
@@ -122,11 +124,10 @@ namespace Installer
 
                 using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
                 {
-                    // 1. Register the SAPI voice
+                    // 1. Register the SAPI voice token - all voices use the same CLSID
                     voiceKey.SetValue("", model.Name);
                     voiceKey.SetValue(lcid, model.Name); // Register for the specific language
-                    voiceKey.SetValue("CLSID", SherpaOnnxClsid);
-                    voiceKey.SetValue("Path", dllPath);
+                    voiceKey.SetValue("CLSID", TTS_ENGINE_CLSID);
 
                     // 2. Set voice attributes
                     using (var attributesKey = voiceKey.CreateSubKey("Attributes"))
@@ -142,19 +143,10 @@ namespace Installer
                         // 3. Set model paths with consistent naming
                         attributesKey.SetValue("Model Path", model.ModelPath);
                         attributesKey.SetValue("Tokens Path", model.TokensPath);
-                        
+
                         // Add data directory path
                         string dataDir = Path.GetDirectoryName(model.ModelPath);
                         attributesKey.SetValue("Data Directory", dataDir);
-                    }
-                }
-
-                // 4. Register the CLSID token for the voice
-                using (var clsidKey = Registry.ClassesRoot.CreateSubKey($@"CLSID\{SherpaOnnxClsid}"))
-                {
-                    using (var tokenKey = clsidKey.CreateSubKey("Token"))
-                    {
-                        tokenKey.SetValue("", model.Name);
                     }
                 }
 
@@ -183,11 +175,10 @@ namespace Installer
 
                 using (var voiceKey = Registry.LocalMachine.CreateSubKey(voiceRegistryPath))
                 {
-                    // 1. Register the SAPI voice
+                    // 1. Register the SAPI voice token - all voices use the same CLSID
                     voiceKey.SetValue("", model.Name);
                     voiceKey.SetValue(lcid, model.Name); // Register for the specific language
-                    voiceKey.SetValue("CLSID", AzureTtsClsid);
-                    voiceKey.SetValue("Path", dllPath);
+                    voiceKey.SetValue("CLSID", TTS_ENGINE_CLSID);
 
                     // 2. Set voice attributes
                     using (var attributesKey = voiceKey.CreateSubKey("Attributes"))
@@ -204,37 +195,28 @@ namespace Installer
                         attributesKey.SetValue("SubscriptionKey", model.SubscriptionKey);
                         attributesKey.SetValue("Region", model.Region);
                         attributesKey.SetValue("VoiceName", model.ShortName);
-                        
+
                         // Set style and role lists if available
                         if (model.StyleList != null && model.StyleList.Count > 0)
                         {
                             attributesKey.SetValue("StyleList", string.Join(",", model.StyleList));
                         }
-                        
+
                         if (model.RoleList != null && model.RoleList.Count > 0)
                         {
                             attributesKey.SetValue("RoleList", string.Join(",", model.RoleList));
                         }
-                        
+
                         // Set selected style and role if specified
                         if (!string.IsNullOrEmpty(model.SelectedStyle))
                         {
                             attributesKey.SetValue("SelectedStyle", model.SelectedStyle);
                         }
-                        
+
                         if (!string.IsNullOrEmpty(model.SelectedRole))
                         {
                             attributesKey.SetValue("SelectedRole", model.SelectedRole);
                         }
-                    }
-                }
-
-                // 4. Register the CLSID token for the voice
-                using (var clsidKey = Registry.ClassesRoot.CreateSubKey($@"CLSID\{AzureTtsClsid}"))
-                {
-                    using (var tokenKey = clsidKey.CreateSubKey("Token"))
-                    {
-                        tokenKey.SetValue("", model.Name);
                     }
                 }
 

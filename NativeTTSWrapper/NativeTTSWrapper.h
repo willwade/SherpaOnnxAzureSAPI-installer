@@ -69,26 +69,15 @@ private:
     void LogMessage(const wchar_t* message);
     std::wstring ExtractTextFromFragList(const SPVTEXTFRAG* pTextFragList);
 
-    // NEW: Direct engine integration methods
+    // Native engine integration methods
     HRESULT GenerateAudioViaNativeEngine(const std::wstring& text, std::vector<BYTE>& audioData);
     HRESULT InitializeEngineFromToken(ISpObjectToken* pToken);
     HRESULT ConvertFloatSamplesToBytes(const std::vector<float>& samples, int sampleRate, std::vector<BYTE>& audioData);
 
-    // DIRECT: SherpaOnnx C API fallback (when engine manager fails)
-    HRESULT GenerateAudioViaDirectSherpaOnnx(const std::wstring& text, std::vector<BYTE>& audioData);
-
-    // LEGACY: ProcessBridge fallback methods (for backward compatibility)
-    bool GenerateAudioViaProcessBridge(const std::wstring& text, std::vector<BYTE>& audioData);
-    bool CallSherpaWorker(const std::wstring& requestPath, std::wstring& responsePath);
-    bool ReadWavFile(const std::wstring& filePath, std::vector<BYTE>& audioData);
-
     // Utility methods
     std::string WStringToUTF8(const std::wstring& wstr);
     std::wstring UTF8ToWString(const std::string& str);
-    std::wstring GenerateGuid();
-    bool CreateTempDirectory(std::wstring& tempDir);
-    bool WriteJsonRequest(const std::wstring& filePath, const std::wstring& text);
-    bool ParseJsonResponse(const std::wstring& filePath, std::wstring& audioPath);
+    std::wstring GetModuleDirectory();
 };
 
 

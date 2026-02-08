@@ -1,26 +1,26 @@
 HKCR
 {
-	NativeTTSWrapper.CNativeTTSWrapper.1 = s 'CNativeTTSWrapper Class'
+	NativeTTSWrapper.CNativeTTSWrapper.1 = s 'OpenSpeech SAPI5 TTS Engine'
 	{
-		CLSID = s '{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}'
+		CLSID = s '{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}'
 	}
-	NativeTTSWrapper.CNativeTTSWrapper = s 'CNativeTTSWrapper Class'
+	NativeTTSWrapper.CNativeTTSWrapper = s 'OpenSpeech SAPI5 TTS Engine'
 	{
-		CLSID = s '{E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B}'
+		CLSID = s '{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}'
 		CurVer = s 'NativeTTSWrapper.CNativeTTSWrapper.1'
 	}
 	NoRemove CLSID
 	{
-		ForceRemove {E1C4A8F2-9B3D-4A5E-8F7C-2D1B3E4F5A6B} = s 'CNativeTTSWrapper Class'
+		ForceRemove {A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D} = s 'OpenSpeech SAPI5 TTS Engine'
 		{
 			ProgID = s 'NativeTTSWrapper.CNativeTTSWrapper.1'
 			VersionIndependentProgID = s 'NativeTTSWrapper.CNativeTTSWrapper'
 			ForceRemove 'Programmable'
 			InprocServer32 = s '%MODULE%'
 			{
-				val ThreadingModel = s 'Apartment'
+				val ThreadingModel = s 'Both'
 			}
-			'TypeLib' = s '{B8F4A8E2-9C3D-4A5E-8F7C-2D1B3E4F5A6B}'
+			'TypeLib' = s '{88B9DB87-7A85-4088-AE32-074F55718967}'
 		}
 	}
 }

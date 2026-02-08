@@ -302,29 +302,41 @@ namespace Installer
                         {
                             try
                             {
-                                // Check if this is an Azure voice by looking for the Azure CLSID
+                                // Check if this is an Azure voice by looking at the VoiceType attribute
                                 using (var voiceKey = voicesKey.OpenSubKey(voiceName))
                                 {
                                     if (voiceKey != null)
                                     {
+                                        // Check CLSID first to ensure it's our voice
                                         string clsid = voiceKey.GetValue("CLSID") as string;
-                                        if (clsid == "{3d8f5c5e-9d6b-4b92-a12b-1a6dff80b6b3}") // Azure CLSID
+                                        if (clsid == "{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}") // Our TTS Engine CLSID
                                         {
-                                            registrar.UnregisterVoice(voiceName);
-                                            Console.WriteLine($"Unregistered Azure voice: {voiceName}");
-
-                                            // Also remove from engines_config.json
-                                            // Extract voice name from SAPI voice name if possible
-                                            if (voiceName.Contains("(") && voiceName.Contains(")"))
+                                            // Check VoiceType attribute to distinguish Azure from Sherpa
+                                            using (var attributesKey = voiceKey.OpenSubKey("Attributes"))
                                             {
-                                                var parts = voiceName.Split('(', ')');
-                                                if (parts.Length >= 2)
+                                                if (attributesKey != null)
                                                 {
-                                                    var voiceParts = parts[1].Split(',');
-                                                    if (voiceParts.Length >= 2)
+                                                    string voiceType = attributesKey.GetValue("VoiceType") as string;
+                                                    if (voiceType == "AzureTTS")
                                                     {
-                                                        string azureVoiceName = voiceParts[1].Trim();
-                                                        EngineConfigManager.RemoveAzureVoice(azureVoiceName);
+                                                        registrar.UnregisterVoice(voiceName);
+                                                        Console.WriteLine($"Unregistered Azure voice: {voiceName}");
+
+                                                        // Also remove from engines_config.json
+                                                        // Extract voice name from SAPI voice name if possible
+                                                        if (voiceName.Contains("(") && voiceName.Contains(")"))
+                                                        {
+                                                            var parts = voiceName.Split('(', ')');
+                                                            if (parts.Length >= 2)
+                                                            {
+                                                                var voiceParts = parts[1].Split(',');
+                                                                if (voiceParts.Length >= 2)
+                                                                {
+                                                                    string azureVoiceName = voiceParts[1].Trim();
+                                                                    EngineConfigManager.RemoveAzureVoice(azureVoiceName);
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
