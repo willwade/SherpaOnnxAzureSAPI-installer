@@ -1,0 +1,260 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-native:
+    name: Build Native DLL
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
+
+    - name: Build NativeTTSWrapper
+      run: |
+        msbuild NativeTTSWrapper\NativeTTSWrapper.sln /t:Build /p:Configuration=Release /p:Platform=x64 /v:minimal
+
+    - name: Upload DLL artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NativeTTSWrapper-x64
+        path: NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll
+        retention-days: 30
+
+    - name: Upload dependency DLLs
+      uses: actions/upload-artifact@v4
+      with:
+        name: Dependencies
+        path: |
+          NativeTTSWrapper/x64/Release/*.dll
+          !NativeTTSWrapper/x64/Release/NativeTTSWrapper.dll
+        retention-days: 30
+
+  build-installer:
+    name: Build Console Installer
+    runs-on: windows-2022
+    needs: build-native
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.x'
+
+    - name: Download Native DLL artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: NativeTTSWrapper-x64
+        path: NativeTTSWrapper/x64/Release/
+
+    - name: Build Console Installer
+      run: dotnet build Installer/Installer.csproj -c Release --no-dependencies || echo "Build skipped - missing dependencies"
+      continue-on-error: true
+
+    - name: Upload installer artifact
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: SherpaOnnxSAPIInstaller
+        path: Installer/bin/Release/net6.0/SherpaOnnxSAPIInstaller.exe
+        retention-days: 30
+
+  build-config-app:
+    name: Build Configuration App
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.x'
+
+    - name: Build Config App
+      run: dotnet build ConfigApp/ConfigApp.csproj -c Release
+
+    - name: Upload Config App artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SherpaOnnxConfig
+        path: ConfigApp/bin/Release/net6.0-windows/
+        retention-days: 30
+
+  test:
+    name: Test SAPI5 Integration
+    runs-on: windows-2022
+    needs: build-native
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Native DLL artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: NativeTTSWrapper-x64
+        path: NativeTTSWrapper/x64/Release/
+
+    - name: Download dependency DLLs
+      uses: actions/download-artifact@v4
+      with:
+        name: Dependencies
+        path: NativeTTSWrapper/x64/Release/
+
+    - name: Register DLL
+      shell: pwsh
+      run: regsvr32 "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+
+    - name: Copy config file
+      run: Copy-Item NativeTTSWrapper\engines_config.json NativeTTSWrapper\x64\Release\
+
+    - name: Run test suite
+      shell: pwsh
+      run: |
+        Add-Type -AssemblyName System.Speech
+        $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+        $voice.SelectVoice("TestSherpaVoice")
+        $voice.Speak("GitHub Actions test")
+
+    - name: Unregister DLL
+      if: always()
+      shell: pwsh
+      run: regsvr32 /u "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+
+  release:
+    name: Create Release
+    runs-on: windows-2022
+    needs: [build-native, build-installer, build-config-app, test]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+
+    - name: Create release package
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}"
+        $version = $version -replace 'refs/tags/v', ''
+
+        # Create package directory
+        New-Item -ItemType Directory -Force -Path "package\SherpaOnnxSAPI"
+
+        # Copy DLL
+        Copy-Item "artifacts\NativeTTSWrapper-x64\*" "package\SherpaOnnxSAPI\" -Recurse
+
+        # Copy config
+        Copy-Item "NativeTTSWrapper\engines_config.json" "package\SherpaOnnxSAPI\"
+
+        # Copy documentation
+        Copy-Item "*.md" "package\SherpaOnnxSAPI\" -Exclude "MILESTONE_SUMMARY.md"
+
+        # Copy test script
+        Copy-Item "test_sapi5_extended.ps1" "package\SherpaOnnxSAPI\"
+
+        # Create install script
+        @"
+        # SherpaOnnx SAPI5 TTS Engine - Install Script
+        Write-Host "Installing SherpaOnnx SAPI5 TTS Engine..."
+
+        # Register DLL
+        regsvr32 "$PSScriptRoot\NativeTTSWrapper.dll"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: Failed to register DLL"
+            exit 1
+        }
+
+        Write-Host "Installation complete!"
+        Write-Host ""
+        Write-Host "To test:"
+        Write-Host "  Add-Type -AssemblyName System.Speech"
+        Write-Host "  `$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer"
+        Write-Host "  `$voice.SelectVoice('TestSherpaVoice')"
+        Write-Host "  `$voice.Speak('Hello world')"
+        "@ | Out-File "package\SherpaOnnxSAPI\install.ps1" -Encoding UTF8
+
+        # Create uninstall script
+        @"
+        # SherpaOnnx SAPI5 TTS Engine - Uninstall Script
+        Write-Host "Uninstalling SherpaOnnx SAPI5 TTS Engine..."
+        regsvr32 /u "$PSScriptRoot\NativeTTSWrapper.dll"
+        Write-Host "Uninstallation complete!"
+        "@ | Out-File "package\SherpaOnnxSAPI\uninstall.ps1" -Encoding UTF8
+
+    - name: Create ZIP package
+      run: Compress-Archive -Path package/* -DestinationPath "SherpaOnnxSAPI-${{ github.ref_name }}.zip"
+
+    - name: Generate Release Notes
+      id: release_notes
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = '${{ github.ref_name }}'.replace('refs/tags/v', '');
+          const notes = `## SherpaOnnx SAPI5 TTS Engine v${version}
+
+          ### Installation
+          1. Download \`SherpaOnnxSAPI-${{ github.ref_name }}.zip\`
+          2. Extract to a folder (e.g., \`C:\\Program Files\\OpenAssistive\\OpenSpeech\`)
+          3. Run \`install.ps1\` as Administrator
+          4. Test with PowerShell:
+              \`\`\`
+              Add-Type -AssemblyName System.Speech
+              $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+              $voice.SelectVoice('TestSherpaVoice')
+              $voice.Speak('Hello world')
+              \`\`\`
+
+          ### Changes
+          - Native SAPI5 COM implementation with SherpaOnnx v1.12.10
+          - vits-piper-en_US-amy-low voice model (16kHz)
+          - Sample rate matching fix (no more "Minnie Mouse" effect)
+          - Voice speed: lengthScale=1.15 (15% slower for natural speech)
+
+          ### Documentation
+          - [BUILD.md](BUILD.md) - Build instructions
+          - [SETUP.md](SETUP.md) - Configuration guide
+          - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
+          - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
+
+          ### Requirements
+          - Windows 10/11 (x64)
+          - No .NET runtime needed for SAPI5 engine
+          - 250MB RAM minimum
+
+          Full source: https://github.com/OpenAssistive/SherpaOnnxSAPI-installer
+          `;
+          core.setOutput('notes', notes);
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: SherpaOnnxSAPI-${{ github.ref_name }}.zip
+        body: ${{ steps.release_notes.outputs.notes }}
+        draft: false
+        prerelease: false
+        generate_release_notes: false

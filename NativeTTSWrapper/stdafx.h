@@ -27,4 +27,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+// TTS Engine interfaces
+#include "ITTSEngine.h"
+
 using namespace ATL;

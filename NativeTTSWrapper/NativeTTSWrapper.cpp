@@ -24,6 +24,7 @@ extern "C" {
 }
 
 // Include TTSEngineManager for native engine support
+#include "ITTSEngine.h"
 #include "TTSEngineManager.h"
 
 // Implementation of CNativeTTSWrapper
@@ -353,7 +354,7 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
                 LogMessage(L"Engine already loaded");
 
                 // Query the engine for its actual sample rate
-                ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+                NativeTTS::ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
                 if (engine)
                 {
                     int channels, bitsPerSample;
@@ -432,7 +433,7 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
                         LogMessage(L"Loaded fallback Amy configuration");
 
                         // Query the engine for its actual sample rate
-                        ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+                        NativeTTS::ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
                         if (engine)
                         {
                             int channels, bitsPerSample;
@@ -459,8 +460,8 @@ HRESULT CNativeTTSWrapper::InitializeEngineFromToken(ISpObjectToken* pToken)
 
             LogMessage((L"Configuration loaded, using engine: " + m_currentEngineId).c_str());
 
-            // Query the engine for its actual sample rate
-            ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
+                // Query the engine for its actual sample rate
+                NativeTTS::ITTSEngine* engine = manager.GetEngine(m_currentEngineId);
             if (engine && engine->IsInitialized())
             {
                 int channels, bitsPerSample;
