@@ -14,7 +14,6 @@ NativeTTSWrapper/x64/
 NativeTTSWrapper/Debug/
 NativeTTSWrapper/Release/
 NativeTTSWrapper/build/
-NativeTTSWrapper/deps/
 NativeTTSWrapper/*.sdf
 NativeTTSWrapper/*.opensdf
 NativeTTSWrapper/*.VC.db
