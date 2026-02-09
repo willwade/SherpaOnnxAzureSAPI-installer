@@ -18,20 +18,17 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download SherpaOnnx library
+      shell: cmd
       run: |
-        Write-Host "Downloading SherpaOnnx v1.12.20 library..." -ForegroundColor Yellow
-        # Use SourceForge mirror - v1.12.10 not available, using v1.12.20
-        $url = "https://sourceforge.net/projects/sherpa-onnx.mirror/files/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2/download"
-        $output = "NativeTTSWrapper\libs-win\sherpa-onnx-win-x64-static.tar.bz2"
-        New-Item -ItemType Directory -Force -Path (Split-Path $output)
-        Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing
-        Write-Host "Extracting SherpaOnnx library..." -ForegroundColor Yellow
-        tar -xf $output -C "NativeTTSWrapper\libs-win\"
-        # Rename extracted directory to match expected path
-        if (Test-Path "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static") {
-            Move-Item "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static" "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static" -Force
-        }
-        Write-Host "SherpaOnnx library downloaded and extracted" -ForegroundColor Green
+        echo Downloading SherpaOnnx v1.12.20 library...
+        curl -L -o NativeTTSWrapper\libs-win\sherpa-onnx-win-x64-static.tar.bz2 "https://sourceforge.net/projects/sherpa-onnx.mirror/files/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2/download"
+        echo Extracting with 7-Zip...
+        cd NativeTTSWrapper\libs-win
+        7z x sherpa-onnx-win-x64-static.tar.bz2 -so | 7z x -si -ttar -y
+        if exist sherpa-onnx-v1.12.20-win-x64-static (
+            rename sherpa-onnx-v1.12.20-win-x64-static sherpa-onnx-v1.12.10-win-x64-static
+        )
+        echo SherpaOnnx library downloaded and extracted
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
