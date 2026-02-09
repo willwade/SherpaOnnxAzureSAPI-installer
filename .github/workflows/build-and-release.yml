@@ -213,9 +213,44 @@ jobs:
       shell: pwsh
       run: |
         Add-Type -AssemblyName System.Speech
-        $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
-        $voice.SelectVoice("TestSherpaVoice")
-        $voice.Speak("GitHub Actions test")
+        $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+
+        # Test 1: Verify voice is installed
+        Write-Host "Testing: Voice registration..."
+        $installedVoice = $synth.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Name -eq "TestSherpaVoice" }
+        if ($installedVoice) {
+            Write-Host "  [OK] TestSherpaVoice is registered"
+        } else {
+            Write-Host "  [FAIL] TestSherpaVoice not found"
+            exit 1
+        }
+
+        # Test 2: Verify voice can be selected
+        Write-Host "Testing: Voice selection..."
+        try {
+            $synth.SelectVoice("TestSherpaVoice")
+            Write-Host "  [OK] TestSherpaVoice can be selected"
+        } catch {
+            Write-Host "  [FAIL] Cannot select TestSherpaVoice: $_"
+            exit 1
+        }
+
+        # Test 3: Verify voice attributes
+        Write-Host "Testing: Voice attributes..."
+        $voiceInfo = $synth.Voice
+        if ($voiceInfo.Name -eq "TestSherpaVoice") {
+            Write-Host "  [OK] Voice: $($voiceInfo.Name)"
+            Write-Host "  [OK] Gender: $($voiceInfo.Gender)"
+            Write-Host "  [OK] Age: $($voiceInfo.Age)"
+            Write-Host "  [OK] Culture: $($voiceInfo.Culture.Name)"
+        } else {
+            Write-Host "  [FAIL] Unexpected voice: $($voiceInfo.Name)"
+            exit 1
+        }
+
+        # Note: Skipping actual Speak() test as CI runners have no audio device
+        Write-Host ""
+        Write-Host "All SAPI5 tests passed!" -ForegroundColor Green
 
     - name: Cleanup SAPI5 registry keys
       if: always()
