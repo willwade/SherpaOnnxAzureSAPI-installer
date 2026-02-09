@@ -18,17 +18,57 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download SherpaOnnx library
-      shell: cmd
+      shell: pwsh
       run: |
-        echo Downloading SherpaOnnx v1.12.20 library...
-        curl -L -o NativeTTSWrapper\libs-win\sherpa-onnx-win-x64-static.tar.bz2 "https://sourceforge.net/projects/sherpa-onnx.mirror/files/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2/download"
-        echo Extracting with 7-Zip...
-        cd NativeTTSWrapper\libs-win
-        7z x sherpa-onnx-win-x64-static.tar.bz2 -so | 7z x -si -ttar -y
-        if exist sherpa-onnx-v1.12.20-win-x64-static (
-            rename sherpa-onnx-v1.12.20-win-x64-static sherpa-onnx-v1.12.10-win-x64-static
-        )
-        echo SherpaOnnx library downloaded and extracted
+        Write-Host "Downloading SherpaOnnx v1.12.20 library..." -ForegroundColor Yellow
+
+        # Create directory
+        New-Item -ItemType Directory -Force -Path "NativeTTSWrapper\libs-win"
+
+        # Download using SourceForge mirror
+        $url = "https://sourceforge.net/projects/sherpa-onnx.mirror/files/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2/download"
+        $output = "NativeTTSWrapper\libs-win\archive.tar.bz2"
+
+        Write-Host "Downloading from: $url" -ForegroundColor Gray
+        Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing -MaximumRedirection 10
+
+        # Verify download
+        $size = (Get-Item $output).Length
+        Write-Host "Downloaded size: $size bytes" -ForegroundColor Cyan
+
+        if ($size -lt 1000000) {
+            Write-Host "ERROR: Download too small, might be HTML error page" -ForegroundColor Red
+            Get-Content $output | Select-Object -First 5
+            exit 1
+        }
+
+        # Extract tar.bz2 using tar (Windows 10+ has BSD tar)
+        Write-Host "Extracting archive..." -ForegroundColor Yellow
+        tar -xf "$output" -C "NativeTTSWrapper\libs-win\"
+
+        # List what was extracted
+        Write-Host "Extracted contents:" -ForegroundColor Cyan
+        Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Directory | Format-Table -AutoSize
+
+        # Rename if needed
+        if (Test-Path "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static") {
+            Write-Host "Renaming directory..." -ForegroundColor Gray
+            Move-Item "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static" `
+                      "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static" -Force
+        }
+
+        # Verify the include path exists
+        $includePath = "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\include\sherpa-onnx\c-api"
+        if (Test-Path "$includePath\c-api.h") {
+            Write-Host "SUCCESS: c-api.h found at $includePath" -ForegroundColor Green
+        } else {
+            Write-Host "ERROR: c-api.h not found!" -ForegroundColor Red
+            Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Recurse -Filter "*.h" | Select-Object -First 10 | Format-Table
+            exit 1
+        }
+
+        # Cleanup archive
+        Remove-Item "$output" -Force
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
