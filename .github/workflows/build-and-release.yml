@@ -180,11 +180,8 @@ jobs:
         name: NativeTTSWrapper-x64
         path: NativeTTSWrapper/x64/Release/
 
-    - name: Download dependency DLLs
-      uses: actions/download-artifact@v4
-      with:
-        name: Dependencies
-        path: NativeTTSWrapper/x64/Release/
+    - name: Copy config file
+      run: Copy-Item NativeTTSWrapper\engines_config.json NativeTTSWrapper\x64\Release\
 
     - name: Register DLL
       shell: pwsh
