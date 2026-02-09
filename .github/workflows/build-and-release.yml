@@ -114,17 +114,10 @@ jobs:
         name: NativeTTSWrapper-x64
         path: NativeTTSWrapper/x64/Release/
 
-    - name: Download SherpaOnnxConfig artifact
-      uses: actions/download-artifact@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
-        name: SherpaOnnxConfig
-        path: ConfigApp/bin/Release/net8.0-windows/
-
-    - name: Download Console Installer artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: SherpaOnnxSAPIInstaller
-        path: Installer/bin/Release/net8.0/
+        dotnet-version: '8.0.x'
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
