@@ -1040,7 +1040,9 @@ namespace SherpaOnnxConfig
 
                     using (RegistryKey voiceKey = rootKey.CreateSubKey(voice.Id))
                     {
-                        voiceKey.SetValue("", $"{voice.Name} - {voice.EngineType}");
+                        // Use friendly name for display in SAPI apps
+                        string displayName = GetFriendlyVoiceName(voice);
+                        voiceKey.SetValue("", displayName);
 
                         using (RegistryKey attrKey = voiceKey.CreateSubKey("Attributes"))
                         {
@@ -1048,7 +1050,7 @@ namespace SherpaOnnxConfig
                             attrKey.SetValue("Language", langCode);
                             attrKey.SetValue("Gender", voice.Gender ?? "Female");
                             attrKey.SetValue("Age", "Adult");
-                            attrKey.SetValue("Name", voice.Id);
+                            attrKey.SetValue("Name", displayName);  // Use friendly name instead of ID
                             attrKey.SetValue("Vendor", "OpenAssistive");
                             attrKey.SetValue("Description", $"{voice.Name} TTS Voice");
                         }
@@ -1183,6 +1185,44 @@ namespace SherpaOnnxConfig
             if (language.Contains("Japanese")) return "411";
             if (language.Contains("Korean")) return "412";
             return "409"; // Default to en-US
+        }
+
+        private string GetFriendlyVoiceName(VoiceInfo voice)
+        {
+            // If voice has a proper name, use it directly
+            if (!string.IsNullOrEmpty(voice.Name) && voice.Name != voice.Id)
+            {
+                // For names like "Hausa (MMS)", use as-is
+                if (voice.Name.Contains("(") && voice.Name.Contains(")"))
+                {
+                    return voice.Name;
+                }
+
+                // Capitalize first letter for simple names like "amy"
+                if (voice.Name.Length > 0 && char.IsLower(voice.Name[0]))
+                {
+                    return char.ToUpper(voice.Name[0]) + voice.Name.Substring(1);
+                }
+
+                return voice.Name;
+            }
+
+            // Fallback: create friendly name from ID
+            string friendlyId = voice.Id;
+
+            // Capitalize first letter
+            if (friendlyId.Length > 0 && char.IsLower(friendlyId[0]))
+            {
+                friendlyId = char.ToUpper(friendlyId[0]) + friendlyId.Substring(1);
+            }
+
+            // Add engine type suffix if not already present
+            if (!friendlyId.Contains("Sherpa") && !friendlyId.Contains("Azure"))
+            {
+                friendlyId += $" ({voice.EngineType})";
+            }
+
+            return friendlyId;
         }
 
         private void AppendOutput(string text, Color color)
