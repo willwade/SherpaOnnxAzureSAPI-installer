@@ -33,6 +33,13 @@ namespace SherpaOnnxConfig
             "models"
         );
 
+        private static readonly string ConfigDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenSpeech"
+        );
+
+        private static readonly string EnginesConfigPath = Path.Combine(ConfigDir, "engines_config.json");
+
         public MainForm()
         {
             InitializeComponent();
@@ -1067,9 +1074,101 @@ namespace SherpaOnnxConfig
 
         private void UpdateEnginesConfig(VoiceInfo voice)
         {
-            string configPath = "C:\\github\\SherpaOnnxAzureSAPI-installer\\NativeTTSWrapper\\engines_config.json";
-            // TODO: Update the config file with the new voice
-            AppendOutput($"\r  Note: Update engines_config.json manually to add: {voice.Id}", Color.FromArgb(255, 200, 100));
+            try
+            {
+                // Ensure config directory exists
+                Directory.CreateDirectory(ConfigDir);
+
+                // Read existing config or create new one
+                Dictionary<string, object> config;
+                string configPath = EnginesConfigPath;
+
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    config = JsonSerializer.Deserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+                }
+                else
+                {
+                    // Create default config structure
+                    config = new Dictionary<string, object>
+                    {
+                        ["engines"] = new Dictionary<string, object>(),
+                        ["voices"] = new Dictionary<string, object>(),
+                        ["settings"] = new Dictionary<string, object>
+                        {
+                            ["defaultEngine"] = "sherpa-amy",
+                            ["fallbackEngine"] = "sherpa-amy"
+                        }
+                    };
+                }
+
+                // Get engines section
+                var engines = config.ContainsKey("engines")
+                    ? (Dictionary<string, object>)config["engines"]
+                    : new Dictionary<string, object>();
+
+                // Get voices section
+                var voices = config.ContainsKey("voices")
+                    ? (Dictionary<string, object>)config["voices"]
+                    : new Dictionary<string, object>();
+
+                // Create engine ID for this voice
+                string engineId = $"sherpa-{voice.Id}";
+
+                // Build model paths using ModelsDir (LocalApplicationData)
+                string modelDir = Path.Combine(ModelsDir, voice.Id);
+                string modelPath = Path.Combine(modelDir, "model.onnx");
+                string tokensPath = Path.Combine(modelDir, "tokens.txt");
+
+                // For models with espeak-ng-data
+                string dataDir = "";
+                if (Directory.Exists(Path.Combine(modelDir, "espeak-ng-data")))
+                {
+                    dataDir = Path.Combine(modelDir, "espeak-ng-data");
+                }
+
+                // Add/update engine configuration
+                var engineConfig = new Dictionary<string, object>
+                {
+                    ["type"] = "sherpaonnx",
+                    ["config"] = new Dictionary<string, object>
+                    {
+                        ["modelPath"] = modelPath.Replace("\\", "/"),
+                        ["tokensPath"] = tokensPath.Replace("\\", "/"),
+                        ["noiseScale"] = 0.667,
+                        ["noiseScaleW"] = 0.8,
+                        ["lengthScale"] = 1.15,
+                        ["numThreads"] = 1,
+                        ["provider"] = "cpu",
+                        ["debug"] = true
+                    }
+                };
+
+                if (!string.IsNullOrEmpty(dataDir))
+                {
+                    ((Dictionary<string, object>)engineConfig["config"])["dataDir"] = dataDir.Replace("\\", "/");
+                }
+
+                engines[engineId] = engineConfig;
+                voices[voice.Id] = engineId;
+
+                // Update config
+                config["engines"] = engines;
+                config["voices"] = voices;
+
+                // Write back to file
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                string jsonOutput = JsonSerializer.Serialize(config, options);
+                File.WriteAllText(configPath, jsonOutput);
+
+                AppendOutput($"\r  ✓ Updated engines_config.json at {configPath}", Color.FromArgb(100, 255, 100));
+                AppendOutput($"\r  ✓ Engine ID: {engineId}", Color.FromArgb(100, 255, 100));
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"\r  ERROR updating config: {ex.Message}", Color.FromArgb(255, 100, 100));
+            }
         }
 
         private string GetLanguageCode(string language)

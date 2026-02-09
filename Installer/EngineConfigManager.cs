@@ -12,7 +12,12 @@ namespace SherpaOnnxSAPIInstaller
     /// </summary>
     public static class EngineConfigManager
     {
-        private static readonly string ConfigPath = @"C:\Program Files\OpenAssistive\OpenSpeech\engines_config.json";
+        private static readonly string ConfigDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenSpeech"
+        );
+
+        private static readonly string ConfigPath = Path.Combine(ConfigDir, "engines_config.json");
         
         /// <summary>
         /// Adds an Azure TTS voice configuration to engines_config.json

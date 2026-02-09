@@ -357,9 +357,9 @@ namespace Installer
                 Console.WriteLine($"Error uninstalling Azure voices: {ex.Message}");
             }
 
-            // Check if any models remain in Program Files
+            // Check if any models remain in LocalApplicationData
             string modelsDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "OpenSpeech",
                 "models"
             );
@@ -988,7 +988,7 @@ namespace Installer
 
                 // 1. Check model files
                 string modelDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "OpenSpeech",
                     "models",
                     model.Id
@@ -1622,7 +1622,12 @@ namespace Installer
     /// </summary>
     public static class EngineConfigManager
     {
-        private static readonly string ConfigPath = @"C:\Program Files\OpenAssistive\OpenSpeech\engines_config.json";
+        private static readonly string ConfigDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenSpeech"
+        );
+
+        private static readonly string ConfigPath = Path.Combine(ConfigDir, "engines_config.json");
 
         /// <summary>
         /// Adds an Azure TTS voice configuration to engines_config.json
