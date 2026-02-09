@@ -66,8 +66,7 @@ jobs:
         path: NativeTTSWrapper/x64/Release/
 
     - name: Build Console Installer
-      run: dotnet build Installer/Installer.csproj -c Release --no-dependencies || echo "Build skipped - missing dependencies"
-      continue-on-error: true
+      run: dotnet build Installer/Installer.csproj -c Release --no-dependencies
 
     - name: Upload installer artifact
       if: success()
