@@ -59,9 +59,10 @@ jobs:
             exit 1
         }
 
-        # Extract tar.bz2 using tar (Windows 10+ has BSD tar)
-        Write-Host "Extracting archive..." -ForegroundColor Yellow
-        tar -xf "$output" -C "NativeTTSWrapper\libs-win\"
+        # Extract using 7-Zip (much faster than tar on Windows)
+        Write-Host "Extracting archive with 7-Zip..." -ForegroundColor Yellow
+        cd "NativeTTSWrapper\libs-win"
+        7z x archive.tar.bz2 -so | 7z x -si -ttar -y > $null
 
         # List what was extracted
         Write-Host "Extracted contents:" -ForegroundColor Cyan
