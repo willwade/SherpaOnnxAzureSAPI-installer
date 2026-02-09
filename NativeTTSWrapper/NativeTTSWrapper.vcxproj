@@ -82,8 +82,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)libs-win\sherpa-onnx-v1.12.10-win-x64-static\lib;$(ProjectDir)libs;$(ProjectDir)azure-speech-sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
-      <Message>Copying Azure Speech SDK DLLs to output directory</Message>
+      <Command>if exist "$(ProjectDir)azure-speech-sdk\bin\*.dll" copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
+      <Message>Copying Azure Speech SDK DLLs to output directory (if available)</Message>
     </PostBuildEvent>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -123,8 +123,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)libs-win\sherpa-onnx-v1.12.10-win-x64-static\lib;$(ProjectDir)libs;$(ProjectDir)azure-speech-sdk\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
-      <Message>Copying Azure Speech SDK DLLs to output directory</Message>
+      <Command>if exist "$(ProjectDir)azure-speech-sdk\bin\*.dll" copy "$(ProjectDir)azure-speech-sdk\bin\*.dll" "$(OutDir)" /Y</Command>
+      <Message>Copying Azure Speech SDK DLLs to output directory (if available)</Message>
     </PostBuildEvent>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
