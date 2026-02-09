@@ -66,7 +66,7 @@
 
       <!-- Configuration File -->
       <Component Id="ConfigFile" Guid="D4E6F8A0-3C4D-5E6F-7A8B-9C0D1E2F3A4B">
-        <File Id="EngineConfigJson" Source="NativeTTSWrapper\x64\Release\engines_config.json" />
+        <File Id="EngineConfigJson" Source="NativeTTSWrapper\engines_config.json" />
       </Component>
 
       <!-- Installer Executable (Console) -->
