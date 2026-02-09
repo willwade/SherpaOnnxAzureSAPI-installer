@@ -194,10 +194,20 @@ jobs:
       shell: pwsh
       run: |
         # Create SAPI5 voice token registry keys (normally done by MSI installer)
-        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /f
-        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /v "Test Sherpa Voice" /f
-        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /t REG_SZ /d "Test SherpaVoice" /f
-        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" /f
+        New-Item -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Force | Out-Null
+        New-Item -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "(default)" -Value "Test Sherpa Voice" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "CLSID" -Value "{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "Language" -Value "409" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "Gender" -Value "Female" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "Age" -Value "Adult" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "Vendor" -Value "OpenAssistive" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Name "Name" -Value "TestSherpaVoice" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Name "Language" -Value "409" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Name "Gender" -Value "Female" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Name "Age" -Value "Adult" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Name "Vendor" -Value "OpenAssistive" -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" -Name "Name" -Value "TestSherpaVoice" -Force | Out-Null
 
     - name: Run test suite
       shell: pwsh
@@ -211,7 +221,7 @@ jobs:
       if: always()
       shell: pwsh
       run: |
-        reg delete "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /f
+        Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" -Recurse -Force -ErrorAction SilentlyContinue
 
     - name: Unregister DLL
       if: always()
