@@ -84,6 +84,25 @@ jobs:
             exit 1
         }
 
+        # Verify libraries exist
+        $libPath = "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\lib"
+        $requiredLibs = @("cppinyin_core.lib", "sherpa-onnx-c-api.lib", "sherpa-onnx-core.lib", "onnxruntime.lib")
+        $missingLibs = @()
+        foreach ($lib in $requiredLibs) {
+            if (-not (Test-Path "$libPath\$lib")) {
+                $missingLibs += $lib
+            }
+        }
+
+        if ($missingLibs.Count -gt 0) {
+            Write-Host "ERROR: Missing libraries: $($missingLibs -join ', ')" -ForegroundColor Red
+            Write-Host "Available libraries in $libPath:" -ForegroundColor Yellow
+            Get-ChildItem -Path $libPath -Filter "*.lib" | Format-Table Name, Length -AutoSize
+            exit 1
+        } else {
+            Write-Host "SUCCESS: All required libraries found" -ForegroundColor Green
+        }
+
         # Cleanup archive
         Remove-Item "$output" -Force
 
