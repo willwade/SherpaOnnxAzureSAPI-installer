@@ -61,8 +61,7 @@ jobs:
 
         # Extract using 7-Zip (much faster than tar on Windows)
         Write-Host "Extracting archive with 7-Zip..." -ForegroundColor Yellow
-        cd "NativeTTSWrapper\libs-win"
-        7z x archive.tar.bz2 -so | 7z x -si -ttar -y > $null
+        7z x "$output" -so | 7z x -si -ttar -y "-oNativeTTSWrapper\libs-win" > $null
 
         # List what was extracted
         Write-Host "Extracted contents:" -ForegroundColor Cyan
