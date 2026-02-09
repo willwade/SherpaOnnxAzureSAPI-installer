@@ -881,40 +881,62 @@ namespace SherpaOnnxConfig
 
             try
             {
-                if (voice.Source == "sherpa")
+                // Test using SAPI5 - this works for both SherpaOnnx and Azure voices
+                AppendOutput("\r  Testing via SAPI5...", Color.FromArgb(150, 200, 255));
+
+                bool voiceInstalled = await System.Threading.Tasks.Task.Run(() =>
                 {
-                    if (!voice.IsDownloaded())
+                    try
                     {
-                        AppendOutput("\rERROR: Model not downloaded. Click 'Download Model' first.", Color.FromArgb(255, 100, 100));
-                        return;
-                    }
+                        // Check if voice is installed in SAPI5
+                        using (var synthesizer = new System.Speech.Synthesis.SpeechSynthesizer())
+                        {
+                            var installedVoices = synthesizer.GetInstalledVoices();
+                            var friendlyName = GetFriendlyVoiceName(voice);
 
-                    // Find test executable
-                    string testExe = "C:\\github\\SherpaOnnxAzureSAPI-installer\\NativeTTSWrapper\\x64\\Release\\Sapi5Test.exe";
-                    if (!File.Exists(testExe))
-                    {
-                        AppendOutput("\rERROR: Test executable not found. Build the project first.", Color.FromArgb(255, 100, 100));
-                        return;
-                    }
+                            var matchedVoice = installedVoices.FirstOrDefault(v =>
+                                v.VoiceInfo.Name == friendlyName);
 
-                    ProcessStartInfo psi = new ProcessStartInfo
-                    {
-                        FileName = testExe,
-                        Arguments = $"\"{voice.Id}\" \"{testText}\"",
-                        UseShellExecute = false,
-                        CreateNoWindow = false
-                    };
+                            if (matchedVoice == null)
+                            {
+                                return false; // Voice not installed
+                            }
 
-                    using (Process process = Process.Start(psi)!)
-                    {
-                        await System.Threading.Tasks.Task.Run(() => process.WaitForExit());
-                        statusLabel.Text = process.ExitCode == 0 ? "Status: Test complete" : "Status: Test failed";
+                            // Try to select and speak
+                            synthesizer.SelectVoice(friendlyName);
+
+                            // Use async speak with timeout
+                            var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+                            synthesizer.SpeakCompleted += (s, e) => tcs.SetResult(true);
+
+                            synthesizer.SpeakAsync(testText);
+
+                            // Wait for completion or timeout (10 seconds)
+                            if (!tcs.Task.Wait(TimeSpan.FromSeconds(10)))
+                            {
+                                synthesizer.SpeakAsyncCancelAll();
+                                return false;
+                            }
+
+                            return true;
+                        }
                     }
-                }
-                else
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                if (!voiceInstalled)
                 {
-                    AppendOutput("\rAzure voices require SAPI5 registration. Install first.", Color.FromArgb(255, 200, 100));
+                    AppendOutput("\r  ERROR: Voice not installed in SAPI5. Click 'Install Voice' first.", Color.FromArgb(255, 100, 100));
+                    AppendOutput("\r  Note: SherpaOnnx voices must be installed to SAPI5 before testing.", Color.FromArgb(200, 200, 100));
+                    statusLabel.Text = "Status: Test failed";
+                    return;
                 }
+
+                AppendOutput("\r  ✓ Test completed successfully!", Color.FromArgb(100, 255, 100));
+                statusLabel.Text = "Status: Test complete";
             }
             catch (Exception ex)
             {
