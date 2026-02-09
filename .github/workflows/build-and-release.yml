@@ -217,9 +217,6 @@ jobs:
       if: always()
       shell: pwsh
       run: regsvr32 /u "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
-      if: always()
-      shell: pwsh
-      run: regsvr32 /u "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
 
   release:
     name: Create Release
