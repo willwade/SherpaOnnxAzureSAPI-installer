@@ -1046,7 +1046,6 @@ namespace SherpaOnnxConfig
                         {
                             string langCode = GetLanguageCode(voice.Language);
                             attrKey.SetValue("Language", langCode);
-                            attrKey.SetValue("Language", voice.Language);
                             attrKey.SetValue("Gender", voice.Gender ?? "Female");
                             attrKey.SetValue("Age", "Adult");
                             attrKey.SetValue("Name", voice.Id);
