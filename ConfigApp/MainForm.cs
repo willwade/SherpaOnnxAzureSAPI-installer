@@ -1,703 +1,1194 @@
 using System;
 using System.Drawing;
+using System.Diagnostics;
 using System.IO;
-using System.Speech.Synthesis;
 using System.Text.Json;
-using System.Threading.Tasks;
+using Microsoft.Win32;
 using System.Windows.Forms;
-using static SherpaOnnxConfig.EngineConfigManager;
+using System.Linq;
+using System.Collections.Generic;
+using System.Net.Http;
 
 namespace SherpaOnnxConfig
 {
     public partial class MainForm : Form
     {
-        private TabControl? tabControl;
-        private TabPage? voicesPage;
-        private TabPage? settingsPage;
-        private TabPage? azurePage;
-        private TabPage? aboutPage;
-
-        // Voices page controls
-        private ListBox? voicesListBox;
-        private TextBox? voiceSearchBox;
+        private Label? statusLabel;
+        private ComboBox? languageComboBox;
+        private ComboBox? engineFilterComboBox;
+        private ComboBox? voiceComboBox;
+        private Button? refreshButton;
         private Button? downloadButton;
         private Button? testVoiceButton;
-        private ProgressBar? downloadProgress;
-        private Label? statusLabel;
+        private Button? installVoiceButton;
+        private Button? uninstallVoiceButton;
+        private RichTextBox? outputTextBox;
+        private TextBox? testTextInput;
 
-        // Settings page controls
-        private NumericUpDown? speedSlider;
-        private NumericUpDown? pitchSlider;
-        private NumericUpDown? stabilitySlider;
-        private NumericUpDown? threadsSlider;
-        private Button? saveSettingsButton;
-
-        // Azure page controls
-        private TextBox? subscriptionKeyTextBox;
-        private TextBox? regionTextBox;
-        private ComboBox? azureVoiceComboBox;
-        private Button? saveAzureButton;
-        private Button? testAzureButton;
-
-        private const string ConfigPath = @"C:\Program Files\OpenAssistive\OpenSpeech\engines_config.json";
-        private const string VoiceDbUrl = "https://github.com/willwade/tts-wrapper/raw/main/tts_wrapper/engines/sherpaonnx/merged_models.json";
-        private const string LocalVoiceDbPath = "./merged_models.json";
+        private SherpaModelsCatalog? sherpaCatalog = null;
+        private const string SapiTokensPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
+        private const string ModelsDir = @"C:\Program Files\OpenSpeech\models";
 
         public MainForm()
         {
             InitializeComponent();
-            LoadVoicesDatabase();
+            LoadCatalogsAsync();
         }
 
         private void InitializeComponent()
         {
-            this.Text = "SherpaOnnx SAPI5 Configuration";
-            this.Size = new Size(800, 600);
-            this.MinimumSize = new Size(700, 500);
+            this.Text = "SherpaOnnx SAPI5 Voice Installer";
+            this.Size = new Size(760, 680);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Font = new Font("Segoe UI", 9F);
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
+            this.BackColor = Color.FromArgb(245, 245, 245);
 
-            // Create TabControl
-            tabControl = new TabControl
+            // Title
+            Label titleLabel = new Label
             {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(10)
+                Location = new Point(20, 15),
+                Size = new Size(720, 25),
+                Text = "SherpaOnnx SAPI5 Voice Installer",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 51, 102)
             };
 
-            // Create TabPages
-            voicesPage = new TabPage("Voices") { Padding = new Padding(10) };
-            settingsPage = new TabPage("Settings") { Padding = new Padding(10) };
-            azurePage = new TabPage("Azure") { Padding = new Padding(10) };
-            aboutPage = new TabPage("About") { Padding = new Padding(10) };
-
-            tabControl.TabPages.Add(voicesPage);
-            tabControl.TabPages.Add(settingsPage);
-            tabControl.TabPages.Add(azurePage);
-            tabControl.TabPages.Add(aboutPage);
-
-            this.Controls.Add(tabControl);
-
-            // Initialize each page
-            InitializeVoicesPage();
-            InitializeSettingsPage();
-            InitializeAzurePage();
-            InitializeAboutPage();
-        }
-
-        private void InitializeVoicesPage()
-        {
-            if (voicesPage == null) return;
-
-            // Search box
-            var searchLabel = new Label
+            // Status label
+            statusLabel = new Label
             {
-                Text = "Search voices:",
-                Location = new Point(10, 15),
-                Size = new Size(80, 20)
+                Location = new Point(20, 45),
+                Size = new Size(720, 20),
+                Text = "Status: Loading voice catalog...",
+                ForeColor = Color.FromArgb(100, 100, 100)
             };
 
-            voiceSearchBox = new TextBox
+            // Language selection
+            Label languageLabel = new Label
             {
-                Location = new Point(95, 13),
-                Size = new Size(350, 25),
-                PlaceholderText = "Type to filter..."
-            };
-            voiceSearchBox.TextChanged += (s, e) => FilterVoices();
-
-            // Voices list
-            var listLabel = new Label
-            {
-                Text = "Available Voices (select to download):",
-                Location = new Point(10, 50),
-                Size = new Size(200, 20)
+                Location = new Point(20, 80),
+                Size = new Size(100, 20),
+                Text = "Language:",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
 
-            voicesListBox = new ListBox
+            languageComboBox = new ComboBox
             {
-                Location = new Point(10, 75),
-                Size = new Size(435, 300),
-                SelectionMode = SelectionMode.One,
-                DisplayMember = "DisplayName",
-                ValueMember = "Id"
+                Location = new Point(120, 78),
+                Size = new Size(200, 25),
+                DropDownStyle = ComboBoxStyle.DropDown,  // Allow typing to search
+                Font = new Font("Segoe UI", 9F)
+            };
+            languageComboBox.Items.Add("All Languages");
+            languageComboBox.SelectedIndex = 0;
+            languageComboBox.SelectedIndexChanged += FilterVoices;
+            languageComboBox.TextChanged += (s, e) => FilterVoices();
+
+            // Engine filter
+            Label engineLabel = new Label
+            {
+                Location = new Point(350, 80),
+                Size = new Size(100, 20),
+                Text = "Engine Type:",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
 
-            // Details panel
-            var detailsLabel = new Label
+            engineFilterComboBox = new ComboBox
             {
-                Text = "Voice Details:",
-                Location = new Point(460, 50),
-                Size = new Size(100, 20)
+                Location = new Point(450, 78),
+                Size = new Size(160, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 9F)
+            };
+            engineFilterComboBox.Items.AddRange(new object[] { "All Engines", "SherpaOnnx (Offline)", "Azure (Cloud)" });
+            engineFilterComboBox.SelectedIndex = 0;
+            engineFilterComboBox.SelectedIndexChanged += FilterVoices;
+
+            refreshButton = new Button
+            {
+                Location = new Point(620, 76),
+                Size = new Size(80, 30),
+                Text = "Refresh",
+                FlatStyle = FlatStyle.Flat
+            };
+            refreshButton.Click += (s, e) => LoadCatalogsAsync();
+
+            // Voice selection
+            GroupBox voiceGroup = new GroupBox
+            {
+                Location = new Point(20, 115),
+                Size = new Size(720, 110),
+                Text = "Available Voices"
             };
 
-            var detailsBox = new GroupBox
+            voiceComboBox = new ComboBox
             {
-                Location = new Point(460, 75),
-                Size = new Size(300, 200),
-                Text = "Information"
+                Location = new Point(15, 25),
+                Size = new Size(545, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 9F)
             };
+            voiceComboBox.SelectedIndexChanged += VoiceComboBox_SelectedIndexChanged;
 
-            // Buttons
             downloadButton = new Button
             {
-                Text = "Download & Install",
-                Location = new Point(10, 390),
-                Size = new Size(140, 35),
+                Location = new Point(570, 23),
+                Size = new Size(135, 30),
+                Text = "Download Model",
+                BackColor = Color.FromArgb(255, 140, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
                 Enabled = false
             };
+            downloadButton.FlatAppearance.BorderSize = 0;
             downloadButton.Click += DownloadButton_Click;
+
+            Label voiceHint = new Label
+            {
+                Location = new Point(15, 55),
+                Size = new Size(690, 45),
+                Text = "Select a voice to download, test and install. SherpaOnnx models are downloaded and cached locally.\nAzure voices require an API key in engines_config.json.",
+                ForeColor = Color.FromArgb(120, 120, 120),
+                Font = new Font("Segoe UI", 8F)
+            };
+
+            Label modelInfoLabel = new Label
+            {
+                Location = new Point(15, 85),
+                Size = new Size(690, 20),
+                Text = "",
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 100, 200)
+            };
+
+            voiceGroup.Controls.Add(voiceComboBox);
+            voiceGroup.Controls.Add(downloadButton);
+            voiceGroup.Controls.Add(voiceHint);
+            voiceGroup.Controls.Add(modelInfoLabel);
+
+            // Test group
+            GroupBox testGroup = new GroupBox
+            {
+                Location = new Point(20, 235),
+                Size = new Size(720, 100),
+                Text = "Test Voice"
+            };
+
+            testTextInput = new TextBox
+            {
+                Location = new Point(15, 25),
+                Size = new Size(595, 25),
+                Text = "The quick brown fox jumps over the lazy dog.",
+                Font = new Font("Segoe UI", 9F)
+            };
 
             testVoiceButton = new Button
             {
-                Text = "▶ Test Voice",
-                Location = new Point(160, 390),
-                Size = new Size(120, 35)
+                Location = new Point(620, 23),
+                Size = new Size(85, 30),
+                Text = "▶ Test",
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
             };
+            testVoiceButton.FlatAppearance.BorderSize = 0;
             testVoiceButton.Click += TestVoiceButton_Click;
 
-            downloadProgress = new ProgressBar
+            Label hintLabel = new Label
             {
-                Location = new Point(10, 435),
-                Size = new Size(650, 20),
-                Visible = false
+                Location = new Point(15, 55),
+                Size = new Size(690, 35),
+                Text = "Tests the selected voice. SherpaOnnx voices must be downloaded first. Azure voices require SAPI5 registration.",
+                ForeColor = Color.FromArgb(120, 120, 120),
+                Font = new Font("Segoe UI", 8F)
             };
 
-            statusLabel = new Label
+            testGroup.Controls.Add(testTextInput);
+            testGroup.Controls.Add(testVoiceButton);
+            testGroup.Controls.Add(hintLabel);
+
+            // Install/Uninstall group
+            GroupBox installGroup = new GroupBox
             {
-                Text = "Ready",
-                Location = new Point(10, 465),
-                Size = new Size(650, 20),
-                ForeColor = SystemColors.GrayText
+                Location = new Point(20, 345),
+                Size = new Size(720, 70),
+                Text = "SAPI5 Registration"
             };
 
-            voicesListBox.SelectedIndexChanged += (s, e) => UpdateVoiceDetails();
-
-            // Add controls to page
-            voicesPage.Controls.AddRange(new Control[]
+            installVoiceButton = new Button
             {
-                searchLabel, voiceSearchBox,
-                listLabel, voicesListBox,
-                detailsLabel, detailsBox,
-                downloadButton, testVoiceButton,
-                downloadProgress, statusLabel
-            });
-        }
-
-        private void InitializeSettingsPage()
-        {
-            if (settingsPage == null) return;
-
-            int yPos = 20;
-
-            // Speed setting
-            var speedLabel = new Label
-            {
-                Text = "Speech Speed (lengthScale):",
-                Location = new Point(20, yPos),
-                Size = new Size(180, 20)
-            };
-
-            speedSlider = new NumericUpDown
-            {
-                Location = new Point(220, yPos - 2),
-                Size = new Size(100, 25),
-                Minimum = 0.5m,
-                Maximum = 2.0m,
-                Increment = 0.05m,
-                DecimalPlaces = 2,
-                Value = 1.15m
-            };
-
-            var speedHelp = new Label
-            {
-                Text = "Lower=faster, Higher=slower (1.0=normal)",
-                Location = new Point(330, yPos),
-                Size = new Size(250, 20),
-                ForeColor = SystemColors.GrayText
-            };
-
-            yPos += 50;
-
-            // Pitch variation
-            var pitchLabel = new Label
-            {
-                Text = "Pitch Variation (noiseScale):",
-                Location = new Point(20, yPos),
-                Size = new Size(180, 20)
-            };
-
-            pitchSlider = new NumericUpDown
-            {
-                Location = new Point(220, yPos - 2),
-                Size = new Size(100, 25),
-                Minimum = 0.3m,
-                Maximum = 0.9m,
-                Increment = 0.05m,
-                DecimalPlaces = 3,
-                Value = 0.667m
-            };
-
-            var pitchHelp = new Label
-            {
-                Text = "Higher=more variation",
-                Location = new Point(330, yPos),
-                Size = new Size(250, 20),
-                ForeColor = SystemColors.GrayText
-            };
-
-            yPos += 50;
-
-            // Stability
-            var stabilityLabel = new Label
-            {
-                Text = "Pitch Stability (noiseScaleW):",
-                Location = new Point(20, yPos),
-                Size = new Size(180, 20)
-            };
-
-            stabilitySlider = new NumericUpDown
-            {
-                Location = new Point(220, yPos - 2),
-                Size = new Size(100, 25),
-                Minimum = 0.5m,
-                Maximum = 1.2m,
-                Increment = 0.1m,
-                DecimalPlaces = 1,
-                Value = 0.8m
-            };
-
-            var stabilityHelp = new Label
-            {
-                Text = "Higher=more stable",
-                Location = new Point(330, yPos),
-                Size = new Size(250, 20),
-                ForeColor = SystemColors.GrayText
-            };
-
-            yPos += 50;
-
-            // Threads
-            var threadsLabel = new Label
-            {
-                Text = "CPU Threads:",
-                Location = new Point(20, yPos),
-                Size = new Size(180, 20)
-            };
-
-            threadsSlider = new NumericUpDown
-            {
-                Location = new Point(220, yPos - 2),
-                Size = new Size(100, 25),
-                Minimum = 1,
-                Maximum = 4,
-                Increment = 1,
-                Value = 1
-            };
-
-            var threadsHelp = new Label
-            {
-                Text = "1=safest, 4=fastest",
-                Location = new Point(330, yPos),
-                Size = new Size(250, 20),
-                ForeColor = SystemColors.GrayText
-            };
-
-            yPos += 60;
-
-            // Save button
-            saveSettingsButton = new Button
-            {
-                Text = "Save Settings",
-                Location = new Point(20, yPos),
+                Location = new Point(15, 25),
                 Size = new Size(140, 35),
-                BackColor = Color.FromArgb(0, 120, 215),
+                Text = "Install to SAPI5",
+                BackColor = Color.FromArgb(0, 180, 80),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
             };
-            saveSettingsButton.FlatAppearance.BorderSize = 0;
-            saveSettingsButton.Click += SaveSettingsButton_Click;
+            installVoiceButton.FlatAppearance.BorderSize = 0;
+            installVoiceButton.Click += InstallVoiceButton_Click;
 
-            // Reset button
-            var resetButton = new Button
+            uninstallVoiceButton = new Button
             {
-                Text = "Reset to Defaults",
-                Location = new Point(170, yPos),
-                Size = new Size(140, 35)
-            };
-            resetButton.Click += (s, e) =>
-            {
-                speedSlider.Value = 1.15m;
-                pitchSlider.Value = 0.667m;
-                stabilitySlider.Value = 0.8m;
-                threadsSlider.Value = 1;
-            };
-
-            // Test voice button
-            var testButton = new Button
-            {
-                Text = "▶ Test Settings",
-                Location = new Point(320, yPos),
-                Size = new Size(140, 35)
-            };
-            testButton.Click += TestVoiceButton_Click;
-
-            // Add controls
-            settingsPage.Controls.AddRange(new Control[]
-            {
-                speedLabel, speedSlider, speedHelp,
-                pitchLabel, pitchSlider, pitchHelp,
-                stabilityLabel, stabilitySlider, stabilityHelp,
-                threadsLabel, threadsSlider, threadsHelp,
-                saveSettingsButton, resetButton, testButton
-            });
-        }
-
-        private void InitializeAzurePage()
-        {
-            if (azurePage == null) return;
-
-            var noteLabel = new Label
-            {
-                Text = "Azure TTS Configuration (optional cloud-based voices)",
-                Location = new Point(20, 20),
-                Size = new Size(500, 20),
-                Font = new Font("Segoe UI", 9F, FontStyle.Italic),
-                ForeColor = SystemColors.GrayText
-            };
-
-            int yPos = 60;
-
-            // Subscription key
-            var keyLabel = new Label
-            {
-                Text = "Subscription Key:",
-                Location = new Point(20, yPos),
-                Size = new Size(120, 20)
-            };
-
-            subscriptionKeyTextBox = new TextBox
-            {
-                Location = new Point(150, yPos - 2),
-                Size = new Size(300, 25),
-                PasswordChar = '●',
-                PlaceholderText = "Enter your Azure subscription key"
-            };
-
-            yPos += 40;
-
-            // Region
-            var regionLabel = new Label
-            {
-                Text = "Region:",
-                Location = new Point(20, yPos),
-                Size = new Size(120, 20)
-            };
-
-            regionTextBox = new TextBox
-            {
-                Location = new Point(150, yPos - 2),
-                Size = new Size(150, 25),
-                PlaceholderText = "e.g., uksouth, eastus"
-            };
-
-            yPos += 40;
-
-            // Voice selection
-            var voiceLabel = new Label
-            {
-                Text = "Default Voice:",
-                Location = new Point(20, yPos),
-                Size = new Size(120, 20)
-            };
-
-            azureVoiceComboBox = new ComboBox
-            {
-                Location = new Point(150, yPos - 2),
-                Size = new Size(250, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            azureVoiceComboBox.Items.AddRange(new object[]
-            {
-                "en-US-JennyNeural", "en-US-GuyNeural", "en-US-AriaNeural",
-                "en-GB-SoniaNeural", "en-GB-LibbyNeural", "en-GB-RyanNeural"
-            });
-            azureVoiceComboBox.SelectedIndex = 0;
-
-            yPos += 50;
-
-            // Save button
-            saveAzureButton = new Button
-            {
-                Text = "Save Azure Config",
-                Location = new Point(20, yPos),
-                Size = new Size(150, 35),
-                BackColor = Color.FromArgb(0, 120, 215),
+                Location = new Point(165, 25),
+                Size = new Size(140, 35),
+                Text = "Uninstall",
+                BackColor = Color.FromArgb(200, 50, 50),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
             };
-            saveAzureButton.FlatAppearance.BorderSize = 0;
-            saveAzureButton.Click += SaveAzureButton_Click;
+            uninstallVoiceButton.FlatAppearance.BorderSize = 0;
+            uninstallVoiceButton.Click += UninstallVoiceButton_Click;
 
-            // Test button
-            testAzureButton = new Button
+            Label installHint = new Label
             {
-                Text = "▶ Test Azure Voice",
-                Location = new Point(180, yPos),
-                Size = new Size(150, 35)
-            };
-            testAzureButton.Click += TestAzureVoiceButton_Click;
-
-            // Info box
-            var infoBox = new GroupBox
-            {
-                Location = new Point(20, yPos + 50),
-                Size = new Size(700, 150),
-                Text = "Azure TTS Information"
+                Location = new Point(315, 25),
+                Size = new Size(390, 35),
+                Text = "Registers the voice with Windows SAPI5. Requires Administrator privileges.\nVoices must be downloaded before installation.",
+                ForeColor = Color.FromArgb(120, 120, 120),
+                Font = new Font("Segoe UI", 8F)
             };
 
-            var infoText = new Label
+            installGroup.Controls.Add(installVoiceButton);
+            installGroup.Controls.Add(uninstallVoiceButton);
+            installGroup.Controls.Add(installHint);
+
+            // Output
+            outputTextBox = new RichTextBox
             {
-                Text = "Azure TTS provides high-quality cloud-based neural voices.\n\n" +
-                       "To get started:\n" +
-                       "1. Create an Azure Speech Service account\n" +
-                       "2. Get your subscription key and region\n" +
-                       "3. Enter them above and click Save\n\n" +
-                       "Learn more: https://aka.ms/azure-speech-docs",
-                Location = new Point(10, 20),
-                Size = new Size(680, 120)
+                Location = new Point(20, 425),
+                Size = new Size(720, 230),
+                ReadOnly = true,
+                BackColor = Color.FromArgb(30, 30, 30),
+                ForeColor = Color.FromArgb(200, 200, 200),
+                Font = new Font("Consolas", 9F),
+                BorderStyle = BorderStyle.FixedSingle,
+                Text = "Welcome to SherpaOnnx SAPI5 Voice Installer!\r\n\r\n" +
+                       "Loading voice catalog...\r\n\r\n"
             };
 
-            infoBox.Controls.Add(infoText);
-
-            azurePage.Controls.AddRange(new Control[]
-            {
-                noteLabel, keyLabel, subscriptionKeyTextBox,
-                regionLabel, regionTextBox,
-                voiceLabel, azureVoiceComboBox,
-                saveAzureButton, testAzureButton, infoBox
-            });
+            this.Controls.Add(titleLabel);
+            this.Controls.Add(statusLabel);
+            this.Controls.Add(languageLabel);
+            this.Controls.Add(languageComboBox);
+            this.Controls.Add(engineLabel);
+            this.Controls.Add(engineFilterComboBox);
+            this.Controls.Add(refreshButton);
+            this.Controls.Add(voiceGroup);
+            this.Controls.Add(testGroup);
+            this.Controls.Add(installGroup);
+            this.Controls.Add(outputTextBox);
         }
 
-        private void InitializeAboutPage()
-        {
-            if (aboutPage == null) return;
+        private HashSet<string> allLanguages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var titleLabel = new Label
-            {
-                Text = "SherpaOnnx SAPI5 TTS Engine",
-                Location = new Point(20, 20),
-                Size = new Size(300, 30),
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold)
-            };
-
-            var versionLabel = new Label
-            {
-                Text = "Version 1.0.0",
-                Location = new Point(20, 60),
-                Size = new Size(200, 20),
-                ForeColor = SystemColors.GrayText
-            };
-
-            var infoBox = new GroupBox
-            {
-                Location = new Point(20, 100),
-                Size = new Size(700, 250),
-                Text = "About"
-            };
-
-            var infoText = new Label
-            {
-                Text = "A native Windows SAPI5 Text-to-Speech engine using SherpaOnnx with offline neural TTS models.\n\n" +
-                       "Features:\n" +
-                       "  • 100% offline operation (SherpaOnnx voices)\n" +
-                       "  • High-quality neural TTS using VITS models\n" +
-                       "  • Compatible with all SAPI5 applications\n" +
-                       "  • Support for multiple languages and voices\n" +
-                       "  • Azure TTS integration (cloud-based option)\n\n" +
-                       "Project: https://github.com/OpenAssistive/SherpaOnnxSAPI-installer\n\n" +
-                       "Built with:\n" +
-                       "  • SherpaOnnx by k2-fsa\n" +
-                       "  • Piper Voice Models\n" +
-                       "  • ONNX Runtime\n\n" +
-                       "License: Apache 2.0",
-                Location = new Point(10, 20),
-                Size = new Size(680, 220)
-            };
-
-            infoBox.Controls.Add(infoText);
-
-            // Close button
-            var closeButton = new Button
-            {
-                Text = "Close",
-                Location = new Point(20, 370),
-                Size = new Size(100, 35),
-                DialogResult = DialogResult.OK
-            };
-
-            aboutPage.Controls.AddRange(new Control[]
-            {
-                titleLabel, versionLabel, infoBox, closeButton
-            });
-        }
-
-        private async void LoadVoicesDatabase()
+        private async void LoadCatalogsAsync()
         {
             try
             {
-                statusLabel?.Text ??= "Loading voice database...";
+                statusLabel!.Text = "Status: Loading SherpaOnnx catalog...";
 
-                if (File.Exists(LocalVoiceDbPath))
+                string catalogPath = Path.Combine(AppContext.BaseDirectory, "merged_models.json");
+                if (!File.Exists(catalogPath))
                 {
-                    var json = await File.ReadAllTextAsync(LocalVoiceDbPath);
-                    ParseVoicesDatabase(json);
+                    catalogPath = "C:\\github\\SherpaOnnxAzureSAPI-installer\\ConfigApp\\merged_models.json";
+                }
+
+                if (File.Exists(catalogPath))
+                {
+                    string json = await File.ReadAllTextAsync(catalogPath);
+                    sherpaCatalog = JsonSerializer.Deserialize<SherpaModelsCatalog>(json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    AppendOutput($"Loaded {sherpaCatalog?.Count ?? 0} SherpaOnnx models from catalog.", Color.FromArgb(100, 255, 100));
+
+                    // Extract all unique languages from catalog
+                    allLanguages.Clear();
+                    allLanguages.Add("All Languages");
+
+                    if (sherpaCatalog != null)
+                    {
+                        foreach (var kvp in sherpaCatalog)
+                        {
+                            try
+                            {
+                                var model = kvp.Value;
+
+                                // Process languages in SherpaLanguage format
+                                if (model.Languages != null)
+                                {
+                                    foreach (var lang in model.Languages)
+                                    {
+                                        string langName = lang.LanguageName ?? "";
+                                        if (!string.IsNullOrEmpty(langName))
+                                            allLanguages.Add(langName);
+                                    }
+                                }
+                                // Process languages in SherpaLanguage2 format
+                                else if (model.LanguageList != null)
+                                {
+                                    foreach (var lang in model.LanguageList)
+                                    {
+                                        string langName = lang.Language_Name ?? "";
+                                        if (!string.IsNullOrEmpty(langName))
+                                            allLanguages.Add(langName);
+                                    }
+                                }
+                                // Process language from LanguageData object
+                                else if (model.LanguageData != null)
+                                {
+                                    if (model.LanguageData is JsonElement jsonElement)
+                                    {
+                                        if (jsonElement.ValueKind == JsonValueKind.Array)
+                                        {
+                                            foreach (var item in jsonElement.EnumerateArray())
+                                            {
+                                                if (item.ValueKind == JsonValueKind.Object)
+                                                {
+                                                    // Use TryGetProperty to avoid exceptions on missing keys
+                                                    if (item.TryGetProperty("language_name", out var langNameProp))
+                                                        allLanguages.Add(langNameProp.GetString() ?? "");
+
+                                                    if (item.TryGetProperty("Language Name", out var langNameProp2))
+                                                        allLanguages.Add(langNameProp2.GetString() ?? "");
+                                                }
+                                                else if (item.ValueKind == JsonValueKind.String)
+                                                {
+                                                    allLanguages.Add(item.GetString() ?? "");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Skip models with problematic structures
+                                continue;
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    statusLabel?.Text ??= "Voice database not found. Please run build-installer.ps1 first.";
+                    AppendOutput("Catalog file not found. Using built-in model list.", Color.FromArgb(255, 200, 100));
                 }
+
+                // Populate language dropdown dynamically
+                PopulateLanguageDropdown();
+
+                FilterVoices();
+                statusLabel.Text = $"Status: Ready - {voiceComboBox?.Items.Count ?? 0} voices available";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading voice database: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendOutput($"Error loading catalog: {ex.Message}", Color.FromArgb(255, 100, 100));
+                statusLabel!.Text = "Status: Error loading catalog";
             }
         }
 
-        private void ParseVoicesDatabase(string json)
+        private void PopulateLanguageDropdown()
         {
-            // Simple JSON parse for demo
-            // In production, use proper deserialization
-            var voices = JsonSerializer.Deserialize<JsonElement>(json);
+            // Clear existing items except the first selection
+            int selectedIndex = languageComboBox!.SelectedIndex;
+            languageComboBox.Items.Clear();
 
-            if (voicesListBox == null) return;
-
-            voicesListBox.Items.Clear();
-
-            foreach (var voice in voices.EnumerateObject())
+            // Add all discovered languages
+            foreach (var lang in allLanguages.OrderBy(l => l))
             {
-                var voiceData = voice.Value;
-                if (voiceData.TryGetProperty("language", out var lang) &&
-                    lang[0].GetProperty("lang_code").GetString() == "en")
+                languageComboBox.Items.Add(lang);
+            }
+
+            languageComboBox.SelectedIndex = 0;
+
+            AppendOutput($"Found {allLanguages.Count} unique languages in catalog.", Color.FromArgb(100, 200, 255));
+        }
+
+        private List<VoiceInfo> allVoices = new List<VoiceInfo>();
+
+        private void FilterVoices(object? sender = null, EventArgs? e = null)
+        {
+            allVoices.Clear();
+            voiceComboBox!.Items.Clear();
+
+            string languageFilter = languageComboBox!.SelectedItem?.ToString()?.ToLower() ?? "";
+            string engineFilter = engineFilterComboBox!.SelectedItem?.ToString()?.ToLower() ?? "";
+
+            // Add SherpaOnnx voices from catalog
+            if (sherpaCatalog != null && (engineFilter.Contains("all") || engineFilter.Contains("sherpa")))
+            {
+                foreach (var kvp in sherpaCatalog)
                 {
-                    voicesListBox.Items.Add(new
+                    var model = kvp.Value;
+
+                    // Check language filter - handle both language formats
+                    bool langMatch = languageFilter.Contains("all");
+
+                    // Try different language field formats
+                    List<SherpaLanguage>? languages = model.Languages;
+                    List<SherpaLanguage2>? languages2 = model.LanguageList;
+                    bool hasLanguageData = model.LanguageData != null;
+
+                    // Check languages in SherpaLanguage format
+                    if (languages != null && languages.Count > 0)
                     {
-                        Id = voice.Name,
-                        DisplayName = $"{voiceData.GetProperty("name").GetString()} ({voiceData.GetProperty("quality").GetString()})",
-                        Name = voiceData.GetProperty("name").GetString(),
-                        Quality = voiceData.GetProperty("quality").GetString(),
-                        Size = voiceData.GetProperty("filesize_mb").GetSingle()
+                        foreach (var lang in languages)
+                        {
+                            string langName = (lang.LanguageName ?? "").ToLower();
+
+                            // Match if filter contains language name or if language name contains filter
+                            if (!langMatch && !string.IsNullOrEmpty(languageFilter) && !string.IsNullOrEmpty(langName))
+                            {
+                                if (languageFilter.Contains("english") && langName.Contains("english")) langMatch = true;
+                                else if (languageFilter.Contains("spanish") && langName.Contains("spanish")) langMatch = true;
+                                else if (languageFilter.Contains("french") && langName.Contains("french")) langMatch = true;
+                                else if (languageFilter.Contains("german") && langName.Contains("german")) langMatch = true;
+                                else if (languageFilter.Contains("italian") && langName.Contains("italian")) langMatch = true;
+                                else if (languageFilter.Contains("portuguese") && langName.Contains("portuguese")) langMatch = true;
+                                else if (languageFilter.Contains("chinese") && langName.Contains("chinese")) langMatch = true;
+                                else if (languageFilter.Contains("japanese") && langName.Contains("japanese")) langMatch = true;
+                                else if (languageFilter.Contains("korean") && langName.Contains("korean")) langMatch = true;
+                                else if (langName.Contains(languageFilter)) langMatch = true;
+                                else if (languageFilter.Contains(langName)) langMatch = true;
+                            }
+                        }
+                    }
+                    // Check languages in SherpaLanguage2 format
+                    else if (languages2 != null && languages2.Count > 0)
+                    {
+                        foreach (var lang in languages2)
+                        {
+                            string langName = (lang.Language_Name ?? "").ToLower();
+
+                            if (!langMatch && !string.IsNullOrEmpty(languageFilter) && !string.IsNullOrEmpty(langName))
+                            {
+                                if (languageFilter.Contains("english") && langName.Contains("english")) langMatch = true;
+                                else if (languageFilter.Contains("spanish") && langName.Contains("spanish")) langMatch = true;
+                                else if (languageFilter.Contains("french") && langName.Contains("french")) langMatch = true;
+                                else if (languageFilter.Contains("german") && langName.Contains("german")) langMatch = true;
+                                else if (languageFilter.Contains("italian") && langName.Contains("italian")) langMatch = true;
+                                else if (languageFilter.Contains("portuguese") && langName.Contains("portuguese")) langMatch = true;
+                                else if (languageFilter.Contains("chinese") && langName.Contains("chinese")) langMatch = true;
+                                else if (languageFilter.Contains("japanese") && langName.Contains("japanese")) langMatch = true;
+                                else if (languageFilter.Contains("korean") && langName.Contains("korean")) langMatch = true;
+                                else if (langName.Contains(languageFilter)) langMatch = true;
+                                else if (languageFilter.Contains(langName)) langMatch = true;
+                            }
+                        }
+                    }
+                    // LanguageData handling is done in the hasLanguageData block above
+                    // Handle LanguageData object (dynamic language field)
+                    else if (hasLanguageData && model.LanguageData is JsonElement jsonElem)
+                    {
+                        if (jsonElem.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in jsonElem.EnumerateArray())
+                            {
+                                string langName = "";
+                                if (item.ValueKind == JsonValueKind.Object)
+                                {
+                                    if (item.TryGetProperty("language_name", out var prop))
+                                        langName = prop.GetString() ?? "";
+                                    else if (item.TryGetProperty("Language Name", out var prop2))
+                                        langName = prop2.GetString() ?? "";
+                                }
+                                else if (item.ValueKind == JsonValueKind.String)
+                                {
+                                    langName = item.GetString() ?? "";
+                                }
+
+                                if (!langMatch && !string.IsNullOrEmpty(languageFilter) && !string.IsNullOrEmpty(langName))
+                                {
+                                    string langLower = langName.ToLower();
+                                    if (languageFilter.Contains("english") && langLower.Contains("english")) langMatch = true;
+                                    else if (languageFilter.Contains("spanish") && langLower.Contains("spanish")) langMatch = true;
+                                    else if (languageFilter.Contains("french") && langLower.Contains("french")) langMatch = true;
+                                    else if (languageFilter.Contains("german") && langLower.Contains("german")) langMatch = true;
+                                    else if (languageFilter.Contains("italian") && langLower.Contains("italian")) langMatch = true;
+                                    else if (languageFilter.Contains("portuguese") && langLower.Contains("portuguese")) langMatch = true;
+                                    else if (languageFilter.Contains("chinese") && langLower.Contains("chinese")) langMatch = true;
+                                    else if (languageFilter.Contains("japanese") && langLower.Contains("japanese")) langMatch = true;
+                                    else if (languageFilter.Contains("korean") && langLower.Contains("korean")) langMatch = true;
+                                    else if (langLower.Contains(languageFilter)) langMatch = true;
+                                    else if (languageFilter.Contains(langLower)) langMatch = true;
+                                }
+                            }
+                        }
+                        else if (jsonElem.ValueKind == JsonValueKind.String)
+                        {
+                            string langName = jsonElem.GetString() ?? "";
+                            if (!langMatch && !string.IsNullOrEmpty(languageFilter) && !string.IsNullOrEmpty(langName))
+                            {
+                                string langLower = langName.ToLower();
+                                if (languageFilter.Contains("english") && langLower.Contains("en")) langMatch = true;
+                                else if (languageFilter.Contains("spanish") && langLower.Contains("es")) langMatch = true;
+                                else if (languageFilter.Contains("french") && langLower.Contains("fr")) langMatch = true;
+                                else if (languageFilter.Contains("german") && langLower.Contains("de")) langMatch = true;
+                                else if (languageFilter.Contains("italian") && langLower.Contains("it")) langMatch = true;
+                                else if (languageFilter.Contains("portuguese") && langLower.Contains("pt")) langMatch = true;
+                                else if (languageFilter.Contains("chinese") && langLower.Contains("zh")) langMatch = true;
+                                else if (languageFilter.Contains("japanese") && langLower.Contains("ja")) langMatch = true;
+                                else if (languageFilter.Contains("korean") && langLower.Contains("ko")) langMatch = true;
+                                else if (langLower.Contains(languageFilter)) langMatch = true;
+                                else if (languageFilter.Contains(langLower)) langMatch = true;
+                            }
+                        }
+                    }
+
+                    if (!langMatch) continue;
+
+                    // Check engine filter
+                    bool engineMatch = engineFilter.Contains("all") || engineFilter.Contains("sherpa");
+                    string modelType = model.GetModelType() ?? "";
+                    if (engineFilter.Contains("azure") && !engineFilter.Contains("all") && !engineFilter.Contains("sherpa"))
+                        continue;
+
+                    // Get language display name
+                    string langStr = "Unknown";
+                    if (languages != null && languages.Count > 0)
+                        langStr = languages[0].LanguageName ?? "Unknown";
+                    else if (languages2 != null && languages2.Count > 0)
+                        langStr = languages2[0].Language_Name ?? "Unknown";
+                    else if (hasLanguageData && model.LanguageData is JsonElement jsonElem)
+                    {
+                        if (jsonElem.ValueKind == JsonValueKind.Array && jsonElem.GetArrayLength() > 0)
+                        {
+                            var first = jsonElem[0];
+                            if (first.ValueKind == JsonValueKind.Object)
+                            {
+                                if (first.TryGetProperty("language_name", out var prop))
+                                    langStr = prop.GetString() ?? "";
+                                else if (first.TryGetProperty("Language Name", out var prop2))
+                                    langStr = prop2.GetString() ?? "";
+                            }
+                            else if (first.ValueKind == JsonValueKind.String)
+                            {
+                                langStr = first.GetString() ?? "";
+                            }
+                        }
+                        else if (jsonElem.ValueKind == JsonValueKind.String)
+                        {
+                            langStr = jsonElem.GetString() ?? "";
+                        }
+                    }
+
+                    // Determine engine type for display
+                    string engineType = model.Id?.Contains("mms") == true ? "MMS" : "SherpaOnnx";
+
+                    // Convert URL format if needed (for MMS models)
+                    string modelUrl = model.GetUrl() ?? "";
+                    if (modelUrl.Contains("/resolve/main/") && model.Id?.Contains("mms") == true)
+                    {
+                        // Convert resolve URL to tree URL for listing
+                        modelUrl = modelUrl.Replace("/resolve/main/", "/tree/main/");
+                    }
+
+                    allVoices.Add(new VoiceInfo
+                    {
+                        Id = model.Id ?? kvp.Key,
+                        Name = model.Name ?? modelType,
+                        Language = langStr,
+                        EngineType = engineType,
+                        IsOffline = true,
+                        ModelUrl = modelUrl,
+                        ModelSize = model.FilesizeMb,
+                        SampleRate = model.SampleRate,
+                        ModelType = modelType,
+                        Source = "sherpa"
                     });
                 }
             }
 
-            statusLabel?.Text ??= $"Found {voicesListBox.Items.Count} English voices";
+            // Add Azure voices
+            if (engineFilter.Contains("all") || engineFilter.Contains("azure"))
+            {
+                foreach (var azureVoice in GetAzureVoices())
+                {
+                    bool langMatch = languageFilter.Contains("all") ||
+                                   azureVoice.Language.ToLower().Contains(languageFilter);
+                    if (langMatch)
+                    {
+                        allVoices.Add(azureVoice);
+                    }
+                }
+            }
+
+            // Populate dropdown
+            foreach (var voice in allVoices.OrderBy(v => v.Language).ThenBy(v => v.Name))
+            {
+                string status = voice.IsDownloaded() ? "[✓]" : "[↓]";
+                string source = voice.Source == "azure" ? "[Azure]" : $"[{voice.EngineType}]";
+                voiceComboBox.Items.Add($"{voice.Id} - {voice.Language} {source} {status}");
+            }
+
+            if (voiceComboBox.Items.Count > 0)
+                voiceComboBox.SelectedIndex = 0;
+
+            statusLabel!.Text = $"Status: {voiceComboBox.Items.Count} voice(s) available";
         }
 
-        private void FilterVoices()
+        private void VoiceComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            if (voicesListBox == null || voiceSearchBox == null) return;
-
-            var search = voiceSearchBox.Text.ToLower();
-            foreach (var item in voicesListBox.Items)
+            var voice = GetSelectedVoice();
+            if (voice != null)
             {
-                // TODO: Implement filtering
+                downloadButton!.Enabled = !voice.IsOffline || !voice.IsDownloaded();
             }
         }
 
-        private void UpdateVoiceDetails()
+        private VoiceInfo? GetSelectedVoice()
         {
-            downloadButton!.Enabled = voicesListBox!.SelectedItem != null;
+            if (voiceComboBox?.SelectedItem == null) return null;
+            string item = voiceComboBox.SelectedItem.ToString()!;
+            string id = item.Split(' ')[0];
+            return allVoices.FirstOrDefault(v => v.Id == id);
+        }
+
+        private List<VoiceInfo> GetAzureVoices()
+        {
+            return new List<VoiceInfo>
+            {
+                new VoiceInfo { Id = "jenny", Name = "Jenny Neural", Language = "English (US)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "guy", Name = "Guy Neural", Language = "English (US)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "libby", Name = "Libby Neural", Language = "English (UK)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "sonia", Name = "Sonia Neural", Language = "English (UK)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "elena", Name = "Elena Neural", Language = "Spanish (Spain)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "dario", Name = "Dario Neural", Language = "Spanish (Spain)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "denise", Name = "Denise Neural", Language = "French (France)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "henri", Name = "Henri Neural", Language = "French (France)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "katja", Name = "Katja Neural", Language = "German (Germany)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "conrad", Name = "Conrad Neural", Language = "German (Germany)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "elisa", Name = "Elsa Neural", Language = "Italian (Italy)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "diego", Name = "Diego Neural", Language = "Italian (Italy)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "francisca", Name = "Francisca Neural", Language = "Portuguese (Brazil)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "antonio", Name = "Antonio Neural", Language = "Portuguese (Brazil)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "xiaoyi", Name = "Xiaoyi Neural", Language = "Chinese (Mainland)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "xiaochen", Name = "Xiaochen Neural", Language = "Chinese (Mainland)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "nanami", Name = "Nanami Neural", Language = "Japanese (Japan)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "keita", Name = "Keita Neural", Language = "Japanese (Japan)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+                new VoiceInfo { Id = "sunhi", Name = "SunHi Neural", Language = "Korean (Korea)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Female" },
+                new VoiceInfo { Id = "insun", Name = "InSuk Neural", Language = "Korean (Korea)", EngineType = "Azure", IsOffline = false, Source = "azure", Gender = "Male" },
+            };
         }
 
         private async void DownloadButton_Click(object? sender, EventArgs e)
         {
-            if (voicesListBox?.SelectedItem == null) return;
+            var voice = GetSelectedVoice();
+            if (voice == null || voice.Source != "sherpa")
+            {
+                AppendOutput("ERROR: Can only download SherpaOnnx models", Color.FromArgb(255, 100, 100));
+                return;
+            }
 
-            statusLabel!.Text = "Downloading voice...";
-            downloadProgress!.Visible = true;
-            downloadButton!.Enabled = false;
+            AppendOutput($"\r\n=== Downloading Model: {voice.Id} ===", Color.FromArgb(255, 140, 0));
+            if (voice.ModelSize > 0)
+                AppendOutput($"Size: {voice.ModelSize:F2} MB", Color.FromArgb(200, 200, 200));
+            statusLabel!.Text = $"Status: Downloading {voice.Id}...";
 
             try
             {
-                // TODO: Implement download logic
-                await Task.Delay(2000); // Demo
-                statusLabel.Text = "Voice installed successfully!";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error downloading voice: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                statusLabel.Text = "Download failed";
-            }
-            finally
-            {
-                downloadProgress.Visible = false;
-                downloadButton.Enabled = true;
-            }
-        }
+                string modelDir = Path.Combine(ModelsDir, voice.Id);
+                Directory.CreateDirectory(modelDir);
 
-        private void SaveSettingsButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                // TODO: Save to engines_config.json
-                MessageBox.Show("Settings saved successfully!", "Success",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error saving settings: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void SaveAzureButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                // TODO: Save Azure config
-                MessageBox.Show("Azure configuration saved!", "Success",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error saving Azure config: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void TestVoiceButton_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                using var synthesizer = new SpeechSynthesizer();
-                var voices = synthesizer.GetInstalledVoices();
-
-                foreach (var voice in voices)
+                if (voice.ModelUrl == null)
                 {
-                    if (voice.VoiceInfo.Description.Contains("Sherpa", StringComparison.OrdinalIgnoreCase))
-                    {
-                        synthesizer.SelectVoice(voice.VoiceInfo.Name);
-                        synthesizer.Speak("This is a test of the SherpaOnnx SAPI5 text to speech engine.");
-                        statusLabel?.Text ??= "Test complete!";
-                        return;
-                    }
+                    AppendOutput("\rERROR: No download URL available for this model", Color.FromArgb(255, 100, 100));
+                    return;
                 }
 
-                MessageBox.Show("SherpaOnnx voice not found. Please install the engine first.",
-                    "Voice Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Detect URL type and download accordingly
+                if (voice.ModelUrl.Contains("huggingface.co"))
+                {
+                    await DownloadHuggingFaceModel(voice, modelDir);
+                }
+                else if (voice.ModelUrl.EndsWith(".tar.bz2") || voice.ModelUrl.EndsWith(".tar.gz") || voice.ModelUrl.Contains("tar.bz2"))
+                {
+                    await DownloadTarArchive(voice, modelDir);
+                }
+                else
+                {
+                    AppendOutput($"\rERROR: Unknown URL format: {voice.ModelUrl}", Color.FromArgb(255, 100, 100));
+                    return;
+                }
+
+                AppendOutput($"\r✓ Model downloaded to {modelDir}", Color.FromArgb(100, 255, 100));
+                statusLabel.Text = $"Status: {voice.Id} downloaded";
+                FilterVoices(); // Refresh status
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error testing voice: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppendOutput($"\rERROR: {ex.Message}", Color.FromArgb(255, 100, 100));
+                statusLabel.Text = "Status: Download failed";
             }
         }
 
-        private void TestAzureVoiceButton_Click(object? sender, EventArgs e)
+        private async System.Threading.Tasks.Task DownloadTarArchive(VoiceInfo voice, string modelDir)
         {
-            MessageBox.Show("Azure TTS not yet implemented in the native engine.",
-                "Not Implemented", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            string tarFile = Path.Combine(modelDir, "model.tar.bz2");
+
+            AppendOutput($"\rDownloading archive from {voice.ModelUrl}...", Color.FromArgb(150, 200, 255));
+            using (var client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromMinutes(30);
+                var response = await client.GetAsync(voice.ModelUrl);
+                response.EnsureSuccessStatusCode();
+
+                using (var fs = File.Create(tarFile))
+                {
+                    await response.Content.CopyToAsync(fs);
+                }
+            }
+
+            AppendOutput($"Extracting...", Color.FromArgb(150, 200, 255));
+
+            // Extract using tar
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "tar",
+                Arguments = $"-xf \"{tarFile}\" -C \"{modelDir}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using (Process process = Process.Start(psi)!)
+            {
+                process.WaitForExit();
+            }
+
+            // Clean up tar file
+            File.Delete(tarFile);
+        }
+
+        private async System.Threading.Tasks.Task DownloadHuggingFaceModel(VoiceInfo voice, string modelDir)
+        {
+            // For MMS models, the URL is like https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/tree/main/abi
+            // We need to convert to API URL to list files: https://huggingface.co/api/models/willwade/mms-tts-multilingual-models-onnx/tree/main/abi
+            // Or download known files directly: tokens.txt and model.onnx
+
+            string baseUrl = voice.ModelUrl;
+
+            // Convert tree URL to direct file URLs
+            // e.g., https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/tree/main/abi
+            // becomes https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/main/abi/tokens.txt
+
+            string resolveBaseUrl = baseUrl.Replace("/tree/", "/resolve/");
+
+            AppendOutput($"\rDownloading MMS model files from HuggingFace...", Color.FromArgb(150, 200, 255));
+
+            using (var client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromMinutes(10);
+                client.DefaultRequestHeaders.Add("User-Agent", "SherpaOnnxConfig");
+
+                // Download tokens.txt
+                string tokensUrl = $"{resolveBaseUrl}/tokens.txt";
+                AppendOutput($"\r  Downloading tokens.txt...", Color.FromArgb(200, 200, 200));
+
+                try
+                {
+                    var tokensResponse = await client.GetAsync(tokensUrl);
+                    if (tokensResponse.IsSuccessStatusCode)
+                    {
+                        string tokensPath = Path.Combine(modelDir, "tokens.txt");
+                        File.WriteAllText(tokensPath, await tokensResponse.Content.ReadAsStringAsync());
+                        AppendOutput($"    ✓ tokens.txt", Color.FromArgb(150, 255, 150));
+                    }
+                    else
+                    {
+                        AppendOutput($"    ✗ tokens.txt ({tokensResponse.StatusCode})", Color.FromArgb(255, 150, 150));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendOutput($"    ✗ tokens.txt: {ex.Message}", Color.FromArgb(255, 150, 150));
+                }
+
+                // Download model.onnx
+                string modelUrl = $"{resolveBaseUrl}/model.onnx";
+                AppendOutput($"\r  Downloading model.onnx...", Color.FromArgb(200, 200, 200));
+
+                try
+                {
+                    var modelResponse = await client.GetAsync(modelUrl);
+                    if (modelResponse.IsSuccessStatusCode)
+                    {
+                        string modelPath = Path.Combine(modelDir, "model.onnx");
+                        using (var fs = File.Create(modelPath))
+                        {
+                            await modelResponse.Content.CopyToAsync(fs);
+                        }
+                        AppendOutput($"    ✓ model.onnx", Color.FromArgb(150, 255, 150));
+                    }
+                    else
+                    {
+                        AppendOutput($"    ✗ model.onnx ({modelResponse.StatusCode})", Color.FromArgb(255, 150, 150));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendOutput($"    ✗ model.onnx: {ex.Message}", Color.FromArgb(255, 150, 150));
+                }
+
+                // Try downloading model.int8.onnx if exists (common for MMS)
+                string modelInt8Url = $"{resolveBaseUrl}/model.int8.onnx";
+                try
+                {
+                    var int8Response = await client.GetAsync(modelInt8Url);
+                    if (int8Response.IsSuccessStatusCode)
+                    {
+                        AppendOutput($"\r  Found model.int8.onnx, downloading...", Color.FromArgb(200, 200, 200));
+                        string int8Path = Path.Combine(modelDir, "model.int8.onnx");
+                        using (var fs = File.Create(int8Path))
+                        {
+                            await int8Response.Content.CopyToAsync(fs);
+                        }
+                        AppendOutput($"    ✓ model.int8.onnx", Color.FromArgb(150, 255, 150));
+                    }
+                }
+                catch
+                {
+                    // int8 model is optional, ignore errors
+                }
+            }
+        }
+
+        private async void TestVoiceButton_Click(object? sender, EventArgs e)
+        {
+            var voice = GetSelectedVoice();
+            if (voice == null)
+            {
+                AppendOutput("ERROR: No voice selected", Color.FromArgb(255, 100, 100));
+                return;
+            }
+
+            string testText = testTextInput!.Text.Trim();
+            if (string.IsNullOrEmpty(testText))
+                testText = "The quick brown fox jumps over the lazy dog.";
+
+            AppendOutput($"\r\n=== Testing Voice: {voice.Id} ===", Color.FromArgb(100, 150, 255));
+            AppendOutput($"Text: \"{testText}\"", Color.FromArgb(200, 200, 200));
+            statusLabel!.Text = $"Status: Testing {voice.Id}...";
+
+            try
+            {
+                if (voice.Source == "sherpa")
+                {
+                    if (!voice.IsDownloaded())
+                    {
+                        AppendOutput("\rERROR: Model not downloaded. Click 'Download Model' first.", Color.FromArgb(255, 100, 100));
+                        return;
+                    }
+
+                    // Find test executable
+                    string testExe = "C:\\github\\SherpaOnnxAzureSAPI-installer\\NativeTTSWrapper\\x64\\Release\\Sapi5Test.exe";
+                    if (!File.Exists(testExe))
+                    {
+                        AppendOutput("\rERROR: Test executable not found. Build the project first.", Color.FromArgb(255, 100, 100));
+                        return;
+                    }
+
+                    ProcessStartInfo psi = new ProcessStartInfo
+                    {
+                        FileName = testExe,
+                        Arguments = $"\"{voice.Id}\" \"{testText}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = false
+                    };
+
+                    using (Process process = Process.Start(psi)!)
+                    {
+                        await System.Threading.Tasks.Task.Run(() => process.WaitForExit());
+                        statusLabel.Text = process.ExitCode == 0 ? "Status: Test complete" : "Status: Test failed";
+                    }
+                }
+                else
+                {
+                    AppendOutput("\rAzure voices require SAPI5 registration. Install first.", Color.FromArgb(255, 200, 100));
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"\rERROR: {ex.Message}", Color.FromArgb(255, 100, 100));
+                statusLabel.Text = "Status: Test failed";
+            }
+        }
+
+        private async void InstallVoiceButton_Click(object? sender, EventArgs e)
+        {
+            var voice = GetSelectedVoice();
+            if (voice == null)
+            {
+                AppendOutput("ERROR: No voice selected", Color.FromArgb(255, 100, 100));
+                return;
+            }
+
+            AppendOutput($"\r\n=== Installing Voice: {voice.Id} ===", Color.FromArgb(100, 255, 100));
+            statusLabel!.Text = $"Status: Installing {voice.Id}...";
+
+            try
+            {
+                string dllPath = "C:\\github\\SherpaOnnxAzureSAPI-installer\\NativeTTSWrapper\\x64\\Release\\NativeTTSWrapper.dll";
+                if (!File.Exists(dllPath))
+                {
+                    AppendOutput($"\rERROR: DLL not found at {dllPath}", Color.FromArgb(255, 100, 100));
+                    return;
+                }
+
+                // Step 1: Register DLL
+                AppendOutput($"\rStep 1: Registering NativeTTSWrapper.dll...", Color.FromArgb(200, 200, 200));
+                await RegisterDll(dllPath);
+
+                // Step 2: Create registry keys
+                AppendOutput($"\rStep 2: Creating SAPI5 registry entries...", Color.FromArgb(200, 200, 200));
+                await CreateVoiceRegistryKeys(voice);
+
+                // Step 3: Update engines_config.json
+                AppendOutput($"\rStep 3: Updating engines_config.json...", Color.FromArgb(200, 200, 200));
+                UpdateEnginesConfig(voice);
+
+                AppendOutput($"\r✓ Voice '{voice.Id}' installed successfully!", Color.FromArgb(100, 255, 100));
+                statusLabel.Text = $"Status: {voice.Id} installed";
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"\rERROR: {ex.Message}", Color.FromArgb(255, 100, 100));
+                statusLabel.Text = "Status: Installation failed";
+            }
+        }
+
+        private async void UninstallVoiceButton_Click(object? sender, EventArgs e)
+        {
+            var voice = GetSelectedVoice();
+            if (voice == null)
+            {
+                AppendOutput("ERROR: No voice selected", Color.FromArgb(255, 100, 100));
+                return;
+            }
+
+            AppendOutput($"\r\n=== Uninstalling Voice: {voice.Id} ===", Color.FromArgb(255, 150, 100));
+            statusLabel!.Text = $"Status: Uninstalling {voice.Id}...";
+
+            try
+            {
+                await RemoveVoiceRegistryKeys(voice.Id);
+                AppendOutput($"\r✓ Voice '{voice.Id}' uninstalled!", Color.FromArgb(255, 200, 100));
+                statusLabel.Text = $"Status: {voice.Id} uninstalled";
+            }
+            catch (Exception ex)
+            {
+                AppendOutput($"\rERROR: {ex.Message}", Color.FromArgb(255, 100, 100));
+                statusLabel.Text = "Status: Uninstallation failed";
+            }
+        }
+
+        private System.Threading.Tasks.Task RegisterDll(string dllPath)
+        {
+            var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "regsvr32",
+                    Arguments = $"\"{dllPath}\" /s",
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                Process? process = Process.Start(psi);
+                if (process != null)
+                {
+                    process.EnableRaisingEvents = true;
+                    process.Exited += (s, e) =>
+                    {
+                        tcs.SetResult(process.ExitCode == 0);
+                        process.Dispose();
+                    };
+                }
+                else
+                {
+                    tcs.SetResult(false);
+                }
+            }
+            catch
+            {
+                tcs.SetResult(false);
+            }
+
+            return tcs.Task;
+        }
+
+        private async System.Threading.Tasks.Task CreateVoiceRegistryKeys(VoiceInfo voice)
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                using (RegistryKey? rootKey = Registry.LocalMachine.OpenSubKey(SapiTokensPath, true))
+                {
+                    if (rootKey == null)
+                        throw new Exception("Run as Administrator");
+
+                    using (RegistryKey voiceKey = rootKey.CreateSubKey(voice.Id))
+                    {
+                        voiceKey.SetValue("", $"{voice.Name} - {voice.EngineType}");
+
+                        using (RegistryKey attrKey = voiceKey.CreateSubKey("Attributes"))
+                        {
+                            string langCode = GetLanguageCode(voice.Language);
+                            attrKey.SetValue("Language", langCode);
+                            attrKey.SetValue("Language", voice.Language);
+                            attrKey.SetValue("Gender", voice.Gender ?? "Female");
+                            attrKey.SetValue("Age", "Adult");
+                            attrKey.SetValue("Name", voice.Id);
+                            attrKey.SetValue("Vendor", "OpenAssistive");
+                            attrKey.SetValue("Description", $"{voice.Name} TTS Voice");
+                        }
+                    }
+                }
+            });
+
+            AppendOutput($"\r  Created: HKLM\\{SapiTokensPath}\\{voice.Id}", Color.FromArgb(150, 255, 150));
+        }
+
+        private async System.Threading.Tasks.Task RemoveVoiceRegistryKeys(string voiceId)
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                using (RegistryKey? rootKey = Registry.LocalMachine.OpenSubKey(SapiTokensPath, true))
+                {
+                    if (rootKey != null)
+                        rootKey.DeleteSubKeyTree(voiceId, false);
+                }
+            });
+        }
+
+        private void UpdateEnginesConfig(VoiceInfo voice)
+        {
+            string configPath = "C:\\github\\SherpaOnnxAzureSAPI-installer\\NativeTTSWrapper\\engines_config.json";
+            // TODO: Update the config file with the new voice
+            AppendOutput($"\r  Note: Update engines_config.json manually to add: {voice.Id}", Color.FromArgb(255, 200, 100));
+        }
+
+        private string GetLanguageCode(string language)
+        {
+            if (language.Contains("US") || language.Contains("United States")) return "409";
+            if (language.Contains("UK") || language.Contains("United Kingdom")) return "809";
+            if (language.Contains("Spanish")) return "c0a";
+            if (language.Contains("French")) return "40c";
+            if (language.Contains("German")) return "407";
+            if (language.Contains("Italian")) return "410";
+            if (language.Contains("Portuguese")) return "416";
+            if (language.Contains("Chinese")) return "804";
+            if (language.Contains("Japanese")) return "411";
+            if (language.Contains("Korean")) return "412";
+            return "409"; // Default to en-US
+        }
+
+        private void AppendOutput(string text, Color color)
+        {
+            if (outputTextBox != null)
+            {
+                outputTextBox.SelectionStart = outputTextBox.TextLength;
+                outputTextBox.SelectionLength = 0;
+                outputTextBox.SelectionColor = color;
+                outputTextBox.AppendText(text + "\r\n");
+                outputTextBox.SelectionStart = outputTextBox.TextLength;
+                outputTextBox.ScrollToCaret();
+            }
+        }
+
+        // Data classes
+        private class SherpaModelsCatalog : Dictionary<string, SherpaModel> { }
+
+        private class SherpaModel
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("id")]
+            public string? Id { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("model_type")]
+            public string? ModelType { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("type")]
+            public string? Type { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("developer")]
+            public string? Developer { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("name")]
+            public string? Name { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("language")]
+            public object? LanguageData { get; set; }  // Can be array or string
+
+            [System.Text.Json.Serialization.JsonPropertyName("languages")]
+            public List<SherpaLanguage>? Languages { get; set; }
+
+            // For MMS models - language is an array with different format
+            public List<SherpaLanguage2>? LanguageList { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("quality")]
+            public string? Quality { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("sample_rate")]
+            public int SampleRate { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("num_speakers")]
+            public int NumSpeakers { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("url")]
+            public string? Url { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("compression")]
+            public bool Compression { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("filesize_mb")]
+            public double FilesizeMb { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("region")]
+            public string? Region { get; set; }
+
+            // Helper properties
+            public string? GetUrl() => Url;
+            public string? GetModelType() => ModelType ?? Type;
+        }
+
+        private class SherpaLanguage
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("lang_code")]
+            public string? LangCode { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("language_name")]
+            public string? LanguageName { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("country")]
+            public string? Country { get; set; }
+        }
+
+        private class SherpaLanguage2
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("Iso Code")]
+            public string? Iso_Code { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("Language Name")]
+            public string? Language_Name { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("Country")]
+            public string? Country { get; set; }
+        }
+
+        private class VoiceInfo
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Language { get; set; } = "";
+            public string EngineType { get; set; } = "";
+            public bool IsOffline { get; set; }
+            public bool IsDownloaded() => IsOffline && Directory.Exists(Path.Combine(ModelsDir, Id));
+            public string? ModelUrl { get; set; }
+            public double ModelSize { get; set; }
+            public int SampleRate { get; set; }
+            public string? ModelType { get; set; }
+            public string? Source { get; set; }
+            public string? Gender { get; set; }
         }
     }
 }

@@ -55,12 +55,24 @@
         <File Id="EngineConfigJson" Source="NativeTTSWrapper\x64\Release\engines_config.json" />
       </Component>
 
-      <!-- Installer Executable -->
+      <!-- Installer Executable (Console) -->
       <Component Id="InstallerExe" Guid="E5F7A9B1-4D5E-6F7A-8B9C-0D1E2F3A4B5C">
-        <File Id="InstallerExeFile" Source="bin\Release\net6.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes">
-          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx SAPI Installer" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
-          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx SAPI Installer" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
+        <File Id="InstallerExeFile" Source="bin\Release\net6.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes" />
+      </Component>
+
+      <!-- ConfigApp GUI -->
+      <Component Id="ConfigAppExe" Guid="A6B8C0D2-6E7F-7A8B-9C0D-1E2F3A4B5C6E">
+        <File Id="ConfigAppExeFile" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe" KeyPath="yes">
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx Voice Config" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx Voice Config" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
         </File>
+      </Component>
+
+      <!-- ConfigApp Dependencies -->
+      <Component Id="ConfigAppDeps" Guid="B7C9D1E3-7F8A-8B9C-0D1E-2F3A4B5C6D7F">
+        <File Id="ConfigAppDll" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.dll" />
+        <File Id="ConfigAppRuntime" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.runtimeconfig.json" />
+        <File Id="ConfigAppDepsJson" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.deps.json" />
       </Component>
     </ComponentGroup>
 
@@ -106,10 +118,10 @@
     </UI>
 
     <Property Id="WIXUI_INSTALLDIR" Value="OPENASSISTIVEFOLDER" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch SherpaOnnx SAPI Installer" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch SherpaOnnx Voice Config" />
 
-    <!-- Launch application after install -->
-    <Property Id="WixShellExecTarget" Value="[#InstallerExeFile]" />
+    <!-- Launch ConfigApp GUI after install -->
+    <Property Id="WixShellExecTarget" Value="[#ConfigAppExeFile]" />
     <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
 
   </Product>
