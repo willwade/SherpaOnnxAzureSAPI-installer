@@ -54,7 +54,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '6.x'
+        dotnet-version: '8.0.x'
 
     - name: Download Native DLL artifact
       uses: actions/download-artifact@v4
@@ -71,7 +71,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SherpaOnnxSAPIInstaller
-        path: Installer/bin/Release/net6.0/SherpaOnnxSAPIInstaller.exe
+        path: Installer/bin/Release/net8.0/SherpaOnnxSAPIInstaller.exe
         retention-days: 30
 
   build-config-app:
@@ -85,7 +85,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '6.x'
+        dotnet-version: '8.0.x'
 
     - name: Build Config App
       run: dotnet build ConfigApp/ConfigApp.csproj -c Release
@@ -94,8 +94,81 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SherpaOnnxConfig
-        path: ConfigApp/bin/Release/net6.0-windows/
+        path: ConfigApp/bin/Release/net8.0-windows/
         retention-days: 30
+
+  build-msi:
+    name: Build MSI Installer
+    runs-on: windows-2022
+    needs: build-native
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Native DLL artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: NativeTTSWrapper-x64
+        path: NativeTTSWrapper/x64/Release/
+
+    - name: Download SherpaOnnxConfig artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: SherpaOnnxConfig
+        path: ConfigApp/bin/Release/net8.0-windows/
+
+    - name: Download Console Installer artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: SherpaOnnxSAPIInstaller
+        path: Installer/bin/Release/net8.0/
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
+
+    - name: Build ConfigApp for release
+      run: |
+        Write-Host "Building ConfigApp for release..." -ForegroundColor Yellow
+        dotnet build ConfigApp/ConfigApp.csproj -c Release
+
+    - name: Build Console Installer for release
+      run: |
+        Write-Host "Building Console Installer for release..." -ForegroundColor Yellow
+        dotnet build Installer/Installer.csproj -c Release
+
+    - name: Download WiX Toolset
+      run: |
+        Write-Host "Downloading WiX Toolset v3.14..." -ForegroundColor Yellow
+        $url = "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip"
+        Invoke-WebRequest -Uri $url -OutFile wix314-binaries.zip -UseBasicParsing
+        Expand-Archive -Path wix314-binaries.zip -DestinationPath wix-tools -Force
+        Write-Host "✅ WiX Toolset extracted" -ForegroundColor Green
+
+    - name: Build MSI with WiX
+      run: |
+        Write-Host "Building MSI installer..." -ForegroundColor Yellow
+
+        # Compile WiX source
+        .\wix-tools\candle.exe Installer/Product.wxs -out Installer/Product.wixobj -ext WixUIExtension.dll -ext WixUtilExtension.dll
+
+        # Link to create MSI
+        .\wix-tools\light.exe Installer/Product.wixobj -out SherpaOnnxSAPI.msi -ext WixUIExtension.dll -ext WixUtilExtension.dll -sval
+
+        Write-Host "✅ MSI built successfully" -ForegroundColor Green
+
+        # Show file size
+        $msiSize = (Get-Item SherpaOnnxSAPI.msi).Length / 1MB
+        Write-Host "MSI Size: $([math]::Round($msiSize, 2)) MB" -ForegroundColor Cyan
+
+    - name: Upload MSI artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SherpaOnnxSAPI-MSI
+        path: SherpaOnnxSAPI.msi
+        retention-days: 90
 
   test:
     name: Test SAPI5 Integration
@@ -141,7 +214,7 @@ jobs:
   release:
     name: Create Release
     runs-on: windows-2022
-    needs: [build-native, build-installer, build-config-app, test]
+    needs: [build-native, build-installer, build-config-app, build-msi, test]
     if: startsWith(github.ref, 'refs/tags/v')
 
     permissions:
@@ -218,6 +291,13 @@ jobs:
           const notes = `## SherpaOnnx SAPI5 TTS Engine v${version}
 
           ### Installation
+
+          **Option 1: MSI Installer (Recommended)**
+          1. Download \`SherpaOnnxSAPI.msi\`
+          2. Run the installer - it will register the SAPI5 voice and install the configuration app
+          3. Use the "SherpaOnnx Voice Config" desktop shortcut to download and configure voices
+
+          **Option 2: Manual ZIP Installation**
           1. Download \`SherpaOnnxSAPI-${{ github.ref_name }}.zip\`
           2. Extract to a folder (e.g., \`C:\\Program Files\\OpenAssistive\\OpenSpeech\`)
           3. Run \`install.ps1\` as Administrator
@@ -253,7 +333,9 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        files: SherpaOnnxSAPI-${{ github.ref_name }}.zip
+        files: |
+          SherpaOnnxSAPI-${{ github.ref_name }}.zip
+          artifacts/SherpaOnnxSAPI-MSI/SherpaOnnxSAPI.msi
         body: ${{ steps.release_notes.outputs.notes }}
         draft: false
         prerelease: false
