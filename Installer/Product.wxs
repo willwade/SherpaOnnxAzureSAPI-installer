@@ -26,6 +26,9 @@
       <Directory Id="ProgramMenuFolder">
         <Directory Id="ApplicationProgramsFolder" Name="SherpaOnnx SAPI"/>
       </Directory>
+
+      <!-- Desktop Folder -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
 
     <!-- Files and Components -->
@@ -33,21 +36,32 @@
       <!-- Native DLL -->
       <Component Id="NativeDll" Guid="B2C4D6E8-1A2B-3C4D-5E6F-7A8B9C0D1E2F">
         <File Id="NativeTTSWrapperDll" Source="NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" KeyPath="yes" Checksum="yes"/>
-        <!-- Register DLL as COM server -->
-        <Class Id="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" Context="InprocServer32" ThreadingModel="both">
-          <ProgId Id="SherpaOnnx.TTSEngine.1" Description="SherpaOnnx TTS Engine">
-            <ProgId Id="SherpaOnnx.TTSEngine" Description="SherpaOnnx TTS Engine" />
-          </ProgId>
-        </Class>
-        <RegistryValue Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}\InprocServer32" Type="string" Value="[OPENASSISTIVEFOLDER]NativeTTSWrapper.dll" />
-        <RegistryValue Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}\InprocServer32" Name="ThreadingModel" Type="string" Value="Both" />
-      </Component>
-
-      <!-- SherpaOnnx Libraries -->
-      <Component Id="SherpaOnnxLibs" Guid="C3D5E7F9-2B3C-4D5E-6F7A-8B9C0D1E2F3A">
-        <File Id="SherpaOnnxCoreDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\sherpa-onnx-core.dll" />
-        <File Id="SherpaOnnxCApiDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\sherpa-onnx-c-api.dll" />
-        <File Id="OnnxRuntimeDll" Source="NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\bin\onnxruntime.dll" />
+        <!-- Register DLL as COM server via Registry -->
+        <RegistryKey Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}">
+          <RegistryValue Type="string" Value="SherpaOnnx TTS Engine" />
+          <RegistryKey Key="InprocServer32" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+            <RegistryValue Type="string" Value="[#NativeTTSWrapperDll]" />
+            <RegistryValue Name="ThreadingModel" Type="string" Value="Both" />
+          </RegistryKey>
+          <RegistryKey Key="ProgId" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+            <RegistryValue Type="string" Value="SherpaOnnx.TTSEngine" />
+            <RegistryKey Key="CLSID" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+              <RegistryValue Type="string" Value="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SherpaOnnx.TTSEngine" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Value="SherpaOnnx TTS Engine" />
+          <RegistryKey Key="CLSID" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+            <RegistryValue Type="string" Value="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" />
+          </RegistryKey>
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SherpaOnnx.TTSEngine.1" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Value="SherpaOnnx TTS Engine" />
+          <RegistryKey Key="CurVer" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+            <RegistryValue Type="string" Value="SherpaOnnx.TTSEngine" />
+          </RegistryKey>
+        </RegistryKey>
       </Component>
 
       <!-- Configuration File -->
@@ -57,14 +71,14 @@
 
       <!-- Installer Executable (Console) -->
       <Component Id="InstallerExe" Guid="E5F7A9B1-4D5E-6F7A-8B9C-0D1E2F3A4B5C">
-        <File Id="InstallerExeFile" Source="bin\Release\net6.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes" />
+        <File Id="InstallerExeFile" Source="Installer\bin\Release\net8.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes" />
       </Component>
 
       <!-- ConfigApp GUI -->
       <Component Id="ConfigAppExe" Guid="A6B8C0D2-6E7F-7A8B-9C0D-1E2F3A4B5C6E">
         <File Id="ConfigAppExeFile" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe" KeyPath="yes">
-          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx Voice Config" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
-          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx Voice Config" Icon="InstallerIcon.ico" IconIndex="0" Advertise="yes" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx Voice Config" Advertise="yes" />
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx Voice Config" Advertise="yes" />
         </File>
       </Component>
 
@@ -81,7 +95,7 @@
       <Component Id="SAPI5VoiceRegistry" Guid="F6A8B0C2-5E6F-7A8B-9C0D-1E2F3A4B5C6D">
         <!-- Voice Token Registry Keys -->
         <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
-          <RegistryValue Name="" Type="string" Value="Test Sherpa Voice" />
+          <RegistryValue Type="string" Value="Test Sherpa Voice" />
           <RegistryValue Name="CLSID" Type="string" Value="{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}" />
           <RegistryValue Name="Language" Type="string" Value="409" />
           <RegistryValue Name="Gender" Type="string" Value="Female" />
