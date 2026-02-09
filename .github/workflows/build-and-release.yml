@@ -190,6 +190,15 @@ jobs:
     - name: Copy config file
       run: Copy-Item NativeTTSWrapper\engines_config.json NativeTTSWrapper\x64\Release\
 
+    - name: Create SAPI5 voice registry keys for testing
+      shell: pwsh
+      run: |
+        # Create SAPI5 voice token registry keys (normally done by MSI installer)
+        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /f
+        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /v "Test Sherpa Voice" /f
+        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /t REG_SZ /d "Test SherpaVoice" /f
+        reg add "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\Attributes" /f
+
     - name: Run test suite
       shell: pwsh
       run: |
@@ -198,7 +207,16 @@ jobs:
         $voice.SelectVoice("TestSherpaVoice")
         $voice.Speak("GitHub Actions test")
 
+    - name: Cleanup SAPI5 registry keys
+      if: always()
+      shell: pwsh
+      run: |
+        reg delete "HKLM:\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice" /f
+
     - name: Unregister DLL
+      if: always()
+      shell: pwsh
+      run: regsvr32 /u "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
       if: always()
       shell: pwsh
       run: regsvr32 /u "${{ github.workspace }}\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
