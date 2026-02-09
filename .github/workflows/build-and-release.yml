@@ -29,6 +29,21 @@ jobs:
       run: |
         msbuild NativeTTSWrapper\NativeTTSWrapper.sln /t:Build /p:Configuration=Release /p:Platform=x64 /v:minimal
 
+    - name: Verify DLL was built
+      run: |
+        Write-Host "Verifying NativeTTSWrapper.dll..." -ForegroundColor Yellow
+        $dllPath = "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+        if (Test-Path $dllPath) {
+          $dllSize = (Get-Item $dllPath).Length / 1MB
+          Write-Host "✓ NativeTTSWrapper.dll built: $([math]::Round($dllSize, 2)) MB" -ForegroundColor Green
+          Write-Host "  Path: $((Get-Item $dllPath).FullName)" -ForegroundColor Cyan
+        } else {
+          Write-Host "✗ NativeTTSWrapper.dll NOT FOUND!" -ForegroundColor Red
+          Write-Host "Files in build output:" -ForegroundColor Yellow
+          Get-ChildItem -Path "NativeTTSWrapper\x64\Release\" -ErrorAction SilentlyContinue | Format-Table Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}}
+          exit 1
+        }
+
     - name: Upload DLL artifact
       uses: actions/upload-artifact@v4
       with:
