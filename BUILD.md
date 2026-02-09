@@ -1,6 +1,23 @@
 # SherpaOnnx SAPI5 TTS Engine - Build Instructions
 
-Complete guide to build the NativeTTSWrapper DLL with SherpaOnnx integration for SAPI5.
+Complete guide to build the SherpaOnnx SAPI5 TTS Engine.
+
+## Quick Start
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/willwade/SherpaOnnxAzureSAPI-installer.git
+cd SherpaOnnxAzureSAPI-installer
+
+# 2. Download dependencies (runs automatically in CI, run locally for dev)
+pwsh -File scripts\Download-SherpaOnnx.ps1
+
+# 3. Build the native DLL
+msbuild NativeTTSWrapper\NativeTTSWrapper.sln /p:Configuration=Release /p:Platform=x64
+
+# 4. Register the DLL (requires Administrator)
+regsvr32 "NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+```
 
 ## Prerequisites
 
@@ -9,74 +26,69 @@ Complete guide to build the NativeTTSWrapper DLL with SherpaOnnx integration for
 1. **Visual Studio 2019/2022** (Community Edition works)
    - C++ Desktop Development workload
    - Windows SDK (10.0 or later)
-   - MSVC v143 or later (v145 used in this project)
+   - Platform Toolset: v143 or later
 
-2. **Git**
-   - For cloning repositories
+2. **Git for Windows**
+   - Required for `bash` tar extraction (included with Git)
+   - Download: https://git-scm.com/download/win
 
-3. **7-Zip** (optional but recommended)
-   - For extracting downloaded archives
+3. **.NET 8 SDK** (for ConfigApp and Installer)
+   - Download: https://dotnet.microsoft.com/download/dotnet/8.0
 
-### Project Dependencies
+### Optional Software
 
-All dependencies are included in the repository:
-- SherpaOnnx v1.12.10 Windows binaries (pre-compiled)
-- Azure Speech SDK C++ libraries
-- spdlog (logging library)
-- nlohmann/json (JSON parsing, included as header-only)
+- **7-Zip** - Faster extraction (script will auto-detect)
+  - Download: https://www.7-zip.org/
 
-## Quick Start (Pre-built)
+## Automated Dependency Download
 
-If you have the pre-built binaries:
+The `scripts\Download-SherpaOnnx.ps1` script handles everything:
 
-1. Register the DLL:
-   ```powershell
-   regsvr32 "C:\path\to\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
-   ```
+| Feature | Description |
+|---------|-------------|
+| **Download** | Fetches SherpaOnnx v1.12.10 from GitHub release |
+| **Extract** | Auto-detects 7-Zip, bash+tar, or PowerShell tar |
+| **Verify** | Checks all required libraries are present |
+| **Cross-platform** | Works in GitHub Actions CI and local development |
 
-2. Test the voice:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File test_sapi5_extended.ps1
-   ```
-
-## Building from Source
-
-### Step 1: Clone Repository
-
-```bash
-git clone https://github.com/yourusername/SherpaOnnxAzureSAPI-installer.git
-cd SherpaOnnxAzureSAPI-installer
-```
-
-### Step 2: Download SherpaOnnx Model
-
-Download the vits-piper-en_US-amy-low model:
-
+**Run the script:**
 ```powershell
-# Create model directory
-New-Item -ItemType Directory -Force -Path "models\amy\vits-piper-en_US-amy-low"
-
-# Download model (63 MB)
-Invoke-WebRequest -Uri "https://huggingface.co/csukuangfj/sherpa-onnx-apk/resolve/main/tts-engine-new/1.10.17/sherpa-onnx-1.10.17-arm64-v8a-en-tts-vits-piper-en_US-amy-medium.tar.bz2" -OutFile "models\amy\sherpa-amy-model.tar.bz2"
-
-# Extract with 7-Zip
-& "${env:ProgramFiles}\7-Zip\7z.exe" x "models\amy\sherpa-amy-model.tar.bz2" -O"models\amy" -y
+pwsh -File scripts\Download-SherpaOnnx.ps1
 ```
 
-**Or manually download from:**
-https://huggingface.co/csukuangfj/vits-piper-en_US-amy-low
+**What it downloads:**
+- SherpaOnnx v1.12.10 Windows x64 static library (~170 MB)
+- Includes all required dependencies: cppinyin_core.lib, onnxruntime.lib, etc.
 
-### Step 3: Download SherpaOnnx Windows Libraries
+**If the script fails:**
+```
+ERROR: Extraction failed. No sherpa-onnx directory found.
 
+Please install one of the following:
+  1. 7-Zip: https://www.7-zip.org/
+  2. Git for Windows (includes bash): https://git-scm.com/download/win
+```
+
+## Manual Build Steps
+
+### 1. Download SherpaOnnx Library
+
+**Option A: Use the script (recommended)**
 ```powershell
-# Download sherpa-onnx-v1.12.10-win-x64-static
-Invoke-WebRequest -Uri "https://huggingface.co/csukuangfj/sherpa-onnx-libs/resolve/main/win64/1.12.10/sherpa-onnx-v1.12.10-win-x64-static.tar.bz2" -OutFile "NativeTTSWrapper\libs-win\sherpa-onnx-win-x64-static.tar.bz2"
-
-# Extract
-& "${env:ProgramFiles}\7-Zip\7z.exe" x "NativeTTSWrapper\libs-win\sherpa-onnx-win-x64-static.tar.bz2" -O"NativeTTSWrapper\libs-win" -y
+pwsh -File scripts\Download-SherpaOnnx.ps1
 ```
 
-Expected structure after extraction:
+**Option B: Manual download**
+```powershell
+# Download from our GitHub release
+Invoke-WebRequest -Uri "https://github.com/willwade/SherpaOnnxAzureSAPI-installer/releases/download/v1.0.0-deps/sherpa-onnx-win-x64-static.tar.bz2" -OutFile "NativeTTSWrapper\libs-win\archive.tar.bz2"
+
+# Extract (requires 7-Zip or Git Bash)
+cd NativeTTSWrapper\libs-win
+tar -xf archive.tar.bz2
+```
+
+Expected structure:
 ```
 NativeTTSWrapper/libs-win/sherpa-onnx-v1.12.10-win-x64-static/
 ├── include/
@@ -84,193 +96,162 @@ NativeTTSWrapper/libs-win/sherpa-onnx-v1.12.10-win-x64-static/
 │       └── c-api/
 │           └── c-api.h
 └── lib/
+    ├── cppinyin_core.lib
     ├── sherpa-onnx-c-api.lib
     ├── sherpa-onnx-core.lib
     ├── onnxruntime.lib
     └── ... (other dependencies)
 ```
 
-### Step 4: Configure Project
-
-The project is configured to use **MT (static runtime)** to match SherpaOnnx libraries.
-
-**Important:** Do not change these settings:
-- Configuration Type: DynamicLibrary
-- Runtime Library: MultiThreaded (MT)
-- Use of ATL: Static
-- Platform Toolset: v143 or later
-
-### Step 5: Build Solution
+### 2. Build Native DLL
 
 **Using Visual Studio:**
 1. Open `NativeTTSWrapper\NativeTTSWrapper.sln`
-2. Select Release | x64 configuration
+2. Select **Release | x64** configuration
 3. Build → Build Solution (F7)
 
 **Using MSBuild command line:**
 ```bash
-cd NativeTTSWrapper
-msbuild NativeTTSWrapper.sln /t:Build /p:Configuration=Release /p:Platform=x64
+msbuild NativeTTSWrapper\NativeTTSWrapper.sln /t:Build /p:Configuration=Release /p:Platform=x64
 ```
 
-Expected output:
-- DLL: `x64\Release\NativeTTSWrapper.dll`
-- LIB: `x64\Release\NativeTTSWrapper.lib`
-- EXP: `x64\Release\NativeTTSWrapper.exp`
+Output:
+- `NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll` (~15 MB)
 
-### Step 6: Register DLL
+### 3. Register DLL (Administrator required)
 
-**Administrator privileges required:**
 ```powershell
-# Unregister old version (if exists)
-regsvr32 /u "x64\Release\NativeTTSWrapper.dll"
+# Navigate to build output
+cd NativeTTSWrapper\x64\Release
 
-# Register new version
-regsvr32 "x64\Release\NativeTTSWrapper.dll"
+# Register the DLL
+regsvr32 NativeTTSWrapper.dll
+
+# Or with elevation
+Start-Process regsvr32 -ArgumentList 'NativeTTSWrapper.dll' -Verb RunAs -Wait
 ```
 
-**Or with elevation:**
-```powershell
-Start-Process regsvr32 -ArgumentList '"x64\Release\NativeTTSWrapper.dll"' -Verb RunAs -Wait
-```
-
-### Step 7: Verify Installation
+### 4. Verify Installation
 
 ```powershell
-# Check voice is registered
+# Check if voice is registered
 Add-Type -AssemblyName System.Speech
 $synthesizer = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$synthesizer.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Description -like "*Sherpa*" }
+$synthesizer.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Name -like "*Sherpa*" }
 ```
 
 Expected output:
 ```
-Name     : Test Sherpa Voice
-Culture   : en-US
-Gender    : Female
-Age       : Adult
-Description : Test Sherpa Voice
+Name     : SherpaOnnx TTS Voice
+Culture  : en-US
+Gender   : Female
+Age      : Adult
+```
+
+### 5. Test the Voice
+
+```powershell
+# Test with PowerShell
+$synthesizer = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$synthesizer.SelectVoice("SherpaOnnx TTS Voice")
+$synthesizer.Speak("Hello, this is a test of the SherpaOnnx text to speech engine.")
+```
+
+Or use the test script:
+```powershell
+powershell -ExecutionPolicy Bypass -File test_sapi5_extended.ps1
+```
+
+## Building the Installer
+
+### Build ConfigApp (GUI)
+```powershell
+dotnet build ConfigApp\ConfigApp.csproj -c Release
+```
+
+### Build Console Installer
+```powershell
+dotnet build Installer\Installer.csproj -c Release
+```
+
+### Build MSI Installer (requires WiX)
+```powershell
+# Download WiX Toolset v3.14
+Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile wix314-binaries.zip
+Expand-Archive -Path wix314-binaries.zip -DestinationPath wix-tools -Force
+
+# Build MSI
+.\wix-tools\candle.exe Installer\Product.wxs -out Installer/Product.wixobj
+.\wix-tools\light.exe Installer/Product.wixobj -out SherpaOnnxSAPI.msi
 ```
 
 ## Troubleshooting
 
 ### Build Errors
 
-**"Runtime Library mismatch"**
-- Solution: Ensure project uses MT (static runtime), not MD
-- Location: Project Properties → C/C++ → Code Generation → Runtime Library
-
-**"Cannot open sherpa-onnx-c-api.h"**
-- Solution: Run download_sherpa.ps1 to get Windows binaries
+**"Cannot open sherpa-onnx/c-api/c-api.h"**
+- Run: `pwsh -File scripts\Download-SherpaOnnx.ps1`
 - Verify: `NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static\include\sherpa-onnx\c-api\c-api.h` exists
+
+**"error MSB8020: The build tools for v145 cannot be found"**
+- The project now uses v143 (Visual Studio 2022)
+- Update Visual Studio or use the v143 toolset
+
+**"fatal error LNK1181: cannot open input file 'cppinyin_core.lib'"**
+- Run: `pwsh -File scripts\Download-SherpaOnnx.ps1`
+- Verify the script completed successfully
 
 ### Registration Errors
 
 **"Class not registered" (0x80040154)**
-- Solution: Run regsvr32 with Administrator privileges
+- Run regsvr32 with Administrator privileges
 - Use full path to DLL
 
 **"DllRegisterServer entry point not found"**
-- Solution: Ensure Release build (not Debug)
-- Check DLL exports: `dumpbin /EXPORTS NativeTTSWrapper.dll`
+- Ensure Release build (not Debug)
+- Verify DLL exports: `dumpbin /EXPORTS NativeTTSWrapper.dll`
 
 ### Runtime Errors
 
 **"Model file not found"**
-- Solution: Update `engines_config.json` with correct model paths
-- Check model files exist at specified locations
+- Download and configure a voice model using the ConfigApp
+- Or manually update `engines_config.json`
 
 **"Failed to load configuration"**
-- Solution: Ensure `engines_config.json` is in same directory as DLL
-- Check JSON syntax is valid
-
-### Voice Sounds Too Fast/Slow ("Minnie Mouse" effect)
-
-The voice speed can be adjusted in `engines_config.json`:
-
-```json
-{
-  "config": {
-    "lengthScale": 1.0,    // Default speed (1.0 = normal)
-    "noiseScale": 0.667,    // Pitch variation
-    "noiseScaleW": 0.8      // Pitch stability
-  }
-}
-```
-
-- **lengthScale > 1.0**: Slower speech
-- **lengthScale < 1.0**: Faster speech
-- Recommended range: 0.8 to 1.2
-
-## Advanced: Building SherpaOnnx from Source
-
-If you need to build SherpaOnnx with MSVC (for MD runtime compatibility), see [SHERPAONNX_BUILD.md](SHERPAONNX_BUILD.md).
+- Ensure `engines_config.json` is in the same directory as the DLL
 
 ## Project Structure
 
 ```
 SherpaOnnxAzureSAPI-installer/
-├── NativeTTSWrapper/           # Main C++ project
-│   ├── *.cpp, *.h              # Source files
-│   ├── azure-speech-sdk/        # Azure Speech SDK
-│   ├── libs-win/                # SherpaOnnx Windows binaries
-│   ├── x64/Release/             # Built DLL
-│   └── engines_config.json     # Engine configuration
-├── models/                      # Downloaded TTS models
-│   └── amy/                     # vits-piper-en_US-amy-low
-├── test_sapi5_extended.ps1     # Test script
-└── docs/                       # Documentation (this file)
+├── scripts/
+│   └── Download-SherpaOnnx.ps1    # Dependency downloader
+├── NativeTTSWrapper/               # Native C++ DLL project
+│   ├── *.cpp, *.h                  # Source files
+│   ├── libs-win/                   # SherpaOnnx libraries (downloaded by script)
+│   ├── deps/                       # Header-only dependencies
+│   │   ├── nlohmann/json.hpp       # JSON library
+│   │   └── spdlog/                 # Logging library
+│   └── x64/Release/                # Built DLL
+├── ConfigApp/                      # WinForms GUI for voice installation
+├── Installer/                      # Console installer
+├── Installer/Product.wxs           # WiX installer configuration
+└── test_sapi5_extended.ps1        # Test script
 ```
 
-## Configuration
+## CI/CD
 
-### engines_config.json
+The GitHub Actions workflow (`.github/workflows/build-and-release.yml`) automatically:
 
-Located in same directory as DLL. Contains engine definitions:
-
-```json
-{
-  "engines": {
-    "sherpa-amy": {
-      "type": "sherpaonnx",
-      "config": {
-        "modelPath": "C:/path/to/model.onnx",
-        "tokensPath": "C:/path/to/tokens.txt",
-        "dataDir": "C:/path/to/espeak-ng-data",
-        "noiseScale": 0.667,
-        "noiseScaleW": 0.8,
-        "lengthScale": 1.0,
-        "numThreads": 1
-      }
-    }
-  },
-  "voices": {
-    "amy": "sherpa-amy"
-  }
-}
-```
-
-### Registry Entries
-
-Voice registration under:
-```
-HKLM\SOFTWARE\Microsoft\Speech\Voices\Tokens\TestSherpaVoice\
-```
-
-CLSID: `{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}`
-
-## Next Steps
-
-After building and installing:
-
-1. Test with various text samples
-2. Adjust voice parameters for natural speech
-3. Download additional voices (see [MODELS.md](MODELS.md))
-4. Create installer for distribution
+1. Downloads SherpaOnnx dependencies using `scripts\Download-SherpaOnnx.ps1`
+2. Builds NativeTTSWrapper.dll
+3. Builds ConfigApp and Console Installer
+4. Builds MSI installer
+5. Runs SAPI5 integration tests
+6. Creates GitHub releases with artifacts
 
 ## See Also
 
-- [SETUP.md](SETUP.md) - Model download and configuration
+- [SETUP.md](SETUP.md) - Voice model configuration
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
-- [MODELS.md](MODELS.md) - Available TTS models
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
