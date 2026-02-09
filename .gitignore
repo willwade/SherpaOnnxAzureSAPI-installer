@@ -147,3 +147,6 @@ SAPI5_CLSID_TRACKING.md
 # WiX Toolset (local copy)
 wix-tools/
 wix314-binaries.zip
+# WiX build intermediates
+Installer/*.wixobj
+Installer/*.wixlib
