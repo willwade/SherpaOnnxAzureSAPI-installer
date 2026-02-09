@@ -455,7 +455,7 @@ namespace Installer
             }
         }
 
-        private static async Task InstallSpecificVoice(string modelId, ModelInstaller installer, Sapi5Registrar registrar, string dllPath)
+        private static async Task InstallSpecificVoice(string modelId, ModelInstaller installer, Sapi5RegistrarExtended registrar, string dllPath)
         {
             Console.WriteLine($"Installing voice: {modelId}");
             var models = await LoadModelsAsync();
@@ -947,7 +947,7 @@ namespace Installer
             }
         }
 
-        private static async Task UninstallSpecificVoice(string modelId, Sapi5Registrar registrar)
+        private static async Task UninstallSpecificVoice(string modelId, Sapi5RegistrarExtended registrar)
         {
             try
             {

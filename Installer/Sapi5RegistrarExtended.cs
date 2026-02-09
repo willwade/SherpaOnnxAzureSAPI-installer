@@ -8,7 +8,7 @@ using Installer.Shared;
 
 namespace Installer
 {
-    public class Sapi5RegistrarExtended : Sapi5Registrar
+    public class Sapi5RegistrarExtended
     {
         private const string RegistryBasePath = @"SOFTWARE\Microsoft\SPEECH\Voices\Tokens";
 
@@ -230,6 +230,18 @@ namespace Installer
             {
                 throw new Exception($"Failed to register Azure TTS voice: {ex.Message}", ex);
             }
+        }
+
+        // Generic RegisterVoice method for TtsModel (SherpaOnnx voices)
+        public void RegisterVoice(TtsModel model, string dllPath)
+        {
+            RegisterSherpaVoice(model, dllPath);
+        }
+
+        // Generic RegisterVoice method for AzureTtsModel (Azure voices)
+        public void RegisterVoice(AzureTtsModel model, string dllPath)
+        {
+            RegisterAzureVoice(model, dllPath);
         }
 
         public void UnregisterVoice(string voiceId)
