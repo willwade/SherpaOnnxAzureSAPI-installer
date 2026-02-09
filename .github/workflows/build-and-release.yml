@@ -25,20 +25,37 @@ jobs:
         # Create directory
         New-Item -ItemType Directory -Force -Path "NativeTTSWrapper\libs-win"
 
-        # Download using SourceForge mirror
-        $url = "https://sourceforge.net/projects/sherpa-onnx.mirror/files/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2/download"
+        # Try GitHub releases first (direct download URL)
+        $urls = @(
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.20/sherpa-onnx-v1.12.20-win-x64-static.tar.bz2",
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.23/sherpa-onnx-v1.12.23-win-x64-static.tar.bz2"
+        )
+
         $output = "NativeTTSWrapper\libs-win\archive.tar.bz2"
+        $downloaded = $false
 
-        Write-Host "Downloading from: $url" -ForegroundColor Gray
-        Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing -MaximumRedirection 10
+        foreach ($url in $urls) {
+            Write-Host "Trying: $url" -ForegroundColor Gray
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing -MaximumRedirection 10
+                $size = (Get-Item $output).Length
+                Write-Host "Downloaded size: $size bytes" -ForegroundColor Cyan
 
-        # Verify download
-        $size = (Get-Item $output).Length
-        Write-Host "Downloaded size: $size bytes" -ForegroundColor Cyan
+                if ($size -gt 50000000) {
+                    $downloaded = $true
+                    Write-Host "Download successful!" -ForegroundColor Green
+                    break
+                } else {
+                    Write-Host "Download too small, trying next URL..." -ForegroundColor Yellow
+                    Remove-Item $output -Force
+                }
+            } catch {
+                Write-Host "Failed: $_" -ForegroundColor Yellow
+            }
+        }
 
-        if ($size -lt 1000000) {
-            Write-Host "ERROR: Download too small, might be HTML error page" -ForegroundColor Red
-            Get-Content $output | Select-Object -First 5
+        if (-not $downloaded) {
+            Write-Host "ERROR: All download attempts failed" -ForegroundColor Red
             exit 1
         }
 
@@ -50,11 +67,11 @@ jobs:
         Write-Host "Extracted contents:" -ForegroundColor Cyan
         Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Directory | Format-Table -AutoSize
 
-        # Rename if needed
-        if (Test-Path "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static") {
-            Write-Host "Renaming directory..." -ForegroundColor Gray
-            Move-Item "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.20-win-x64-static" `
-                      "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static" -Force
+        # Find and rename the extracted directory
+        $extractedDir = Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Directory | Where-Object { $_.Name -match "sherpa-onnx-v\d+\.\d+.\d+-win-x64-static" } | Select-Object -First 1
+        if ($extractedDir) {
+            Write-Host "Renaming directory: $($extractedDir.Name) -> sherpa-onnx-v1.12.10-win-x64-static" -ForegroundColor Gray
+            Move-Item $extractedDir.FullName "NativeTTSWrapper\libs-win\sherpa-onnx-v1.12.10-win-x64-static" -Force
         }
 
         # Verify the include path exists
@@ -63,7 +80,7 @@ jobs:
             Write-Host "SUCCESS: c-api.h found at $includePath" -ForegroundColor Green
         } else {
             Write-Host "ERROR: c-api.h not found!" -ForegroundColor Red
-            Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Recurse -Filter "*.h" | Select-Object -First 10 | Format-Table
+            Get-ChildItem -Path "NativeTTSWrapper\libs-win" -Recurse -Filter "c-api.h" | Format-Table
             exit 1
         }
 
