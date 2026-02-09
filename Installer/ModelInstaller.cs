@@ -13,15 +13,15 @@ public class ModelInstaller
 
     public ModelInstaller()
     {
-        // Use Program Files for all users
+        // Use user-writable location for models
         modelsDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "OpenSpeech",
             "models"
         );
-        
+
         tempDirectory = Path.Combine(Path.GetTempPath(), "OpenSpeech");
-        
+
         // Ensure directories exist with proper permissions
         Directory.CreateDirectory(modelsDirectory);
         Directory.CreateDirectory(tempDirectory);

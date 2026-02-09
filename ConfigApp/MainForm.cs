@@ -27,7 +27,11 @@ namespace SherpaOnnxConfig
 
         private SherpaModelsCatalog? sherpaCatalog = null;
         private const string SapiTokensPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
-        private const string ModelsDir = @"C:\Program Files\OpenSpeech\models";
+        private static readonly string ModelsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenSpeech",
+            "models"
+        );
 
         public MainForm()
         {
