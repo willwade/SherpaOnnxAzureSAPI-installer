@@ -164,6 +164,18 @@ Test-Step "Step 5: Build MSI Installer" {
         }
     }
 
+    Write-Host "  Checking file paths from Installer directory..." -ForegroundColor Yellow
+    Push-Location Installer
+    $dllPath = "..\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+    $configPath = "..\NativeTTSWrapper\engines_config.json"
+    $configExePath = "..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe"
+
+    Write-Host "    $dllPath" -ForegroundColor Gray
+    Write-Host "      Exists: $(Test-Path $dllPath)" -ForegroundColor $(if (Test-Path $dllPath) { "Green" } else { "Red" })
+    Write-Host "    $configPath" -ForegroundColor Gray
+    Write-Host "      Exists: $(Test-Path $configPath)" -ForegroundColor $(if (Test-Path $configPath) { "Green" } else { "Red" })
+    Pop-Location
+
     Write-Host "  Running WiX candle.exe..." -ForegroundColor Gray
     & $wixCandle "Installer\Product.wxs" -out "Installer\Product.wixobj" -ext WixUIExtension.dll -ext WixUtilExtension.dll
     if ($LASTEXITCODE -ne 0) { throw "WiX candle failed with exit code $LASTEXITCODE" }
@@ -180,6 +192,44 @@ Test-Step "Step 5: Build MSI Installer" {
 
     $msiSize = (Get-Item $msiPath).Length / 1MB
     Write-Host "  MSI Size: $([math]::Round($msiSize, 2)) MB" -ForegroundColor Cyan
+
+    # List MSI contents
+    Write-Host "  MSI Contents:" -ForegroundColor Cyan
+    try {
+        $msi = New-Object -ComObject WindowsInstaller.Installer
+        $db = $msi.OpenDatabase($msiPath, 0)
+        $view = $db.OpenView("SELECT FileName, FileSize FROM File")
+        $view.Execute()
+        $file = $view.Fetch()
+        $files = @()
+        $totalSize = 0
+        while ($file -ne $null) {
+            $fileName = $file.StringData(1)
+            $fileSize = $file.IntegerData(2)
+            $files += @{ Name = $fileName; Size = $fileSize }
+            $totalSize += $fileSize
+            $file = $view.Fetch()
+        }
+        Write-Host "    Files: $($files.Count)" -ForegroundColor Yellow
+        Write-Host "    Total: $([math]::Round($totalSize/1MB, 2)) MB uncompressed" -ForegroundColor Yellow
+        foreach ($f in $files) {
+            $sizeStr = if ($f.Size -gt 0) { "($([math]::Round($f.Size/1KB, 0)) KB)" } else { "" }
+            Write-Host "      - $($f.Name) $sizeStr" -ForegroundColor Gray
+        }
+        $view.Close()
+        $db.Close()
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($msi) | Out-Null
+
+        # Check for NativeTTSWrapper.dll
+        if ($files | Where-Object { $_.Name -eq "NativeTTSWrapper.dll" }) {
+            Write-Host "    ✓ NativeTTSWrapper.dll is in MSI" -ForegroundColor Green
+        } else {
+            Write-Host "    ✗ NativeTTSWrapper.dll is NOT in MSI!" -ForegroundColor Red
+        }
+    }
+    catch {
+        Write-Host "    Cannot list contents (WindowsInstaller COM error)" -ForegroundColor Yellow
+    }
 
     # Warn if MSI is suspiciously small
     if ($msiSize -lt 10) {
