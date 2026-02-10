@@ -164,33 +164,92 @@ jobs:
         if (Test-Path $dllPath) {
           $dllSize = (Get-Item $dllPath).Length / 1MB
           Write-Host "✓ Found NativeTTSWrapper.dll ($([math]::Round($dllSize, 2)) MB)" -ForegroundColor Green
+          Write-Host "  Full path: $((Get-Item $dllPath).FullName)" -ForegroundColor Cyan
         } else {
           Write-Host "✗ NativeTTSWrapper.dll NOT FOUND!" -ForegroundColor Red
-          Write-Host "Looking in: $((Get-Location).Path)\$dllPath" -ForegroundColor Red
-          Write-Host "Files in NativeTTSWrapper\x64\Release\:" -ForegroundColor Yellow
-          Get-ChildItem -Path "NativeTTSWrapper\x64\Release\" -Recurse | Select-Object Name, Length | Format-Table -AutoSize
+          Write-Host "  Working directory: $((Get-Location).Path)" -ForegroundColor Yellow
+          Write-Host "  Looking for: $dllPath" -ForegroundColor Yellow
+          Write-Host "  Files in directory:" -ForegroundColor Yellow
+          Get-ChildItem -Path "NativeTTSWrapper\x64\Release\" -ErrorAction SilentlyContinue | Select-Object Name, @{Name="Size(MB)";Expression={[math]::Round($_.Length/1MB,2)}} | Format-Table -AutoSize
           exit 1
         }
+        Write-Host ""
+        Write-Host "Checking paths from Installer directory perspective..." -ForegroundColor Yellow
+        Push-Location Installer
+        $relativePath = "..\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll"
+        if (Test-Path $relativePath) {
+          Write-Host "✓ Found via relative path: $relativePath" -ForegroundColor Green
+        } else {
+          Write-Host "✗ NOT found via relative path: $relativePath" -ForegroundColor Red
+        }
+        Pop-Location
 
     - name: Build MSI with WiX
       run: |
         Write-Host "Building MSI installer..." -ForegroundColor Yellow
+        Write-Host "  Working directory: $((Get-Location).Path)" -ForegroundColor Cyan
+
+        # List files WiX will try to include
+        Write-Host "`nFiles WiX will try to include:" -ForegroundColor Cyan
+        Write-Host "  From Installer/Product.wxs perspective:" -ForegroundColor Gray
+        Push-Location Installer
+        Write-Host "    ..\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" -ForegroundColor Gray
+        if (Test-Path "..\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll") {
+          Write-Host "      EXISTS" -ForegroundColor Green
+        } else {
+          Write-Host "      NOT FOUND!" -ForegroundColor Red
+        }
+        Write-Host "    ..\NativeTTSWrapper\engines_config.json" -ForegroundColor Gray
+        if (Test-Path "..\NativeTTSWrapper\engines_config.json") {
+          Write-Host "      EXISTS" -ForegroundColor Green
+        } else {
+          Write-Host "      NOT FOUND!" -ForegroundColor Red
+        }
+        Write-Host "    ..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe" -ForegroundColor Gray
+        if (Test-Path "..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe") {
+          Write-Host "      EXISTS" -ForegroundColor Green
+        } else {
+          Write-Host "      NOT FOUND!" -ForegroundColor Red
+        }
+        Pop-Location
 
         # Compile WiX source with verbose output
-        .\wix-tools\candle.exe Installer/Product.wxs -out Installer/Product.wixobj -ext WixUIExtension.dll -ext WixUtilExtension.dll -v
+        Write-Host "`nCompiling WiX source..." -ForegroundColor Yellow
+        .\wix-tools\candle.exe Installer\Product.wxs -out Installer\Product.wixobj -ext WixUIExtension.dll -ext WixUtilExtension.dll -v
 
         # Link to create MSI with verbose output
-        .\wix-tools\light.exe Installer/Product.wixobj -out SherpaOnnxSAPI.msi -ext WixUIExtension.dll -ext WixUtilExtension.dll -sval -v
+        Write-Host "`nLinking MSI..." -ForegroundColor Yellow
+        .\wix-tools\light.exe Installer\Product.wixobj -out SherpaOnnxSAPI.msi -ext WixUIExtension.dll -ext WixUtilExtension.dll -sval -v
 
-        Write-Host "✅ MSI built successfully" -ForegroundColor Green
+        Write-Host "`n✅ MSI built successfully" -ForegroundColor Green
 
         # Show file size
         $msiSize = (Get-Item SherpaOnnxSAPI.msi).Length / 1MB
         Write-Host "MSI Size: $([math]::Round($msiSize, 2)) MB" -ForegroundColor Cyan
 
-        # List MSI contents
+        # List MSI contents using Windows COM
         Write-Host "`nMSI Contents:" -ForegroundColor Cyan
-        .\wix-tools\burn.exe inspect SherpaOnnxSAPI.msi || Write-Host "Cannot inspect MSI with burn"
+        try {
+          $msi = New-Object -ComObject WindowsInstaller.Installer
+          $db = $msi.OpenDatabase("SherpaOnnxSAPI.msi", 0)
+          $view = $db.OpenView("SELECT FileName FROM File")
+          $view.Execute()
+          $file = $view.Fetch()
+          $files = @()
+          while ($file -ne $null) {
+            $files += $file.StringData(1)
+            $file = $view.Fetch()
+          }
+          Write-Host "  Files in MSI: $($files.Count)" -ForegroundColor Yellow
+          foreach ($f in $files) {
+            Write-Host "    - $f" -ForegroundColor Gray
+          }
+          $view.Close()
+          $db.Close()
+          [System.Runtime.Interopservices.Marshal]::ReleaseComObject($msi) | Out-Null
+        } catch {
+          Write-Host "  Cannot list contents (WindowsInstaller COM error)" -ForegroundColor Yellow
+        }
 
     - name: Upload MSI artifact
       uses: actions/upload-artifact@v4
