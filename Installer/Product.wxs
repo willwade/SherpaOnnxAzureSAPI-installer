@@ -35,7 +35,7 @@
     <ComponentGroup Id="ProductComponents" Directory="OPENASSISTIVEFOLDER">
       <!-- Native DLL -->
       <Component Id="NativeDll" Guid="B2C4D6E8-1A2B-3C4D-5E6F-7A8B9C0D1E2F">
-        <File Id="NativeTTSWrapperDll" Source="NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" KeyPath="yes" Checksum="yes"/>
+        <File Id="NativeTTSWrapperDll" Source="..\NativeTTSWrapper\x64\Release\NativeTTSWrapper.dll" KeyPath="yes" Checksum="yes"/>
         <!-- Register DLL as COM server via Registry -->
         <RegistryKey Root="HKCR" Key="CLSID\{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}">
           <RegistryValue Type="string" Value="SherpaOnnx TTS Engine" />
@@ -66,17 +66,17 @@
 
       <!-- Configuration File -->
       <Component Id="ConfigFile" Guid="D4E6F8A0-3C4D-5E6F-7A8B-9C0D1E2F3A4B">
-        <File Id="EngineConfigJson" Source="NativeTTSWrapper\engines_config.json" />
+        <File Id="EngineConfigJson" Source="..\NativeTTSWrapper\engines_config.json" />
       </Component>
 
       <!-- Installer Executable (Console) -->
       <Component Id="InstallerExe" Guid="E5F7A9B1-4D5E-6F7A-8B9C-0D1E2F3A4B5C">
-        <File Id="InstallerExeFile" Source="Installer\bin\Release\net8.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes" />
+        <File Id="InstallerExeFile" Source="..\Installer\bin\Release\net8.0\SherpaOnnxSAPIInstaller.exe" KeyPath="yes" />
       </Component>
 
       <!-- ConfigApp GUI -->
       <Component Id="ConfigAppExe" Guid="A6B8C0D2-6E7F-7A8B-9C0D-1E2F3A4B5C6E">
-        <File Id="ConfigAppExeFile" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe" KeyPath="yes">
+        <File Id="ConfigAppExeFile" Source="..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.exe" KeyPath="yes">
           <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="SherpaOnnx Voice Config" Advertise="yes" />
           <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="SherpaOnnx Voice Config" Advertise="yes" />
         </File>
@@ -84,9 +84,9 @@
 
       <!-- ConfigApp Dependencies -->
       <Component Id="ConfigAppDeps" Guid="B7C9D1E3-7F8A-8B9C-0D1E-2F3A4B5C6D7F">
-        <File Id="ConfigAppDll" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.dll" />
-        <File Id="ConfigAppRuntime" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.runtimeconfig.json" />
-        <File Id="ConfigAppDepsJson" Source="ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.deps.json" />
+        <File Id="ConfigAppDll" Source="..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.dll" />
+        <File Id="ConfigAppRuntime" Source="..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.runtimeconfig.json" />
+        <File Id="ConfigAppDepsJson" Source="..\ConfigApp\bin\Release\net8.0-windows\SherpaOnnxConfig.deps.json" />
       </Component>
     </ComponentGroup>
 
