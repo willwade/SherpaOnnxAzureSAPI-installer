@@ -27,18 +27,66 @@ namespace SherpaOnnxConfig
 
         private SherpaModelsCatalog? sherpaCatalog = null;
         private const string SapiTokensPath = @"SOFTWARE\Microsoft\Speech\Voices\Tokens";
-        private static readonly string ModelsDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OpenSpeech",
-            "models"
-        );
+        private static readonly string AppDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        private static readonly string OpenSpeechDir = Path.Combine(AppDataPath, "OpenSpeech");
+        private static readonly string ModelsDir = Path.Combine(OpenSpeechDir, "models");
 
-        private static readonly string ConfigDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OpenSpeech"
-        );
+        // Config MUST be in the same directory as the DLL so the DLL can find it
+        private static readonly string DllDir = @"C:\github\SherpaOnnxAzureSAPI-installer\NativeTTSWrapper\x64\Release";
+        private static readonly string EnginesConfigPath = Path.Combine(DllDir, "engines_config.json");
 
-        private static readonly string EnginesConfigPath = Path.Combine(ConfigDir, "engines_config.json");
+        // Helper methods for JsonElement to Dictionary conversion
+        private static Dictionary<string, object> ConvertToObjectDictionary(object obj)
+        {
+            if (obj == null) return new Dictionary<string, object>();
+
+            if (obj is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
+            {
+                var result = new Dictionary<string, object>();
+                foreach (var property in jsonElement.EnumerateObject())
+                {
+                    result[property.Name] = ConvertJsonElementToObject(property.Value);
+                }
+                return result;
+            }
+
+            if (obj is Dictionary<string, object> dict)
+                return dict;
+
+            return new Dictionary<string, object>();
+        }
+
+        private static object ConvertJsonElementToObject(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.String:
+                    return element.GetString() ?? string.Empty;
+                case JsonValueKind.Number:
+                    return element.TryGetInt64(out long l) ? l : element.GetDouble();
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    return element.GetBoolean();
+                case JsonValueKind.Object:
+                    var objDict = new Dictionary<string, object>();
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        objDict[property.Name] = ConvertJsonElementToObject(property.Value);
+                    }
+                    return objDict;
+                case JsonValueKind.Array:
+                    var list = new List<object>();
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        list.Add(ConvertJsonElementToObject(item));
+                    }
+                    return list;
+                case JsonValueKind.Null:
+                    return null!;
+                default:
+                    return element.ToString();
+            }
+        }
 
         public MainForm()
         {
@@ -1066,15 +1114,19 @@ namespace SherpaOnnxConfig
                         string displayName = GetFriendlyVoiceName(voice);
                         voiceKey.SetValue("", displayName);
 
+                        // Create Attributes subkey with all attributes including CLSID
                         using (RegistryKey attrKey = voiceKey.CreateSubKey("Attributes"))
                         {
                             string langCode = GetLanguageCode(voice.Language);
                             attrKey.SetValue("Language", langCode);
                             attrKey.SetValue("Gender", voice.Gender ?? "Female");
                             attrKey.SetValue("Age", "Adult");
-                            attrKey.SetValue("Name", displayName);  // Use friendly name instead of ID
+                            attrKey.SetValue("Name", displayName);
                             attrKey.SetValue("Vendor", "OpenAssistive");
                             attrKey.SetValue("Description", $"{voice.Name} TTS Voice");
+                            attrKey.SetValue("Version", "1.0");
+                            // CRITICAL: CLSID must be an attribute, not a subkey!
+                            attrKey.SetValue("CLSID", "{A1B2C3D4-E5F6-4A5B-8C9D-1E2F3A4B5C6D}");
                         }
                     }
                 }
@@ -1100,7 +1152,7 @@ namespace SherpaOnnxConfig
             try
             {
                 // Ensure config directory exists
-                Directory.CreateDirectory(ConfigDir);
+                Directory.CreateDirectory(OpenSpeechDir);
 
                 // Read existing config or create new one
                 Dictionary<string, object> config;
@@ -1126,30 +1178,26 @@ namespace SherpaOnnxConfig
                     };
                 }
 
-                // Get engines section
+                // Get engines section - use helper to handle JsonElement
                 var engines = config.ContainsKey("engines")
-                    ? (Dictionary<string, object>)config["engines"]
+                    ? ConvertToObjectDictionary(config["engines"])
                     : new Dictionary<string, object>();
 
                 // Get voices section
                 var voices = config.ContainsKey("voices")
-                    ? (Dictionary<string, object>)config["voices"]
+                    ? ConvertToObjectDictionary(config["voices"])
                     : new Dictionary<string, object>();
 
                 // Create engine ID for this voice
                 string engineId = $"sherpa-{voice.Id}";
 
-                // Build model paths using ModelsDir (LocalApplicationData)
+                // Build model paths using ModelsDir
                 string modelDir = Path.Combine(ModelsDir, voice.Id);
                 string modelPath = Path.Combine(modelDir, "model.onnx");
                 string tokensPath = Path.Combine(modelDir, "tokens.txt");
 
-                // For models with espeak-ng-data
-                string dataDir = "";
-                if (Directory.Exists(Path.Combine(modelDir, "espeak-ng-data")))
-                {
-                    dataDir = Path.Combine(modelDir, "espeak-ng-data");
-                }
+                // Check if this is an MMS model (only needs modelPath and tokensPath)
+                bool isMmsModel = voice.Id.StartsWith("mms_") || voice.Id.Contains("mms");
 
                 // Add/update engine configuration
                 var engineConfig = new Dictionary<string, object>
@@ -1158,19 +1206,28 @@ namespace SherpaOnnxConfig
                     ["config"] = new Dictionary<string, object>
                     {
                         ["modelPath"] = modelPath.Replace("\\", "/"),
-                        ["tokensPath"] = tokensPath.Replace("\\", "/"),
-                        ["noiseScale"] = 0.667,
-                        ["noiseScaleW"] = 0.8,
-                        ["lengthScale"] = 1.15,
-                        ["numThreads"] = 1,
-                        ["provider"] = "cpu",
-                        ["debug"] = true
+                        ["tokensPath"] = tokensPath.Replace("\\", "/")
                     }
                 };
 
-                if (!string.IsNullOrEmpty(dataDir))
+                // Only add extra parameters for non-MMS models
+                if (!isMmsModel)
                 {
-                    ((Dictionary<string, object>)engineConfig["config"])["dataDir"] = dataDir.Replace("\\", "/");
+                    var configDict = (Dictionary<string, object>)engineConfig["config"];
+                    configDict["noiseScale"] = 0.667;
+                    configDict["noiseScaleW"] = 0.8;
+                    configDict["lengthScale"] = 1.0;
+                    configDict["numThreads"] = 1;
+                    configDict["provider"] = "cpu";
+                    configDict["debug"] = true;
+
+                    // For models with espeak-ng-data
+                    string dataDir = "";
+                    if (Directory.Exists(Path.Combine(modelDir, "espeak-ng-data")))
+                    {
+                        dataDir = Path.Combine(modelDir, "espeak-ng-data");
+                        configDict["dataDir"] = dataDir.Replace("\\", "/");
+                    }
                 }
 
                 engines[engineId] = engineConfig;
@@ -1187,10 +1244,11 @@ namespace SherpaOnnxConfig
 
                 AppendOutput($"\r  ✓ Updated engines_config.json at {configPath}", Color.FromArgb(100, 255, 100));
                 AppendOutput($"\r  ✓ Engine ID: {engineId}", Color.FromArgb(100, 255, 100));
+                AppendOutput($"\r  ✓ Model path: {modelPath}", Color.FromArgb(100, 255, 100));
             }
             catch (Exception ex)
             {
-                AppendOutput($"\r  ERROR updating config: {ex.Message}", Color.FromArgb(255, 100, 100));
+                AppendOutput($"\r  ERROR updating config: {ex.Message}\r  {ex.StackTrace}", Color.FromArgb(255, 100, 100));
             }
         }
 

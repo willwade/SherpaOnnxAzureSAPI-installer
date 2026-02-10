@@ -1,0 +1,67 @@
+{
+  "engines": {
+    "azure-jenny": {
+      "type": "azure",
+      "config": {
+        "subscriptionKey": "b14f8945b0f1459f9964bdd72c42c2cc",
+        "region": "uksouth",
+        "voiceName": "en-US-JennyNeural",
+        "language": "en-US",
+        "sampleRate": 24000,
+        "channels": 1,
+        "bitsPerSample": 16
+      }
+    },
+    "azure-libby": {
+      "type": "azure",
+      "config": {
+        "subscriptionKey": "b14f8945b0f1459f9964bdd72c42c2cc",
+        "region": "uksouth",
+        "voiceName": "en-GB-LibbyNeural",
+        "language": "en-GB",
+        "sampleRate": 24000,
+        "channels": 1,
+        "bitsPerSample": 16
+      }
+    },
+    "mms_hat": {
+      "type": "sherpaonnx",
+      "config": {
+        "modelPath": "C:\\Users\\WillWade\\AppData\\Local\\OpenSpeech\\models\\mms_hat\\model.onnx",
+        "tokensPath": "C:\\Users\\WillWade\\AppData\\Local\\OpenSpeech\\models\\mms_hat\\tokens.txt",
+        "voiceId": "mms_hat",
+        "voiceName": "mms_hat",
+        "language": "ha",
+        "sampleRate": 16000,
+        "rules": {
+          "fars": ["k", "k", "o", "r", "s"],
+          "s": ["s", "u", "n"]
+        },
+        "dataDir": "C:\\Users\\WillWade\\AppData\\Local\\OpenSpeech\\models\\mms_hat",
+        "maxNumSentences": 2
+      }
+    }
+  },
+  "voices": {
+    "jenny": "azure-jenny",
+    "libby": "azure-libby",
+    "mms_hat": "mms_hat"
+  },
+  "settings": {
+    "defaultEngine": "azure-jenny",
+    "fallbackEngine": "azure-libby",
+    "enableHealthCheck": true,
+    "healthCheckIntervalMs": 30000,
+    "enablePerformanceLogging": true,
+    "logLevel": "info"
+  },
+  "performance": {
+    "preloadEngines": true,
+    "keepEnginesWarm": true,
+    "maxConcurrentSynthesis": 4,
+    "audioBufferSizeMs": 100,
+    "enableAudioCache": false,
+    "audioCacheMaxSizeMB": 50
+  },
+  "_comment": "SherpaOnnx voices are added automatically via the ConfigApp when you download and install them. Models are stored in %LOCALAPPDATA%\\OpenSpeech\\models\\"
+}

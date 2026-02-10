@@ -193,8 +193,21 @@ STDMETHODIMP CNativeTTSWrapper::SetObjectToken(ISpObjectToken* pToken)
             }
             else
             {
-                m_currentEngineId = voiceName;
-                LogMessage((L"SetObjectToken - Using voice name as engine ID: " + m_currentEngineId).c_str());
+                // First try to look up the voice name in the voice-to-engine mapping
+                // This handles cases like "mms_hat" -> "sherpa-mms_hat"
+                NativeTTS::TTSEngineManager& manager = NativeTTS::TTSEngineManagerSingleton::GetInstance();
+                std::wstring mappedEngineId = manager.GetEngineIdForVoice(voiceName);
+                if (!mappedEngineId.empty())
+                {
+                    m_currentEngineId = mappedEngineId;
+                    LogMessage((L"SetObjectToken - Voice '" + voiceName + L"' maps to engine '" + m_currentEngineId + L"'").c_str());
+                }
+                else
+                {
+                    // No mapping found, use voice name directly as engine ID
+                    m_currentEngineId = voiceName;
+                    LogMessage((L"SetObjectToken - Using voice name as engine ID: " + m_currentEngineId).c_str());
+                }
             }
         }
 
@@ -222,9 +235,15 @@ STDMETHODIMP CNativeTTSWrapper::GetObjectToken(ISpObjectToken** ppToken)
 // Private helper methods
 void CNativeTTSWrapper::LogMessage(const wchar_t* message)
     {
+        // Also output to debugger for immediate visibility
+        OutputDebugStringW(message);
+        OutputDebugStringW(L"\n");
+
         try
         {
-            std::wofstream logFile(L"C:\\OpenSpeech\\native_tts_debug.log", std::ios::app);
+            // Use DLL directory for log file
+            std::wstring logPath = GetModuleDirectory() + L"\\native_tts_debug.log";
+            std::wofstream logFile(logPath, std::ios::app);
             if (logFile.is_open())
             {
                 SYSTEMTIME st;
