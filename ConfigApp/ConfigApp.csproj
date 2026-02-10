@@ -12,6 +12,7 @@
     <Authors>OpenAssistive</Authors>
     <Description>SherpaOnnx SAPI5 TTS Configuration Application</Description>
     <StartupObject>SherpaOnnxConfig.Program</StartupObject>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
